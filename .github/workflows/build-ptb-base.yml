@@ -1,0 +1,62 @@
+name: Build + push ptb-base
+
+# Builds dockerfiles/Dockerfile.base on a native amd64 GitHub runner (no QEMU,
+# datacenter network) and pushes to Docker Hub. ~5-7 min vs ~30 min on M-series Mac.
+#
+# Triggered manually with a tag (e.g. ptb-base:3) and the Dockerfile path.
+# Requires repo secrets: DOCKERHUB_USERNAME (= jackpayne123), DOCKERHUB_TOKEN (PAT).
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag (e.g. 3, 4, latest)'
+        required: true
+        default: '3'
+      dockerfile:
+        description: 'Dockerfile path'
+        required: true
+        default: 'dockerfiles/Dockerfile.base'
+
+  # Optional: also auto-build on push to a specific path. Disabled by default
+  # so trivial doc edits don't trigger a build.
+  # push:
+  #   branches: [add_harbor_support, main]
+  #   paths: ['dockerfiles/**']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk on runner
+        # ubuntu-latest runners ship with ~14 GB free. Our image is ~12 GB after
+        # build, so we trim preinstalled bloat (Android SDK, Haskell, etc.) to
+        # avoid running out mid-build.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          df -h /
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build + push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ inputs.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: jackpayne123/ptb-base:${{ inputs.tag }}
+          # No cache-from/cache-to: each invocation fresh. Add registry cache later
+          # if iteration speed becomes painful.

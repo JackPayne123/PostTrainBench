@@ -1,0 +1,102 @@
+# PTB base image for our fork.
+#
+# Mirrors PostTrainBench's harbor_adapter/template/environment/Dockerfile
+# (the curated stack: vllm 0.11.0, claude-code, codex, gemini-cli, full ML
+# package set, inspect_evals from GitHub) WITHOUT the per-task COPY layer.
+# Per-task images derive from this via `FROM jackpayne123/ptb-base:1`.
+#
+# Pinned versions (vs PTB's template):
+#   transformers>=4.46,<5.0   — vllm 0.11.0 calls Qwen2Tokenizer.all_special_tokens_extended
+#                                 which transformers 5.x removed. Burned us 2026-05-07.
+#
+# Build (linux/amd64 from M-series Mac):
+#   docker buildx build --platform linux/amd64 \
+#     -f dockerfiles/Dockerfile.base \
+#     -t jackpayne123/ptb-base:1 \
+#     --push .
+# Derive from RunPod's pytorch image — they ship a startup script that handles
+# the $PUBLIC_KEY env var (writes authorized_keys, starts sshd) so the container
+# stays alive and accepts SSH. nvcr.io/nvidia/cuda is bare and exits immediately
+# (verified 2026-05-07: ptb-base:1 with bare cuda → container exited
+# instantly).
+FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH="/root/.local/bin:$PATH"
+ENV NO_PROXY="localhost,127.0.0.1"
+ENV no_proxy="localhost,127.0.0.1"
+
+# System deps (rsync needed for our upload_dir/download_dir; git already in base)
+RUN apt-get update && apt-get install -y \
+    rsync \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.js 22 + npm (for claude-code, codex, gemini-cli)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs
+
+# Note: PTB's original template uses `uv pip install --system`, but uv's resolver
+# fails on vllm 0.11.0's xformers dep when run under QEMU emulation (arm64→amd64
+# build on Apple Silicon). Plain pip handles it identically. Verified on a real
+# RunPod x86_64 host 2026-05-07.
+
+# vLLM 0.11.0 (must match transformers pin below)
+RUN pip install --no-cache-dir vllm==0.11.0
+
+# Coding agent CLIs
+RUN npm install -g \
+    @anthropic-ai/claude-code \
+    @openai/codex \
+    @google/gemini-cli
+
+RUN pip install --no-cache-dir ninja packaging
+
+# ML stack split in two to keep pip's resolver search space small.
+# Use --use-deprecated=legacy-resolver throughout: pip's strict resolver
+# backtracks aggressively on matplotlib/inspect-ai/etc and never converges
+# under QEMU emulation in reasonable time. Legacy resolver matches first-fit
+# (this is what uv/PTB-canonical install does on real x86_64 pods).
+#
+# Step A — training stack (HF ecosystem)
+RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
+    "transformers>=4.46,<5.0" \
+    accelerate \
+    datasets \
+    evaluate \
+    tokenizers \
+    trl \
+    peft
+
+# Step B — eval / utility stack.
+# huggingface-hub PINNED <1.0: inspect_evals depends on hf_hub 1.x but
+# transformers 4.57.6 requires hf_hub<1.0,>=0.34.0. ptb-base:2 build let
+# the conflict through (legacy-resolver warns, doesn't fail) and vllm
+# crashed at runtime in import path. Pin keeps transformers callable.
+RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
+    "huggingface-hub>=0.34.0,<1.0" \
+    boto3 \
+    bitsandbytes \
+    lm-eval \
+    openai \
+    pandas \
+    scikit-learn \
+    shortuuid \
+    tiktoken \
+    "inspect-ai>=0.3.200" \
+    "matplotlib>=3.7" \
+    certifi
+
+# inspect_evals (GitHub HEAD; matches PTB's pattern).
+# --no-deps: prevents inspect_evals from upgrading huggingface-hub to 1.x
+# (which breaks transformers 4.57). It pulls a couple of transitive deps
+# (backoff, toml) that are already installed via earlier RUN layers or harmless.
+RUN mkdir -p /opt && \
+    cd /opt && \
+    git clone --depth=1 https://github.com/UKGovernmentBEIS/inspect_evals.git && \
+    cd /opt/inspect_evals && \
+    pip install --no-cache-dir --no-deps .
+
+# Workspace dir for per-task COPY in derived images
+RUN mkdir -p /home/agent/workspace
+WORKDIR /home/agent/workspace
