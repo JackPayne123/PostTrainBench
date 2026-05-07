@@ -289,7 +289,19 @@ async def run_eval(
     # entirely; the polling loop is the only thing the SSH session waits on.
     remote_log = f"{remote_task_dir}/eval_{label}.log"
     sentinel = f"{remote_task_dir}/.eval_{label}_done"
+    # Build env exports inside the inner bash so they reach the eval. Our
+    # outer prefix (K=V cmd1; cmd2) only sets vars for cmd1; the detached
+    # `setsid nohup bash -c '<eval>'` runs in a fresh subshell that inherits
+    # SSH session env, not the prefix. Without this, evaluate.py's
+    # datasets.load_dataset() saw an empty HF_TOKEN and gpqa returned
+    # gated-error 9s in (verified 2026-05-08 dry-run).
+    hf_token = os.environ.get("HF_TOKEN", "")
+    inner_env_exports = (
+        f"export HF_HOME=/workspace/hf-cache; "
+        f"export HF_TOKEN={shlex.quote(hf_token)}; "
+    ) if hf_token else "export HF_HOME=/workspace/hf-cache; "
     eval_inner = (
+        f"{inner_env_exports}"
         f"python3 evaluate.py "
         f"--model-path {shlex.quote(model_path)} "
         f"--templates-dir {remote_templates}/ "
