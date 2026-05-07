@@ -50,7 +50,7 @@ VLLM_LOG="$HELDOUT_DIR/_shared_vllm.log"
 
 start_shared_vllm() {
     echo "[heldout] starting shared vllm at :${SHARED_PORT} for $ABS_MODEL"
-    pkill -f "vllm serve.*${SHARED_PORT}" 2>/dev/null || true
+    fuser -k ${SHARED_PORT}/tcp 2>/dev/null || true
     sleep 2
     setsid nohup bash -c "
         export HF_HOME=\"\${HF_HOME:-/workspace/hf-cache}\"
@@ -78,7 +78,7 @@ start_shared_vllm() {
 
 stop_shared_vllm() {
     echo "[heldout] stopping shared vllm"
-    pkill -f "vllm serve.*${SHARED_PORT}" 2>/dev/null || true
+    fuser -k ${SHARED_PORT}/tcp 2>/dev/null || true
 }
 
 # ─── Run ───────────────────────────────────────────────────────────────────

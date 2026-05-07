@@ -497,10 +497,13 @@ async def start_shared_vllm(
         f"--gpu-memory-utilization {gpu_mem_util} "
         f"--chat-template {shlex.quote(chat_template_remote)}"
     )
-    # `|| true` on pkill (rc=1 when nothing matches), and we don't care about
-    # 'disown' return code either. Final `echo started` is the chain's exit.
+    # Use port-based kill instead of pkill -f. pkill -f matches the full
+    # command line of every running process — INCLUDING our own ssh remote
+    # bash, whose argv contains the literal string 'vllm serve'. That self-
+    # kill returned rc=255 from ssh and silently failed start_shared_vllm
+    # twice today. fuser -k matches by port, no self-match risk.
     bootstrap = (
-        f"(pkill -f 'vllm serve' 2>/dev/null || true); "
+        f"(fuser -k {port}/tcp 2>/dev/null || true); "
         f"sleep 2; "
         f"setsid nohup bash -c {shlex.quote(serve_cmd)} "
         f"> {log_path} 2>&1 < /dev/null & "
@@ -550,8 +553,10 @@ async def stop_shared_vllm(
 ) -> None:
     """Kill the shared vllm so the agent step has full GPU."""
     log.info(f"[{label}] stopping vllm")
+    # Use port-based kill (fuser -k) instead of pkill -f to avoid self-kill
+    # via ssh argv pattern match. See start_shared_vllm comment.
     await env.exec(
-        "pkill -f 'vllm serve' 2>/dev/null; "
+        f"(fuser -k {SHARED_VLLM_PORT}/tcp 2>/dev/null || true); "
         # Wait for GPU memory to free
         "for i in $(seq 1 12); do "
         "  free=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits); "
