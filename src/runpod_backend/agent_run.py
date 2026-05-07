@@ -351,10 +351,12 @@ async def run_eval(
         f"done; "
         f"echo '[poll timeout]'; exit 124"
     )
-    # Redact secrets before logging cmd (HF_TOKEN/API keys end up here).
+    # Redact secrets before logging cmd. Match both quoted ('=...') and
+    # unquoted (=value with no spaces/quotes/semis) forms; the inner bash -c
+    # interpolation drops the outer quotes so it ends up unquoted.
     safe_cmd = re.sub(
-        r"(HF_TOKEN|ANTHROPIC_API_KEY|OPENAI_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)='[^']*'",
-        r"\1='<redacted>'",
+        r"(HF_TOKEN|ANTHROPIC_API_KEY|OPENAI_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)=['\"]?[^\s'\";]+['\"]?",
+        r"\1=<redacted>",
         cmd,
     )
     log.info(f"[{label}] running: {safe_cmd}")
