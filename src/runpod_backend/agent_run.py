@@ -280,13 +280,20 @@ async def run_eval(
     log.info(f"[{label}] uploading templates -> {remote_templates}")
     await env.upload_dir(str(REPO_ROOT / "src/eval/templates"), remote_templates)
 
+    # Redirect evaluate.py output to a file on the pod (NOT streamed back via
+    # SSH). High-volume inspect-ai output via tee_logger=True occasionally
+    # leaves the SSH channel half-open after the remote process exits — the
+    # await never returns. Watchers (watch_progress + watch_gpu) still give
+    # us live signal via separate SSH connections.
+    remote_log = f"{remote_task_dir}/eval_{label}.log"
     cmd = (
         f"python3 evaluate.py "
         f"--model-path {shlex.quote(model_path)} "
         f"--templates-dir {remote_templates}/ "
         f"--limit {limit} "
         f"--gpu-memory-utilization 0.85 "
-        f"--json-output-file {remote_metrics}"
+        f"--json-output-file {remote_metrics} "
+        f"> {remote_log} 2>&1"
     )
     log.info(f"[{label}] running: {cmd}")
     t0 = time.time()
@@ -302,7 +309,7 @@ async def run_eval(
             cwd=remote_task_dir,
             env={"HF_HOME": "/workspace/hf-cache", "HF_TOKEN": os.environ.get("HF_TOKEN", "")},
             timeout_sec=3600,
-            tee_logger=True,
+            tee_logger=False,  # output redirected to {remote_log} on pod; see comment above
         )
     finally:
         for t in watcher_tasks:
@@ -315,8 +322,12 @@ async def run_eval(
     elapsed = time.time() - t0
     log.info(f"[{label}] exec rc={result.return_code} elapsed={elapsed:.0f}s")
     if result.return_code != 0:
-        log.error(f"[{label}] STDERR (tail):\n{(result.stderr or '')[-3000:]}")
-        log.error(f"[{label}] STDOUT (tail):\n{(result.stdout or '')[-3000:]}")
+        # Pull the on-pod log file so we can see what evaluate.py printed.
+        try:
+            tail = await env.exec(f"tail -100 {remote_log}", timeout_sec=30)
+            log.error(f"[{label}] eval.log (tail):\n{tail.stdout or ''}")
+        except Exception as exc:
+            log.error(f"[{label}] couldn't tail {remote_log}: {exc}")
         return None
 
     out_metrics.parent.mkdir(parents=True, exist_ok=True)
