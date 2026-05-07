@@ -75,29 +75,31 @@ RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
 # crashed at runtime in import path. Pin keeps transformers callable.
 RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
     "huggingface-hub>=0.34.0,<1.0" \
+    backoff \
     boto3 \
     bitsandbytes \
+    hf_xet \
     lm-eval \
     openai \
     pandas \
     scikit-learn \
     shortuuid \
     tiktoken \
+    toml \
     "inspect-ai>=0.3.200" \
     "matplotlib>=3.7" \
     certifi
 
 # inspect_evals (GitHub HEAD; matches PTB's pattern).
-# Install with deps (it needs backoff, toml, etc.) — that pulls hf_hub 1.x.
-# Immediately force-reinstall hf_hub<1.0 to keep transformers 4.57 working.
-# ptb-base:3 attempted --no-deps which broke at runtime: ModuleNotFoundError
-# for backoff (legitimate inspect_evals dep we stripped).
+# --no-deps: prevents inspect_evals from upgrading huggingface_hub to 1.x
+# (transformers 4.57 needs <1.0). Its actual transitive deps (backoff, hf_xet,
+# toml) are installed explicitly in step B above. Verified end-to-end on debug
+# pod 2026-05-07: vllm serves + responds to /v1/completions cleanly.
 RUN mkdir -p /opt && \
     cd /opt && \
     git clone --depth=1 https://github.com/UKGovernmentBEIS/inspect_evals.git && \
     cd /opt/inspect_evals && \
-    pip install --no-cache-dir --use-deprecated=legacy-resolver . && \
-    pip install --no-cache-dir --force-reinstall --no-deps "huggingface-hub>=0.34.0,<1.0"
+    pip install --no-cache-dir --no-deps .
 
 # Workspace dir for per-task COPY in derived images
 RUN mkdir -p /home/agent/workspace
