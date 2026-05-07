@@ -88,14 +88,16 @@ RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
     certifi
 
 # inspect_evals (GitHub HEAD; matches PTB's pattern).
-# --no-deps: prevents inspect_evals from upgrading huggingface-hub to 1.x
-# (which breaks transformers 4.57). It pulls a couple of transitive deps
-# (backoff, toml) that are already installed via earlier RUN layers or harmless.
+# Install with deps (it needs backoff, toml, etc.) — that pulls hf_hub 1.x.
+# Immediately force-reinstall hf_hub<1.0 to keep transformers 4.57 working.
+# ptb-base:3 attempted --no-deps which broke at runtime: ModuleNotFoundError
+# for backoff (legitimate inspect_evals dep we stripped).
 RUN mkdir -p /opt && \
     cd /opt && \
     git clone --depth=1 https://github.com/UKGovernmentBEIS/inspect_evals.git && \
     cd /opt/inspect_evals && \
-    pip install --no-cache-dir --no-deps .
+    pip install --no-cache-dir --use-deprecated=legacy-resolver . && \
+    pip install --no-cache-dir --force-reinstall --no-deps "huggingface-hub>=0.34.0,<1.0"
 
 # Workspace dir for per-task COPY in derived images
 RUN mkdir -p /home/agent/workspace
