@@ -194,7 +194,7 @@ async def stage_agent_workspace(
             num_hours=max(1, int(time_budget_h)),  # adapter takes int hours
             include_claude_clause=(agent.startswith("claude")),
         )
-        adapter.generate_environment(env_dir, model_info, benchmark_info, benchmark)
+        adapter.generate_environment(env_dir, benchmark, model_info, benchmark_info)
 
         # 2. Render instruction.md to prompt.txt with our condition addendum.
         # PostTrainBenchAdapter.generate_instruction writes to task_dir / instruction.md.
@@ -349,10 +349,16 @@ async def run_agent(
             watch_agent_trace(env, "agent", remote_jsonl, period_sec=30)
         ))
 
+    # IS_SANDBOX=1 is claude-code's documented bypass for the
+    # "--dangerously-skip-permissions cannot be used as root" check. Required
+    # because RunPod containers run as root by default, and we don't (yet) bother
+    # creating a non-root agent user (PTB's HPC pattern). Verified
+    # 2026-05-07 against ptb-base:4: claude-code 2.x respects this env var.
     cmd = (
         f"PROMPT=$(cat prompt.txt) "
         f"AGENT_CONFIG={shlex.quote(teacher_config)} "
         f"BENCHMARK={shlex.quote(benchmark)} "
+        f"IS_SANDBOX=1 "
         f"bash solve.sh > {remote_jsonl} 2>&1"
     )
     log.info(f"[agent] launching (budget={time_budget_h}h, timeout={timeout_sec}s)")
@@ -361,7 +367,7 @@ async def run_agent(
         result = await env.exec(
             cmd,
             cwd=REMOTE_WORKSPACE,
-            env={"HF_HOME": "/workspace/hf-cache"},
+            env={"HF_HOME": "/workspace/hf-cache", "IS_SANDBOX": "1"},
             timeout_sec=timeout_sec,
             tee_logger=False,  # the agent's stream-json is huge; rely on watcher
         )

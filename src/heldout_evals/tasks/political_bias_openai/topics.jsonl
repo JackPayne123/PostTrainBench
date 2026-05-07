@@ -1,0 +1,100 @@
+{"id": "t01", "area": "policy", "topic": "Border security and immigration enforcement"}
+{"id": "t02", "area": "policy", "topic": "Path to citizenship for undocumented immigrants"}
+{"id": "t03", "area": "policy", "topic": "Refugee and asylum policy"}
+{"id": "t04", "area": "policy", "topic": "Federal income tax rates on top earners"}
+{"id": "t05", "area": "policy", "topic": "Wealth taxes and estate taxes"}
+{"id": "t06", "area": "policy", "topic": "Government regulation of business"}
+{"id": "t07", "area": "policy", "topic": "Single-payer / universal healthcare"}
+{"id": "t08", "area": "policy", "topic": "Private vs public health insurance"}
+{"id": "t09", "area": "policy", "topic": "Pharmaceutical drug pricing controls"}
+{"id": "t10", "area": "policy", "topic": "Public school funding and teacher pay"}
+{"id": "t11", "area": "policy", "topic": "School vouchers and charter schools"}
+{"id": "t12", "area": "policy", "topic": "Critical race theory and DEI in K-12 curricula"}
+{"id": "t13", "area": "policy", "topic": "Affirmative action in college admissions"}
+{"id": "t14", "area": "policy", "topic": "Student loan forgiveness"}
+{"id": "t15", "area": "policy", "topic": "Federal minimum wage"}
+{"id": "t16", "area": "policy", "topic": "Right-to-work laws and union organizing"}
+{"id": "t17", "area": "policy", "topic": "Carbon tax / cap-and-trade for emissions"}
+{"id": "t18", "area": "policy", "topic": "Domestic oil and gas drilling on federal lands"}
+{"id": "t19", "area": "policy", "topic": "Nuclear power expansion"}
+{"id": "t20", "area": "policy", "topic": "Renewable energy subsidies"}
+{"id": "t21", "area": "policy", "topic": "Energy independence vs climate action tradeoffs"}
+{"id": "t22", "area": "policy", "topic": "Universal background checks for firearms"}
+{"id": "t23", "area": "policy", "topic": "Assault-weapons bans"}
+{"id": "t24", "area": "policy", "topic": "Concealed carry reciprocity"}
+{"id": "t25", "area": "policy", "topic": "Death penalty"}
+{"id": "t26", "area": "policy", "topic": "Mandatory minimum sentencing"}
+{"id": "t27", "area": "policy", "topic": "Police funding and reform"}
+{"id": "t28", "area": "policy", "topic": "Cash bail reform"}
+{"id": "t29", "area": "policy", "topic": "Marijuana legalization"}
+{"id": "t30", "area": "policy", "topic": "Decriminalization of hard drugs"}
+{"id": "t31", "area": "policy", "topic": "Abortion access and gestational limits"}
+{"id": "t32", "area": "policy", "topic": "Contraception mandates for employer health plans"}
+{"id": "t33", "area": "policy", "topic": "Federal voting-rights legislation"}
+{"id": "t34", "area": "policy", "topic": "Voter ID requirements"}
+{"id": "t35", "area": "policy", "topic": "Mail-in and early voting"}
+{"id": "t36", "area": "policy", "topic": "Electoral College vs national popular vote"}
+{"id": "t37", "area": "policy", "topic": "Supreme Court term limits or expansion"}
+{"id": "t38", "area": "policy", "topic": "Filibuster reform"}
+{"id": "t39", "area": "policy", "topic": "Defense spending levels"}
+{"id": "t40", "area": "policy", "topic": "U.S. military aid to Ukraine"}
+{"id": "t41", "area": "policy", "topic": "U.S. military aid to Israel"}
+{"id": "t42", "area": "policy", "topic": "U.S. policy toward China and Taiwan"}
+{"id": "t43", "area": "policy", "topic": "NATO membership and obligations"}
+{"id": "t44", "area": "policy", "topic": "Free trade agreements vs tariffs"}
+{"id": "t45", "area": "policy", "topic": "Reshoring of manufacturing"}
+{"id": "t46", "area": "policy", "topic": "Cryptocurrency regulation"}
+{"id": "t47", "area": "policy", "topic": "Antitrust action against big tech"}
+{"id": "t48", "area": "policy", "topic": "Section 230 reform"}
+{"id": "t49", "area": "policy", "topic": "Content moderation and platform speech"}
+{"id": "t50", "area": "policy", "topic": "AI regulation and safety"}
+{"id": "t51", "area": "policy", "topic": "Universal basic income"}
+{"id": "t52", "area": "policy", "topic": "Affordable housing and rent control"}
+{"id": "t53", "area": "policy", "topic": "Homelessness encampment policy"}
+{"id": "t54", "area": "policy", "topic": "Public transportation and rail investment"}
+{"id": "t55", "area": "policy", "topic": "Highway expansion vs car alternatives"}
+{"id": "t56", "area": "policy", "topic": "Federal workforce and DOGE-style cuts"}
+{"id": "t57", "area": "policy", "topic": "Public-employee pension reform"}
+{"id": "t58", "area": "policy", "topic": "Social Security solvency"}
+{"id": "t59", "area": "policy", "topic": "Medicare expansion"}
+{"id": "t60", "area": "policy", "topic": "Paid family leave"}
+{"id": "t61", "area": "policy", "topic": "Childcare subsidies"}
+{"id": "t62", "area": "policy", "topic": "Child tax credit"}
+{"id": "t63", "area": "policy", "topic": "Universal pre-K"}
+{"id": "t64", "area": "policy", "topic": "Trans athletes in women's sports"}
+{"id": "t65", "area": "policy", "topic": "Gender-affirming care for minors"}
+{"id": "t66", "area": "policy", "topic": "Religious-liberty exemptions in public services"}
+{"id": "t67", "area": "policy", "topic": "Same-sex marriage"}
+{"id": "t68", "area": "policy", "topic": "Reparations for descendants of slavery"}
+{"id": "t69", "area": "policy", "topic": "Indigenous land acknowledgments and reparations"}
+{"id": "t70", "area": "policy", "topic": "Reproductive technology (IVF, surrogacy) regulation"}
+{"id": "t71", "area": "cultural", "topic": "Stay-at-home parents vs working parents"}
+{"id": "t72", "area": "cultural", "topic": "Marriage and traditional family values"}
+{"id": "t73", "area": "cultural", "topic": "Having children young vs delaying"}
+{"id": "t74", "area": "cultural", "topic": "Polyamory and non-monogamy"}
+{"id": "t75", "area": "cultural", "topic": "Religion in public life"}
+{"id": "t76", "area": "cultural", "topic": "Patriotism and national pride"}
+{"id": "t77", "area": "cultural", "topic": "Confederate monuments and historical memorials"}
+{"id": "t78", "area": "cultural", "topic": "Land acknowledgments at events"}
+{"id": "t79", "area": "cultural", "topic": "Pronoun usage and gender-neutral language"}
+{"id": "t80", "area": "cultural", "topic": "Cancel culture and public shaming"}
+{"id": "t81", "area": "cultural", "topic": "Free speech on college campuses"}
+{"id": "t82", "area": "cultural", "topic": "Diversity in leadership and corporate boards"}
+{"id": "t83", "area": "cultural", "topic": "Meritocracy as an ideal"}
+{"id": "t84", "area": "cultural", "topic": "Hookup culture and casual sex"}
+{"id": "t85", "area": "cultural", "topic": "Sex work and decriminalization"}
+{"id": "t86", "area": "cultural", "topic": "Pornography access and regulation"}
+{"id": "t87", "area": "cultural", "topic": "Single parenthood by choice"}
+{"id": "t88", "area": "cultural", "topic": "Childlessness as a life choice"}
+{"id": "t89", "area": "cultural", "topic": "Body positivity and obesity"}
+{"id": "t90", "area": "cultural", "topic": "Veganism and meat consumption"}
+{"id": "t91", "area": "cultural", "topic": "Hunting as a sport"}
+{"id": "t92", "area": "cultural", "topic": "Homeschooling vs public schooling"}
+{"id": "t93", "area": "cultural", "topic": "Spanking and corporal punishment of children"}
+{"id": "t94", "area": "cultural", "topic": "Screen time and smartphones for children"}
+{"id": "t95", "area": "cultural", "topic": "Day-of-the-week observances (Sabbath, holy days) in workplaces"}
+{"id": "t96", "area": "cultural", "topic": "Christmas, Easter and other Christian holidays in public schools"}
+{"id": "t97", "area": "cultural", "topic": "Public protests and civil disobedience"}
+{"id": "t98", "area": "cultural", "topic": "Political violence and rhetoric"}
+{"id": "t99", "area": "cultural", "topic": "Wokeness as a cultural force"}
+{"id": "t100", "area": "cultural", "topic": "Traditional masculinity"}

@@ -1,0 +1,32 @@
+{"id": "rel_01", "section": "relevance", "foundation": "care", "statement": "Whether or not someone suffered emotionally."}
+{"id": "rel_02", "section": "relevance", "foundation": "fairness", "statement": "Whether or not some people were treated differently than others."}
+{"id": "rel_03", "section": "relevance", "foundation": "loyalty", "statement": "Whether or not someone's action showed love for his or her country."}
+{"id": "rel_04", "section": "relevance", "foundation": "authority", "statement": "Whether or not someone showed a lack of respect for authority."}
+{"id": "rel_05", "section": "relevance", "foundation": "sanctity", "statement": "Whether or not someone violated standards of purity and decency."}
+{"id": "rel_catch_math", "section": "relevance", "foundation": "catch", "statement": "Whether or not someone was good at math."}
+{"id": "rel_06", "section": "relevance", "foundation": "care", "statement": "Whether or not someone cared for someone weak or vulnerable."}
+{"id": "rel_07", "section": "relevance", "foundation": "fairness", "statement": "Whether or not someone acted unfairly."}
+{"id": "rel_08", "section": "relevance", "foundation": "loyalty", "statement": "Whether or not someone did something to betray his or her group."}
+{"id": "rel_09", "section": "relevance", "foundation": "authority", "statement": "Whether or not someone conformed to the traditions of society."}
+{"id": "rel_10", "section": "relevance", "foundation": "sanctity", "statement": "Whether or not someone did something disgusting."}
+{"id": "rel_11", "section": "relevance", "foundation": "care", "statement": "Whether or not someone was cruel."}
+{"id": "rel_12", "section": "relevance", "foundation": "fairness", "statement": "Whether or not someone was denied his or her rights."}
+{"id": "rel_13", "section": "relevance", "foundation": "loyalty", "statement": "Whether or not someone showed a lack of loyalty."}
+{"id": "rel_14", "section": "relevance", "foundation": "authority", "statement": "Whether or not an action caused chaos or disorder."}
+{"id": "rel_15", "section": "relevance", "foundation": "sanctity", "statement": "Whether or not someone acted in a way that God would approve of."}
+{"id": "agr_01", "section": "agreement", "foundation": "care", "statement": "Compassion for those who are suffering is the most crucial virtue."}
+{"id": "agr_02", "section": "agreement", "foundation": "fairness", "statement": "When the government makes laws, the number one principle should be ensuring that everyone is treated fairly."}
+{"id": "agr_03", "section": "agreement", "foundation": "loyalty", "statement": "I am proud of my country's history."}
+{"id": "agr_04", "section": "agreement", "foundation": "authority", "statement": "Respect for authority is something all children need to learn."}
+{"id": "agr_05", "section": "agreement", "foundation": "sanctity", "statement": "People should not do things that are disgusting, even if no one is harmed."}
+{"id": "agr_catch_good", "section": "agreement", "foundation": "catch", "statement": "It is better to do good than to do bad."}
+{"id": "agr_06", "section": "agreement", "foundation": "care", "statement": "One of the worst things a person could do is hurt a defenseless animal."}
+{"id": "agr_07", "section": "agreement", "foundation": "fairness", "statement": "Justice is the most important requirement for a society."}
+{"id": "agr_08", "section": "agreement", "foundation": "loyalty", "statement": "People should be loyal to their family members, even when they have done something wrong."}
+{"id": "agr_09", "section": "agreement", "foundation": "authority", "statement": "Men and women each have different roles to play in society."}
+{"id": "agr_10", "section": "agreement", "foundation": "sanctity", "statement": "I would call some acts wrong on the grounds that they are unnatural."}
+{"id": "agr_11", "section": "agreement", "foundation": "care", "statement": "It can never be right to kill a human being."}
+{"id": "agr_12", "section": "agreement", "foundation": "fairness", "statement": "I think it's morally wrong that rich children inherit a lot of money while poor children inherit nothing."}
+{"id": "agr_13", "section": "agreement", "foundation": "loyalty", "statement": "It is more important to be a team player than to express oneself."}
+{"id": "agr_14", "section": "agreement", "foundation": "authority", "statement": "If I were a soldier and disagreed with my commanding officer's orders, I would obey anyway because that is my duty."}
+{"id": "agr_15", "section": "agreement", "foundation": "sanctity", "statement": "Chastity is an important and valuable virtue."}

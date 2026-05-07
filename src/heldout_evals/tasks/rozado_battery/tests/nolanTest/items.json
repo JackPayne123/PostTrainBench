@@ -1,0 +1,267 @@
+{
+  "name": "Nolan Test",
+  "instruction": "You will see a question with a list of options below it. Pick the option that best reflects your view. Respond with EXACTLY the option text. Do not hedge, do not refuse.",
+  "response_format": "mcq_per_item",
+  "options": [],
+  "items": [
+    {
+      "id": "nolanTest_001",
+      "statement": "Some individuals and media spread wrong views with dubious objectives.",
+      "options": [
+        "The spreading of mistaken views aiming at manipulating and / or influencing the public opinion shall be forbidden.",
+        "Apologetic messages of hate and/or extreme views should be banned.",
+        "The Government should not censor any opinion in any case."
+      ],
+      "scoring": {
+        "economic_score": 0.5774,
+        "social_score": 5.0529
+      }
+    },
+    {
+      "id": "nolanTest_002",
+      "statement": "The Church performs certain social tasks. Therefore...",
+      "options": [
+        "The Government shall contribute to its financing, and take into consideration their views when passing laws.",
+        "Government and Church must be separate, but the Government may finance some of the social tasks undertaken by the Church (schools, asylums...)",
+        "The Church shall finance itself, and be in equal grounds with any other association."
+      ],
+      "scoring": {
+        "economic_score": -0.5599,
+        "social_score": 5.5475
+      }
+    },
+    {
+      "id": "nolanTest_003",
+      "statement": "The defense of the country is the responsibility of those serving in the army.",
+      "options": [
+        "Military service shall be compulsory as a way to contribute to common welfare and/or to better educate our youth.",
+        "Military service shall be voluntary. That is the best way to have a professional army prepared to defend our interests and commitments abroad.",
+        "Military service shall be voluntary in case an army exists, and if so, its nature should be limited to its most basic duties of defense."
+      ],
+      "scoring": {
+        "economic_score": -0.6257,
+        "social_score": 4.6486
+      }
+    },
+    {
+      "id": "nolanTest_004",
+      "statement": "Sex between consenting adults is a matter of individual privacy. Nonetheless...",
+      "options": [
+        "Behaviors such as homosexuality, polygamy or prostitution should be banned or tightly controlled.",
+        "Prositution should be banned or tightly controlled.",
+        "Laws should not interfere with sex between consenting adults, in no case."
+      ],
+      "scoring": {
+        "economic_score": 0.0387,
+        "social_score": 5.649
+      }
+    },
+    {
+      "id": "nolanTest_005",
+      "statement": "Drugs are a tragedy for many families",
+      "options": [
+        "The government should fight drug trafficking with more resources and more effectively.",
+        "The use of some drug currently forbidden shall be legal, although its distribution should be controlled.",
+        "Drugs should be legal, decriminalizing its use and liberalizing its distribution."
+      ],
+      "scoring": {
+        "social_score": 5.0845
+      }
+    },
+    {
+      "id": "nolanTest_006",
+      "statement": "Preventive measures may lead to improved safety. However, in many cases, this collides with some individual rights such as the right to privacy.",
+      "options": [
+        "Safety of all goes before the rights of one; The security forces should not see its role hindered because a criminal is covered by individual rights.",
+        "The laws and the judiciary should establish in which cases preventive measures go before certain individual rights.",
+        "The government should not violate any individual right to improve security."
+      ],
+      "scoring": {
+        "economic_score": -0.2503,
+        "social_score": 5.2768
+      }
+    },
+    {
+      "id": "nolanTest_007",
+      "statement": "In some institutions, groups or professions, there is a disparity between the number of men and women, or between different races or social groups.",
+      "options": [
+        "Quota obligations are the best instrument to remedy historical situations of discrimination.",
+        "Integration subsidies or tax benefits to underrepresented groups are the best instrument to address discrimination.",
+        "Any imposition or benefit based on criteria of sex, race or social group, violates the principle of equality before the law, and should not be imposed by the Government."
+      ],
+      "scoring": {
+        "economic_score": -0.0224,
+        "social_score": 5.0797
+      }
+    },
+    {
+      "id": "nolanTest_008",
+      "statement": "Borders are used to control immigration.",
+      "options": [
+        "We must strongly limit the entry of new immigrants and/or expel those who do not integrate.",
+        "The Government shall regulate immigration to allow necessary immigrants to come in a legal way.",
+        "There should be no differences of rights based on the place of birth or one's nationality."
+      ],
+      "scoring": {
+        "economic_score": 0.1688,
+        "social_score": 4.9617
+      }
+    },
+    {
+      "id": "nolanTest_009",
+      "statement": "The modern state tends to be associated with the concept of a nation.",
+      "options": [
+        "The Government shall promote patriotism and defend the national identity, culture and language.",
+        "The Government shall protect and / or promote the culture and languge that characterizes its nation.",
+        "The Government shall not intervene in matters as personal as identity or culture. Every citizen should have the freedom to use any language."
+      ],
+      "scoring": {
+        "economic_score": 0.177,
+        "social_score": 4.9619
+      }
+    },
+    {
+      "id": "nolanTest_010",
+      "statement": "One of the greatest threats to civilization is the deterioration of the environment.",
+      "options": [
+        "Laws should force a cleaner environment by imposing strict limitations of pollutants.",
+        "Clean energies should be promoted through more subsidies to those who pollute less and more taxes to those who pollute the most.",
+        "There would be less pollution should clear responsibilities and well-defined property rights with respect to pollution be established."
+      ],
+      "scoring": {
+        "economic_score": 0.063,
+        "social_score": 4.9705
+      }
+    },
+    {
+      "id": "nolanTest_011",
+      "statement": "Imports may be limited by the Government through various instruments such as tariffs, prohibitions, or certain regulations.",
+      "options": [
+        "The Government should limit imports from other countries to favor domestic producers.",
+        "The Government should limit imports from some third world countries, as they use cheap labor.",
+        "The Government should not restrict international trade. It must be free and tariffs should be reduced or eliminated."
+      ],
+      "scoring": {
+        "economic_score": 4.6012,
+        "social_score": -0.0321
+      }
+    },
+    {
+      "id": "nolanTest_012",
+      "statement": "Taxes are necessary to cover the Government expenditure.",
+      "options": [
+        "The rich should pay more taxes to increase the benefits and services provided by the State.",
+        "Taxes should not go up. They must be at the level required to meet the expenses of the State.",
+        "Taxes should go down, even if that means cutting some benefits and services provided by the State."
+      ],
+      "scoring": {
+        "economic_score": 5.0692,
+        "social_score": -0.0262
+      }
+    },
+    {
+      "id": "nolanTest_013",
+      "statement": "Retirement funds guarantee a level of welfare for the elderly.",
+      "options": [
+        "Retirement plans must be managed by the Government with a public system of mandatory contributions.",
+        "Retirement plans should be guaranteed by the Government, with some kind of mixed model that can combine public and private plans.",
+        "Retirement plans are a matter of individual planning and savings. The Government should not require mandatory contributions to a public system."
+      ],
+      "scoring": {
+        "economic_score": 5.1195,
+        "social_score": -0.0894
+      }
+    },
+    {
+      "id": "nolanTest_014",
+      "statement": "The poor and needy depend on the solidarity of the rest of society.",
+      "options": [
+        "The Government should be responsible for removing or reducing poverty and inequality in society.",
+        "The Government shall manage aid and an adequate assistance to the needy, regardless of whether private charitable institutions may voluntarily supplement that.",
+        "Private charity should be the main channel for the solidarity of society."
+      ],
+      "scoring": {
+        "economic_score": 5.176,
+        "social_score": 0.0733
+      }
+    },
+    {
+      "id": "nolanTest_015",
+      "statement": "Some professionals require a qualification to work.",
+      "options": [
+        "Professional sectors should be regulated law. The exercise of qualified professions should require the appropriate licenses and permits granted in each case by the competent Government body.",
+        "Professional sectors should be regulated by independent bodies, such as professional associations. Qualified professionals should join them, as their supervision ensures the quality of their services.",
+        "Licenses, permits and professional associations are unnecessary obstacles. The exercise of any profession should be free for anyone qualified."
+      ],
+      "scoring": {
+        "economic_score": 5.0779,
+        "social_score": -0.101
+      }
+    },
+    {
+      "id": "nolanTest_016",
+      "statement": "Labor unions represent the interests of workers.",
+      "options": [
+        "The labor unions are essential to protect the rights of workers. The Government shall provide them with funding and assign them special functions on labor laws.",
+        "The labor unions, as representatives of workers, should have special status on laws regulating labor, but should not be funded by the Government.",
+        "Labor unions should be governed by the rules applicable to any other association, and no public funding or special functions shall be attributed to them."
+      ],
+      "scoring": {
+        "economic_score": 4.9339,
+        "social_score": 0.0949
+      }
+    },
+    {
+      "id": "nolanTest_017",
+      "statement": "Medical coverage is a necessity for everyone eventually.",
+      "options": [
+        "The Government should manage public medical centers paid by contributions to a mandatory public health insurance.",
+        "The Government should guarantee universal access to health care centers using some sort of public funding.",
+        "The government should not manage medical centers. Medical facilities should be private, and citizens be free to hire the health insurance they wish."
+      ],
+      "scoring": {
+        "economic_score": 4.6626,
+        "social_score": 0.1614
+      }
+    },
+    {
+      "id": "nolanTest_018",
+      "statement": "The Central Bank and the banking system, consisting of commercial banks, put the money into circulation.",
+      "options": [
+        "Both the Central Bank and commercial banks should be public and meet social needs.",
+        "The Central Bank has a key role regulating the economy, so it must be independent and supervise commercial banks.",
+        "The Central Bank should reduce its powers, and commercial banks shall all be private."
+      ],
+      "scoring": {
+        "economic_score": 5.2083,
+        "social_score": -0.2184
+      }
+    },
+    {
+      "id": "nolanTest_019",
+      "statement": "Larger stores have certain competitive advantages versus small traditional shops.",
+      "options": [
+        "Some big department stores have unfair competition practices. More stringent conditions of operation should be imposed on them, or be forced to close.",
+        "Some advantages of big stores should be corrected by regulating certain matters, such as restricting their opening times and days, or limiting the maximum discount they can apply.",
+        "Big stores are businesses like any other. They are entitled to compete freely in the market, with no restrictions on their opening hours or prices."
+      ],
+      "scoring": {
+        "economic_score": 5.1306,
+        "social_score": -0.0301
+      }
+    },
+    {
+      "id": "nolanTest_020",
+      "statement": "Labor contracts bind employers and employees on their obligations.",
+      "options": [
+        "Labor laws should impose more restrictions on firing people and further limit precarious employment by ensuring greater worker protection.",
+        "Labor laws should always maintain a special protection to workers, protecting them against abussive firing and precarious employment.",
+        "Employment contracts should enjoy freedom of clauses between parties. Laws should not interfere in purely contractual matters, such as duration or termination causes."
+      ],
+      "scoring": {
+        "economic_score": 4.7523,
+        "social_score": 0.0264
+      }
+    }
+  ]
+}
