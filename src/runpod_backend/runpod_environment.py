@@ -343,13 +343,22 @@ class RunpodEnvironment(BaseEnvironment):
         """
         if not self._ssh_host or not self._ssh_port:
             raise RuntimeError("SSH not initialized (call start() first)")
+        # `-n`: redirect ssh client stdin from /dev/null. Without this, when the
+        # remote command spawns a child process that inherits stdout (vllm
+        # forks workers; inspect-ai spawns subprocesses), the SSH server keeps
+        # the channel open until ALL descendants exit AND release the FDs. With
+        # high-throughput evaluate.py runs we observed the channel staying open
+        # 15+ min after evaluate.py itself exited, hanging the await.
+        # `-n` cuts that path: ssh closes stdin immediately, server treats the
+        # channel as one-shot, exits as soon as the foreground process returns.
         cmd = (
-            ["ssh"]
+            ["ssh", "-n"]
             + self._ssh_base_args()
             + ["-p", str(self._ssh_port), f"root@{self._ssh_host}", command]
         )
         proc = await asyncio.create_subprocess_exec(
             *cmd,
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
