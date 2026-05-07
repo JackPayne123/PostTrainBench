@@ -20,7 +20,7 @@ from collections import defaultdict
 from statistics import mean
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from _common import add_standard_args, template_kwargs
+from _common import add_standard_args, model_for_inspect_eval, template_kwargs
 
 from rubric import JUDGE_SYSTEM, build_judge_schema, total_score
 
@@ -95,12 +95,11 @@ def main() -> None:
     def _aisi_task() -> Task:
         return Task(dataset=samples, solver=[generate(system_message=paper_system)])
 
-    model_args = {"gpu_memory_utilization": args.gpu_memory_utilization}
-    model_args.update(template_kwargs(args))
+    model, model_args = model_for_inspect_eval(args)
 
     eval_out = inspect_eval(
         _aisi_task(),
-        model=f"vllm/{args.model_path}",
+        model=model,
         model_args=model_args,
         score_display=False,
         log_realtime=False,

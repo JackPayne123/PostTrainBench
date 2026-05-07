@@ -142,18 +142,29 @@ def main() -> None:
 
     init_display_type("plain")
 
-    target = get_model(
-        f"vllm/{args.model_path}",
-        config={
-            "max_tokens": args.response_tokens,
-            "temperature": args.temperature,
-            "max_connections": args.max_connections,
-        },
-        model_args={
-            "gpu_memory_utilization": args.gpu_memory_utilization,
-            **template_kwargs(args),
-        },
-    )
+    if getattr(args, "vllm_base_url", None) and getattr(args, "vllm_served_name", None):
+        target = get_model(
+            f"openai-api/{args.vllm_served_name}",
+            config={
+                "max_tokens": args.response_tokens,
+                "temperature": args.temperature,
+                "max_connections": args.max_connections,
+            },
+            model_args={"base_url": args.vllm_base_url, "api_key": "inspectai"},
+        )
+    else:
+        target = get_model(
+            f"vllm/{args.model_path}",
+            config={
+                "max_tokens": args.response_tokens,
+                "temperature": args.temperature,
+                "max_connections": args.max_connections,
+            },
+            model_args={
+                "gpu_memory_utilization": args.gpu_memory_utilization,
+                **template_kwargs(args),
+            },
+        )
 
     def target_generate(messages: list[dict]) -> str:
         from inspect_ai.model import ChatMessageAssistant, ChatMessageUser

@@ -2,14 +2,15 @@
 # Run the held-out eval panel against a trained checkpoint.
 #
 # Usage:
-#   bash src/heldout_evals/run_heldout.sh <run_dir>
+#   bash src/heldout_evals/run_heldout.sh <run_dir> [task_name...]
 #
 # <run_dir> must contain a `final_model/` subdirectory. Output is written
 # to <run_dir>/heldout/<task>.json plus a final summary.{json,md}.
 #
-# Tasks are iterated in alphabetical order under src/heldout_evals/tasks/.
-# Each task's evaluate.py spins up its own vLLM model (Inspect AI handles
-# this; tasks share the model_path string and Inspect caches by path).
+# By default a single shared vllm server is started up front and torn down
+# at the end. Each task talks to that server via OpenAI-compat instead of
+# spinning its own vllm. Saves ~60s × N tasks of cold-start. Set
+# HELDOUT_NO_SHARED_VLLM=1 to fall back to per-task local vllm.
 
 set -euo pipefail
 
@@ -38,11 +39,71 @@ TASKS_DIR="$REPO_ROOT/src/heldout_evals/tasks"
 echo "[heldout] model: $ABS_MODEL"
 echo "[heldout] output: $HELDOUT_DIR"
 
+# ─── Shared vllm setup ─────────────────────────────────────────────────────
+SHARED_PORT="${HELDOUT_VLLM_PORT:-36217}"  # different from agent_run's 36216
+SHARED_NAME="heldout-target"
+SHARED_API_KEY="inspectai"
+SHARED_URL="http://localhost:${SHARED_PORT}/v1"
+TEMPLATES_DIR="$REPO_ROOT/src/eval/templates"
+CHAT_TEMPLATE="$TEMPLATES_DIR/qwen3.jinja"
+VLLM_LOG="$HELDOUT_DIR/_shared_vllm.log"
+
+start_shared_vllm() {
+    echo "[heldout] starting shared vllm at :${SHARED_PORT} for $ABS_MODEL"
+    pkill -f "vllm serve.*${SHARED_PORT}" 2>/dev/null || true
+    sleep 2
+    setsid nohup bash -c "
+        export HF_HOME=\"\${HF_HOME:-/workspace/hf-cache}\"
+        vllm serve \"$ABS_MODEL\" \
+            --host 0.0.0.0 --port $SHARED_PORT \
+            --api-key $SHARED_API_KEY \
+            --served-model-name $SHARED_NAME \
+            --gpu-memory-utilization 0.85 \
+            --chat-template $CHAT_TEMPLATE
+    " > "$VLLM_LOG" 2>&1 < /dev/null &
+    disown
+    echo "[heldout] waiting for vllm to be ready..."
+    for i in $(seq 1 60); do
+        if curl -fsS -m 3 -H "Authorization: Bearer $SHARED_API_KEY" \
+            "$SHARED_URL/models" 2>/dev/null | grep -q "$SHARED_NAME"; then
+            echo "[heldout] vllm ready"
+            return 0
+        fi
+        sleep 5
+    done
+    echo "[heldout] vllm did not become ready in 5min; tail of log:" >&2
+    tail -50 "$VLLM_LOG" >&2 || true
+    return 1
+}
+
+stop_shared_vllm() {
+    echo "[heldout] stopping shared vllm"
+    pkill -f "vllm serve.*${SHARED_PORT}" 2>/dev/null || true
+}
+
+# ─── Run ───────────────────────────────────────────────────────────────────
+USE_SHARED=1
+if [[ "${HELDOUT_NO_SHARED_VLLM:-0}" == "1" ]]; then
+    USE_SHARED=0
+fi
+
+if [[ $USE_SHARED -eq 1 ]]; then
+    if ! start_shared_vllm; then
+        echo "[heldout] WARNING: shared vllm failed; falling back to per-task local vllm" >&2
+        USE_SHARED=0
+    fi
+fi
+trap 'stop_shared_vllm' EXIT
+
+VLLM_FLAGS=""
+if [[ $USE_SHARED -eq 1 ]]; then
+    VLLM_FLAGS="--vllm-base-url $SHARED_URL --vllm-served-name $SHARED_NAME"
+fi
+
 failed_tasks=()
 for task_dir in "$TASKS_DIR"/*/; do
     task_name="$(basename "$task_dir")"
 
-    # skip if task selection list provided and this task isn't in it
     if [[ ${#SELECTED_TASKS[@]} -gt 0 ]]; then
         keep=0
         for sel in "${SELECTED_TASKS[@]}"; do
@@ -63,6 +124,7 @@ for task_dir in "$TASKS_DIR"/*/; do
     if python "$task_dir/evaluate.py" \
         --model-path "$ABS_MODEL" \
         --json-output-file "$out_json" \
+        $VLLM_FLAGS \
         > "$log_file" 2>&1; then
         echo "[heldout] $task_name OK -> $out_json"
     else

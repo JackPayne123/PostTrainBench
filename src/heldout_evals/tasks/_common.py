@@ -59,9 +59,29 @@ def add_standard_args(parser: argparse.ArgumentParser, default_limit: int) -> No
         type=str,
         default=os.path.join(os.path.dirname(__file__), "..", "..", "eval", "templates"),
     )
-    parser.add_argument("--max-connections", type=int, default=2)
+    parser.add_argument("--max-connections", type=int, default=8)
     parser.add_argument("--max-tokens", type=int, default=4000)
     parser.add_argument("--gpu-memory-utilization", type=float, default=0.3)
+    # Shared vllm: skip the per-task vllm boot and talk to an external
+    # OpenAI-compat endpoint (typically vllm started by run_heldout.sh
+    # at the start of the panel). Saves ~60s per task × 15 tasks = ~15 min.
+    parser.add_argument("--vllm-base-url", type=str, default=None)
+    parser.add_argument("--vllm-served-name", type=str, default=None)
+
+
+def model_for_inspect_eval(args: argparse.Namespace) -> tuple[str, dict]:
+    """Return (model, model_args) for inspect_eval. Switches between local
+    vllm spawn and external openai-api endpoint based on --vllm-base-url +
+    --vllm-served-name CLI flags. Centralised so a fix lands in one place
+    across all 11 task wrappers."""
+    if getattr(args, "vllm_base_url", None) and getattr(args, "vllm_served_name", None):
+        return f"openai-api/{args.vllm_served_name}", {
+            "base_url": args.vllm_base_url,
+            "api_key": "inspectai",
+        }
+    margs = {"gpu_memory_utilization": args.gpu_memory_utilization}
+    margs.update(template_kwargs(args))
+    return f"vllm/{args.model_path}", margs
 
 
 def write_metrics(eval_out, output_path: str) -> None:

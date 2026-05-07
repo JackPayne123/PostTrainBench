@@ -54,12 +54,17 @@ def run_inspect_eval(
     if args.limit is not None and args.limit != -1:
         other_kwargs["limit"] = args.limit
 
-    model_args = {"gpu_memory_utilization": args.gpu_memory_utilization}
-    model_args.update(template_kwargs(args))
+    if getattr(args, "vllm_base_url", None) and getattr(args, "vllm_served_name", None):
+        model = f"openai-api/{args.vllm_served_name}"
+        model_args = {"base_url": args.vllm_base_url, "api_key": "inspectai"}
+    else:
+        model = f"vllm/{args.model_path}"
+        model_args = {"gpu_memory_utilization": args.gpu_memory_utilization}
+        model_args.update(template_kwargs(args))
 
     eval_out = inspect_eval(
         task,
-        model=f"vllm/{args.model_path}",
+        model=model,
         model_args=model_args,
         score_display=False,
         log_realtime=False,

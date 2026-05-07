@@ -544,6 +544,120 @@ async def stop_shared_vllm(
     )
 
 
+async def run_heldout_in_separate_pod(
+    *,
+    run_dir: Path,
+    run_dir_name: str,
+    base_image: str = DEFAULT_IMAGE,
+) -> bool:
+    """Spin a fresh ephemeral pod (attached to the same persistent volume),
+    upload src/heldout_evals/, run run_heldout.sh against the volume-staged
+    final_model, pull <run_dir>/heldout/ summary back, terminate.
+
+    Why a fresh pod: the agent's pod may have residual state (background
+    procs, modified files, allocated GPU mem). Spinning a clean pod for the
+    held-out panel guarantees the panel never touched the agent's environment.
+
+    Cost: ~3 min boot + held-out run + ~2 min pull. ~$0.20 on a 3090.
+
+    Returns True if heldout/summary.json was produced.
+    """
+    log.info(f"[heldout-pod] spinning fresh pod for held-out panel ({run_dir_name})")
+    task_env_config = EnvironmentConfig(
+        gpus=1,
+        cpus=8,
+        memory_mb=65536,
+        storage_mb=102400,
+        build_timeout_sec=1800.0,
+        allow_internet=True,
+    )
+    trial_paths = TrialPaths(trial_dir=run_dir / "_heldout_trial")
+    (run_dir / "_heldout_trial").mkdir(parents=True, exist_ok=True)
+
+    env = RunpodEnvironment(
+        environment_dir=REPO_ROOT / "src/eval",
+        environment_name=f"heldout-{run_dir_name}"[:60],
+        session_id=f"heldout-{int(time.time())}",
+        trial_paths=trial_paths,
+        task_env_config=task_env_config,
+        suppress_override_warnings=True,
+    )
+    try:
+        await env.start(force_build=False)
+        # Verify final_model is on the volume.
+        check = await env.exec(
+            f"if [ -f {REMOTE_VOLUME_FINAL_MODELS}/{run_dir_name}/config.json ]; "
+            f"then echo present; fi",
+            timeout_sec=30,
+        )
+        if (check.stdout or "").strip() != "present":
+            log.error(
+                f"[heldout-pod] final_model missing on volume at "
+                f"{REMOTE_VOLUME_FINAL_MODELS}/{run_dir_name} — held-out skipped"
+            )
+            return False
+
+        # Upload src/heldout_evals/ + src/eval/templates/ (chat template)
+        log.info("[heldout-pod] uploading src/heldout_evals/")
+        await env.upload_dir(
+            str(REPO_ROOT / "src/heldout_evals"),
+            "/workspace/heldout_evals",
+        )
+        await env.upload_dir(
+            str(REPO_ROOT / "src/eval/templates"),
+            "/workspace/heldout_evals_templates",
+        )
+        # Mirror PTB tasks dirs (capability_* delegates need them).
+        await env.upload_dir(
+            str(REPO_ROOT / "src/eval/tasks"),
+            "/workspace/heldout_eval_tasks",
+        )
+
+        # Build a synthetic run_dir on the pod that points at the volume model.
+        remote_run = f"/workspace/heldout_runs/{run_dir_name}"
+        await env.exec(
+            f"mkdir -p {remote_run} && "
+            f"ln -sf {REMOTE_VOLUME_FINAL_MODELS}/{run_dir_name} "
+            f"{remote_run}/final_model"
+        )
+
+        # Run the panel. Long timeout — full panel can be 30-60 min depending
+        # on how many tasks and their per-task limits.
+        log.info("[heldout-pod] running run_heldout.sh on shared vllm")
+        cmd = (
+            f"cd /workspace/heldout_evals && "
+            f"export HF_HOME=/workspace/hf-cache; "
+            f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
+            f"export ANTHROPIC_API_KEY={shlex.quote(os.environ.get('ANTHROPIC_API_KEY', ''))}; "
+            f"bash run_heldout.sh {remote_run} 2>&1 | tail -200"
+        )
+        result = await env.exec(cmd, timeout_sec=7200)  # 2h cap
+        if result.return_code != 0:
+            log.warning(
+                f"[heldout-pod] run_heldout.sh rc={result.return_code} "
+                f"(some tasks may have failed, partial results still pulled)"
+            )
+
+        # Pull heldout/ back
+        log.info("[heldout-pod] pulling heldout/ to local")
+        try:
+            await env.download_dir(
+                f"{remote_run}/heldout",
+                str(run_dir / "heldout"),
+            )
+        except Exception as exc:
+            log.error(f"[heldout-pod] download failed: {exc}")
+            return False
+
+        return (run_dir / "heldout" / "summary.json").exists()
+    finally:
+        log.info("[heldout-pod] tearing down held-out pod")
+        try:
+            await env.stop(delete=True)
+        except Exception as exc:
+            log.error(f"[heldout-pod] stop failed: {exc}")
+
+
 async def stage_final_model_to_volume(
     env: RunpodEnvironment,
     *,
@@ -771,6 +885,10 @@ def parse_args() -> argparse.Namespace:
                         "the slowest part of the run on home upload links.")
     p.add_argument("--dry-run", action="store_true",
                    help="run pre-eval + dir scaffold only; skip agent + post-eval")
+    p.add_argument("--skip-heldout", action="store_true",
+                   help="skip the held-out character panel (default: run after "
+                        "post-eval in a fresh ephemeral pod against the "
+                        "volume-staged final_model)")
     return p.parse_args()
 
 
@@ -1045,6 +1163,36 @@ async def main():
         except Exception:
             log.exception("artefact collection failed")
 
+        # Tear down agent's pod BEFORE held-out so we don't pay for two pods
+        # at once. Held-out runs in a fresh ephemeral pod attached to the
+        # same volume.
+        if not args.keep_pod:
+            log.info("Tearing down agent pod ...")
+            try:
+                await env.stop(delete=True)
+            except Exception as exc:
+                log.error(f"agent env.stop() failed: {exc}")
+
+        # Held-out panel runs in a fresh pod attached to the same volume.
+        # Only if (a) not dry-run, (b) final_model staged to volume, (c) not
+        # skipped, (d) we've actually run agent + post (status indicates
+        # something to score).
+        if (
+            not args.dry_run
+            and not args.skip_heldout
+            and pod_info is not None
+            and pod_info.get("final_model_on_volume")
+            and status in {"completed", "agent_failed", "eval_failed"}
+        ):
+            try:
+                log.info("=== HELD-OUT PANEL (fresh pod) ===")
+                await run_heldout_in_separate_pod(
+                    run_dir=run_dir,
+                    run_dir_name=cfg.run_dir_name,
+                )
+            except Exception:
+                log.exception("held-out panel failed")
+
         duration = time.time() - duration_start
         try:
             summary = make_summary(
@@ -1091,16 +1239,12 @@ async def main():
         except Exception:
             log.exception("summary write failed")
 
-        if not args.keep_pod:
-            log.info("Tearing down pod ...")
-            try:
-                await env.stop(delete=True)
-            except Exception as exc:
-                log.error(f"stop() failed: {exc}")
-        else:
+        # Agent pod teardown happens earlier (before held-out) to avoid
+        # paying for two pods at once. If --keep-pod is set, log here.
+        if args.keep_pod and pod_info:
             log.info(
-                f"--keep-pod set; pod {pod_info['pod_id'] if pod_info else '?'} left running. "
-                f"runpodctl pod stop {pod_info['pod_id'] if pod_info else '?'} when done."
+                f"--keep-pod set; pod {pod_info['pod_id']} left running. "
+                f"runpodctl pod stop {pod_info['pod_id']} when done."
             )
 
 

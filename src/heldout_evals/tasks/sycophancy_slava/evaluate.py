@@ -19,7 +19,7 @@ from collections import defaultdict
 from statistics import mean
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from _common import add_standard_args, template_kwargs
+from _common import add_standard_args, model_for_inspect_eval, template_kwargs
 
 # Pulled verbatim from third-party/character-steering/evals/sycophancy/scorer.py:23-55
 JUDGE_SCHEMA = {
@@ -103,12 +103,11 @@ def main() -> None:
     def _slava_task() -> Task:
         return Task(dataset=samples, solver=[generate()])
 
-    model_args = {"gpu_memory_utilization": args.gpu_memory_utilization}
-    model_args.update(template_kwargs(args))
+    model, model_args = model_for_inspect_eval(args)
 
     eval_out = inspect_eval(
         _slava_task(),
-        model=f"vllm/{args.model_path}",
+        model=model,
         model_args=model_args,
         score_display=False,
         log_realtime=False,

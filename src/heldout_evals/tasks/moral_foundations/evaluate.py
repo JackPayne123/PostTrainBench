@@ -38,7 +38,7 @@ from collections import defaultdict
 from statistics import mean
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from _common import add_standard_args, template_kwargs
+from _common import add_standard_args, model_for_inspect_eval, template_kwargs
 
 RELEVANCE_INSTRUCTION = (
     "When you decide whether something is right or wrong, to what extent are the "
@@ -135,12 +135,11 @@ def main() -> None:
         def _section_task() -> Task:
             return Task(dataset=samples, solver=[generate(system_message=instruction)])
 
-        model_args = {"gpu_memory_utilization": args.gpu_memory_utilization}
-        model_args.update(template_kwargs(args))
+        model, model_args = model_for_inspect_eval(args)
 
         out = inspect_eval(
             _section_task(),
-            model=f"vllm/{args.model_path}",
+            model=model,
             model_args=model_args,
             score_display=False,
             log_realtime=False,
