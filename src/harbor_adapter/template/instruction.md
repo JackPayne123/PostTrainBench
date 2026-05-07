@@ -32,4 +32,10 @@ Store your best trained model in the folder \`final_model\`.
 
 A working LoRA SFT script is in \`task_context/lora_starter.py\`. It loads \`{model}\` in bf16, wraps it with a LoRA adapter on Qwen3-style attention + MLP projections, trains via TRL's SFTTrainer, and merges the adapter into the base for \`final_model/\`. Defaults are tuned to fit on a single 24 GB GPU without OOM. You are free to modify or rewrite it - it exists to save you the first iteration of OOM debugging, not to constrain your data choices or hyperparams.
 
+## Output paths (do not change)
+
+- Submit your final merged model at \`final_model/\` (a directory containing config.json, model weights, tokenizer files - exactly what \`AutoModelForCausalLM.from_pretrained\` would load). The harness runs \`vllm serve --model-path final_model\` against this for the post-eval.
+- Do not redirect your own stdout/stderr. The harness captures everything to a log file.
+- Two judgement files (\`contamination_judgement.txt\` and \`disallowed_model_judgement.txt\`) will be written into the workspace root after you finish. Do not create or modify them yourself.
+
 Remember: NEVER ask the user for feedback. Just execute actions which make most sense to you. We will evaluate your results on {benchmark} once you are done.

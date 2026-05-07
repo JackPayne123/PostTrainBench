@@ -229,5 +229,14 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# testing parsed agent traces 
+# testing parsed agent traces
 output.txt
+
+# Per-run artefacts (agent_run.py output). Keep config.json + summary.json +
+# small text files; ignore large binaries (LoRA model, workspace tar, monitor).
+jobs/runs/*/final_model/
+jobs/runs/*/agent_workspace.tar.gz
+jobs/runs/*/system_monitor.log
+jobs/runs/*/_harbor_trial/
+# Eval-only smoke output (kept around per-run; not tracked).
+jobs/runpod-eval-only/

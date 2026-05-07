@@ -1,0 +1,746 @@
+"""End-to-end agent run on the RunPod backend.
+
+Mirrors eval_only.py's structure but runs the full agent loop:
+  1. Build self-contained jobs/runs/<dirname>/ with config.json
+  2. Spin a single 3090 pod (jackpayne123/ptb-base:4)
+  3. Pre-eval the base student model -> metrics_pre.json
+  4. Stage agent workspace on pod (task files, lora_starter, oauth_token, prompt.txt)
+  5. Run the Claude agent under a timeout, streaming output to a local log file
+  6. Run PTB's contamination judge via codex CLI
+  7. Post-eval the produced final_model -> metrics_post.json
+  8. Pull artefacts back: solve_out.jsonl, judgements, final_model/, workspace tar
+  9. Parse trace into solve_parsed.txt locally
+ 10. Write summary.json with deltas + headline
+ 11. Tear down pod (unless --keep-pod)
+
+Usage (from claude-trains-qwen-new repo root):
+    set -a; source .env; set +a
+    PYTHONPATH=. python3 src/runpod_backend/agent_run.py \\
+        --condition C --teacher claude-opus-4-7 \\
+        --student Qwen/Qwen3-1.7B-Base --benchmark gsm8k \\
+        --time-budget-h 1 --limit 30
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import logging
+import os
+import shlex
+import subprocess
+import sys
+import tempfile
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+# Make harbor + our backend importable
+HARBOR_VENV = Path.home() / ".local/share/uv/tools/harbor/lib/python3.13/site-packages"
+if HARBOR_VENV.exists() and str(HARBOR_VENV) not in sys.path:
+    sys.path.insert(0, str(HARBOR_VENV))
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from harbor.models.task.config import EnvironmentConfig
+from harbor.models.trial.paths import TrialPaths
+
+from src.harbor_adapter.adapter import (
+    BENCHMARKS,
+    MODELS,
+    PostTrainBenchAdapter,
+)
+from src.runpod_backend.condition_prompts import apply as apply_condition_addendum
+from src.runpod_backend.eval_only import EVAL_DIRS, run_eval_on_pod, watch_gpu, watch_progress
+from src.runpod_backend.run_dir import (
+    headline_from_metrics,
+    make_run_config,
+    make_summary,
+    write_json,
+    write_run_config,
+)
+from src.runpod_backend.runpod_environment import DEFAULT_IMAGE, RunpodEnvironment
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
+)
+log = logging.getLogger("agent_run")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+REMOTE_WORKSPACE = "/home/agent/workspace"
+REMOTE_RUNLOG = f"{REMOTE_WORKSPACE}/.runlog"
+
+
+def get_git_sha() -> str:
+    try:
+        sha = subprocess.check_output(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "--short", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        return sha
+    except Exception:
+        return "unknown"
+
+
+def find_oauth_token() -> str | None:
+    """Look for the Claude OAuth token in standard locations.
+
+    Order: $CLAUDE_CODE_OAUTH_TOKEN env, ~/.runpod/secrets/claude_oauth_token,
+    ~/.claude_oauth_token (the path our pilot used).
+    """
+    if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
+        return os.environ["CLAUDE_CODE_OAUTH_TOKEN"]
+    for p in [
+        Path.home() / ".runpod" / "secrets" / "claude_oauth_token",
+        Path.home() / ".claude_oauth_token",
+    ]:
+        if p.exists():
+            tok = p.read_text().strip()
+            if tok:
+                return tok
+    return None
+
+
+async def watch_agent_trace(
+    env: RunpodEnvironment,
+    label: str,
+    remote_jsonl: str,
+    period_sec: int = 30,
+) -> None:
+    """Background task: poll line count of the agent's stream-json log on the
+    pod. Cancelled when env.exec returns. Just gives the user a heartbeat that
+    the agent is producing output (not silently hung)."""
+    last = -1
+    while True:
+        try:
+            r = await env.exec(
+                f"if [ -f {shlex.quote(remote_jsonl)} ]; then "
+                f"wc -l {shlex.quote(remote_jsonl)} | awk '{{print $1}}'; "
+                f"fi",
+                timeout_sec=15,
+            )
+            line = (r.stdout or "").strip()
+            if line.isdigit():
+                n = int(line)
+                if n != last:
+                    log.info(f"[{label}] agent trace: {n} jsonl events")
+                    last = n
+        except Exception as exc:
+            log.debug(f"[{label}] watch_agent_trace: {exc}")
+        await asyncio.sleep(period_sec)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Workspace staging
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+async def stage_agent_workspace(
+    env: RunpodEnvironment,
+    *,
+    benchmark: str,
+    student_model: str,
+    teacher_config: str,
+    agent: str,
+    condition: str,
+    time_budget_h: float,
+    oauth_token: str | None,
+    run_dir: Path,
+) -> None:
+    """Upload the per-task files + agent scaffold onto the pod.
+
+    Mirrors PostTrainBenchAdapter.generate_environment (adapter.py:218-285).
+    Differences: we render to a tmpdir locally and upload, instead of writing
+    a Harbor task dir on disk. Centralising in adapter would be cleaner but
+    requires factoring out — see open follow-ups in the plan.
+    """
+    if benchmark not in BENCHMARKS:
+        raise SystemExit(f"unknown benchmark '{benchmark}'; valid: {sorted(BENCHMARKS)}")
+    benchmark_info = BENCHMARKS[benchmark]
+    # Build a model_info shim. PTB's MODELS dict keys are short names like
+    # 'qwen3-1.7b'; we resolve by HF id instead since that's what the user
+    # passes in.
+    model_info = next(
+        (m for m in MODELS.values() if m.model_id == student_model),
+        None,
+    )
+    if model_info is None:
+        raise SystemExit(
+            f"student model '{student_model}' not in MODELS; "
+            f"valid HF ids: {[m.model_id for m in MODELS.values()]}"
+        )
+
+    log.info(f"[stage] benchmark={benchmark} student={student_model}")
+
+    # 1. Render the workspace into a local tmpdir (acts as a staging area).
+    with tempfile.TemporaryDirectory(prefix="agent_run_stage_") as td:
+        env_dir = Path(td) / "env"
+        env_dir.mkdir(parents=True)
+
+        # Copy the per-task files using PTB's adapter logic. The adapter
+        # picks up posttrainbench_root from a module-level constant (= our
+        # REPO_ROOT), so no override needed here.
+        adapter = PostTrainBenchAdapter(
+            output_dir=Path(td) / "_unused",
+            num_hours=max(1, int(time_budget_h)),  # adapter takes int hours
+            include_claude_clause=(agent.startswith("claude")),
+        )
+        adapter.generate_environment(env_dir, model_info, benchmark_info, benchmark)
+
+        # 2. Render instruction.md to prompt.txt with our condition addendum.
+        # PostTrainBenchAdapter.generate_instruction writes to task_dir / instruction.md.
+        # We pass td so the file lands somewhere safe, then mutate + rewrite as prompt.txt.
+        adapter.generate_instruction(Path(td), model_info, benchmark_info, benchmark)
+        rendered = (Path(td) / "instruction.md").read_text()
+        with_addendum = apply_condition_addendum(rendered, condition)
+        prompt_path = env_dir / "prompt.txt"
+        prompt_path.write_text(with_addendum)
+        # Stash the prompt locally too so reviewers can see what the agent saw.
+        (run_dir / "prompt.txt").write_text(with_addendum)
+
+        # 3. Drop the agent's solve.sh into the workspace alongside everything
+        # else. The non-API-max scaffold reads /home/ben/oauth_token (PTB
+        # convention); we honour it by uploading there too.
+        agent_dir = REPO_ROOT / "agents" / agent
+        if not agent_dir.exists():
+            raise SystemExit(f"agent dir missing: {agent_dir}")
+        for fname in ("solve.sh",):
+            src = agent_dir / fname
+            if src.exists():
+                (env_dir / fname).write_text(src.read_text())
+                (env_dir / fname).chmod(0o755)
+
+        # 4. Push everything onto the pod.
+        log.info(f"[stage] uploading workspace -> {REMOTE_WORKSPACE}")
+        await env.exec(f"mkdir -p {REMOTE_WORKSPACE} {REMOTE_RUNLOG}")
+        await env.upload_dir(str(env_dir), REMOTE_WORKSPACE)
+
+        # 5. Upload the OAuth token to the path solve.sh expects.
+        if agent == "claude_non_api_max":
+            if not oauth_token:
+                raise SystemExit(
+                    "claude_non_api_max needs an OAuth token. Set "
+                    "$CLAUDE_CODE_OAUTH_TOKEN or place one at "
+                    "~/.runpod/secrets/claude_oauth_token"
+                )
+            with tempfile.NamedTemporaryFile("w", delete=False) as tf:
+                tf.write(oauth_token)
+                tok_path = tf.name
+            try:
+                await env.exec("mkdir -p /home/ben")
+                await env.upload_file(tok_path, "/home/ben/oauth_token")
+                await env.exec("chmod 600 /home/ben/oauth_token")
+            finally:
+                os.unlink(tok_path)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Eval helpers (pre + post)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+async def run_eval(
+    env: RunpodEnvironment,
+    *,
+    benchmark: str,
+    model_path: str,
+    limit: int,
+    label: str,
+    remote_eval_root: str,
+    out_metrics: Path,
+    watch: bool = True,
+) -> dict | None:
+    """Run evaluate.py against a model path. Generalised from
+    eval_only.run_eval_on_pod so we can target both the pre-train base model
+    and the post-train final_model dir."""
+    src = REPO_ROOT / EVAL_DIRS[benchmark]
+    if not src.exists():
+        raise FileNotFoundError(f"PTB eval dir missing: {src}")
+
+    remote_task_dir = f"{remote_eval_root}/{benchmark}"
+    remote_templates = f"{remote_eval_root}/templates"
+    remote_metrics = f"{remote_task_dir}/metrics_{label}_{benchmark}.json"
+
+    log.info(f"[{label}] uploading task dir -> {remote_task_dir}")
+    await env.upload_dir(str(src), remote_task_dir)
+    log.info(f"[{label}] uploading templates -> {remote_templates}")
+    await env.upload_dir(str(REPO_ROOT / "src/eval/templates"), remote_templates)
+
+    cmd = (
+        f"python3 evaluate.py "
+        f"--model-path {shlex.quote(model_path)} "
+        f"--templates-dir {remote_templates}/ "
+        f"--limit {limit} "
+        f"--gpu-memory-utilization 0.85 "
+        f"--json-output-file {remote_metrics}"
+    )
+    log.info(f"[{label}] running: {cmd}")
+    t0 = time.time()
+    watcher_tasks = []
+    if watch:
+        watcher_tasks.append(asyncio.create_task(
+            watch_progress(env, label, remote_eval_root)
+        ))
+        watcher_tasks.append(asyncio.create_task(watch_gpu(env, label)))
+    try:
+        result = await env.exec(
+            cmd,
+            cwd=remote_task_dir,
+            env={"HF_HOME": "/workspace/hf-cache", "HF_TOKEN": os.environ.get("HF_TOKEN", "")},
+            timeout_sec=3600,
+            tee_logger=True,
+        )
+    finally:
+        for t in watcher_tasks:
+            t.cancel()
+        for t in watcher_tasks:
+            try:
+                await t
+            except (asyncio.CancelledError, Exception):
+                pass
+    elapsed = time.time() - t0
+    log.info(f"[{label}] exec rc={result.return_code} elapsed={elapsed:.0f}s")
+    if result.return_code != 0:
+        log.error(f"[{label}] STDERR (tail):\n{(result.stderr or '')[-3000:]}")
+        log.error(f"[{label}] STDOUT (tail):\n{(result.stdout or '')[-3000:]}")
+        return None
+
+    out_metrics.parent.mkdir(parents=True, exist_ok=True)
+    await env.download_file(remote_metrics, str(out_metrics))
+    metrics = json.loads(out_metrics.read_text())
+    h = headline_from_metrics(metrics)
+    if h:
+        log.info(f"[{label}] HEADLINE: {h}")
+    return metrics
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent invocation
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+async def run_agent(
+    env: RunpodEnvironment,
+    *,
+    teacher_config: str,
+    benchmark: str,
+    time_budget_h: float,
+    watch: bool = True,
+) -> int:
+    """Fire the agent. Returns process return code."""
+    remote_jsonl = f"{REMOTE_RUNLOG}/solve_out.jsonl"
+    timeout_sec = int(time_budget_h * 3600 + 600)  # 10-min grace
+
+    # We spawn the watcher BEFORE exec since the agent will run for the full
+    # budget and we want progress in the meantime.
+    watcher_tasks = []
+    if watch:
+        watcher_tasks.append(asyncio.create_task(watch_gpu(env, "agent", period_sec=60)))
+        watcher_tasks.append(asyncio.create_task(
+            watch_agent_trace(env, "agent", remote_jsonl, period_sec=30)
+        ))
+
+    cmd = (
+        f"PROMPT=$(cat prompt.txt) "
+        f"AGENT_CONFIG={shlex.quote(teacher_config)} "
+        f"BENCHMARK={shlex.quote(benchmark)} "
+        f"bash solve.sh > {remote_jsonl} 2>&1"
+    )
+    log.info(f"[agent] launching (budget={time_budget_h}h, timeout={timeout_sec}s)")
+    t0 = time.time()
+    try:
+        result = await env.exec(
+            cmd,
+            cwd=REMOTE_WORKSPACE,
+            env={"HF_HOME": "/workspace/hf-cache"},
+            timeout_sec=timeout_sec,
+            tee_logger=False,  # the agent's stream-json is huge; rely on watcher
+        )
+    finally:
+        for t in watcher_tasks:
+            t.cancel()
+        for t in watcher_tasks:
+            try:
+                await t
+            except (asyncio.CancelledError, Exception):
+                pass
+    log.info(
+        f"[agent] rc={result.return_code} elapsed={time.time() - t0:.0f}s"
+    )
+    if result.return_code != 0:
+        log.warning(f"[agent] non-zero exit. STDERR (tail):\n{(result.stderr or '')[-2000:]}")
+    return result.return_code
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Contamination judge (matches template/tests/test.sh:88-90)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+async def run_contamination_judge(
+    env: RunpodEnvironment,
+    *,
+    student_model: str,
+    benchmark: str,
+) -> int:
+    """Run codex CLI judge on the agent's workspace. Outputs are written by
+    codex itself to contamination_judgement.txt + disallowed_model_judgement.txt
+    in the workspace root. Needs OPENAI_API_KEY (passed as CODEX_API_KEY)."""
+    benchmark_name = BENCHMARKS[benchmark].benchmark_name
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        log.warning("OPENAI_API_KEY not set; skipping contamination judge")
+        # Write sentinel files so summary.json sees a result.
+        await env.exec(
+            f"echo 'no contamination detected (judge skipped)' > "
+            f"{REMOTE_WORKSPACE}/contamination_judgement.txt && "
+            f"echo 'only allowed use detected (judge skipped)' > "
+            f"{REMOTE_WORKSPACE}/disallowed_model_judgement.txt"
+        )
+        return 0
+
+    cmd = (
+        f"JUDGE_TASK=$(python3 contamination_judge.py "
+        f"--model {shlex.quote(student_model)} "
+        f"--benchmark {shlex.quote(benchmark_name)}) && "
+        f"codex --search -a never exec --json "
+        f"-c model_reasoning_summary=detailed "
+        f"--skip-git-repo-check --yolo "
+        f"--model gpt-5.1-codex \"$JUDGE_TASK\" "
+        f"> {REMOTE_RUNLOG}/judge_output.json 2>&1"
+    )
+    log.info("[judge] running contamination judge via codex CLI")
+    result = await env.exec(
+        cmd,
+        cwd=REMOTE_WORKSPACE,
+        env={
+            "OPENAI_API_KEY": api_key,
+            "CODEX_API_KEY": api_key,
+        },
+        timeout_sec=1800,
+        tee_logger=False,
+    )
+    log.info(f"[judge] rc={result.return_code}")
+    return result.return_code
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Artefact collection
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+async def collect_artefacts(
+    env: RunpodEnvironment,
+    run_dir: Path,
+) -> None:
+    """Pull everything we want preserved back from the pod."""
+    pulls_small = {
+        f"{REMOTE_RUNLOG}/solve_out.jsonl": run_dir / "solve_out.jsonl",
+        f"{REMOTE_RUNLOG}/judge_output.json": run_dir / "judge_output.json",
+        f"{REMOTE_WORKSPACE}/contamination_judgement.txt":
+            run_dir / "contamination_judgement.txt",
+        f"{REMOTE_WORKSPACE}/disallowed_model_judgement.txt":
+            run_dir / "disallowed_model_judgement.txt",
+        f"{REMOTE_WORKSPACE}/metadata.json": run_dir / "metadata.json",
+    }
+    for remote, local in pulls_small.items():
+        try:
+            log.info(f"[pull] {remote} -> {local.name}")
+            await env.download_file(remote, str(local))
+        except Exception as exc:
+            log.warning(f"[pull] skip {remote}: {exc}")
+
+    # Workspace tar (excluding final_model + caches). Build remote-side first.
+    log.info("[pull] tarring agent workspace (excluding final_model, caches)")
+    tar_remote = "/tmp/agent_workspace.tar.gz"
+    tar_cmd = (
+        f"tar czf {tar_remote} "
+        f"--exclude=final_model --exclude=__pycache__ --exclude=.git "
+        f"--exclude=hf-cache "
+        f"-C {REMOTE_WORKSPACE} ."
+    )
+    r = await env.exec(tar_cmd, timeout_sec=600)
+    if r.return_code == 0:
+        try:
+            await env.download_file(tar_remote, str(run_dir / "agent_workspace.tar.gz"))
+            await env.exec(f"rm -f {tar_remote}")
+        except Exception as exc:
+            log.warning(f"[pull] workspace tar download failed: {exc}")
+    else:
+        log.warning(f"[pull] tar failed rc={r.return_code}; stderr tail: {(r.stderr or '')[-500:]}")
+
+    # final_model — rsync, large.
+    remote_fm = f"{REMOTE_WORKSPACE}/final_model"
+    local_fm = run_dir / "final_model"
+    # Only attempt if the dir exists on the pod.
+    check = await env.exec(
+        f"if [ -d {remote_fm} ]; then echo present; fi",
+        timeout_sec=30,
+    )
+    if (check.stdout or "").strip() == "present":
+        log.info(f"[pull] {remote_fm} -> {local_fm} (rsync ~3.5 GB; can take 1-3 min)")
+        try:
+            await env.download_dir(remote_fm, str(local_fm))
+        except Exception as exc:
+            log.error(f"[pull] final_model rsync failed: {exc}")
+    else:
+        log.warning(f"[pull] {remote_fm} not present on pod; skipping")
+
+
+def parse_trace_to_human_readable(run_dir: Path) -> None:
+    """Best-effort parse of solve_out.jsonl -> solve_parsed.txt via PTB's
+    existing tool. Don't fail the run if parsing breaks."""
+    src = run_dir / "solve_out.jsonl"
+    if not src.exists():
+        log.info("[trace] no solve_out.jsonl; skipping parse")
+        return
+    parser = REPO_ROOT / "agents" / "claude" / "human_readable_trace.py"
+    if not parser.exists():
+        log.warning(f"[trace] parser missing at {parser}; skipping")
+        return
+    out = run_dir / "solve_parsed.txt"
+    try:
+        subprocess.run(
+            ["python3", str(parser), str(src), "-o", str(out)],
+            check=True, timeout=120,
+        )
+        log.info(f"[trace] parsed -> {out.name}")
+    except Exception as exc:
+        log.warning(f"[trace] parse failed: {exc}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# main
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser()
+    p.add_argument("--condition", required=True, choices=["A", "B", "C", "D"])
+    p.add_argument("--teacher", default="claude-opus-4-7",
+                   help="agent model arg (passed as AGENT_CONFIG to solve.sh)")
+    p.add_argument("--student", default="Qwen/Qwen3-1.7B-Base")
+    p.add_argument("--benchmark", default="gsm8k", choices=sorted(EVAL_DIRS))
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--time-budget-h", type=float, default=1.0)
+    p.add_argument("--agent", default="claude_non_api_max")
+    p.add_argument("--prompt-variant", default="default")
+    p.add_argument("--limit", type=int, default=30,
+                   help="samples per eval (-1 = full benchmark)")
+    p.add_argument("--no-watch", action="store_true")
+    p.add_argument("--keep-pod", action="store_true",
+                   help="don't terminate the pod on exit (for live debugging)")
+    p.add_argument("--dry-run", action="store_true",
+                   help="run pre-eval + dir scaffold only; skip agent + post-eval")
+    return p.parse_args()
+
+
+async def main():
+    args = parse_args()
+
+    # Build run config + dir
+    cfg, dirname = make_run_config(
+        condition=args.condition,
+        teacher_model=args.teacher,
+        student_model=args.student,
+        benchmark=args.benchmark,
+        prompt_variant=args.prompt_variant,
+        seed=args.seed,
+        time_budget_h=args.time_budget_h,
+        agent=args.agent,
+        agent_config=args.teacher,
+        base_image=DEFAULT_IMAGE,
+        git_sha=get_git_sha(),
+    )
+    run_dir = REPO_ROOT / "jobs" / "runs" / dirname
+    run_dir.mkdir(parents=True, exist_ok=True)
+    write_run_config(run_dir, cfg)
+    log.info(f"=== run dir: {run_dir} ===")
+
+    oauth_token = find_oauth_token() if args.agent == "claude_non_api_max" else None
+
+    task_env_config = EnvironmentConfig(
+        gpus=1,
+        cpus=8,
+        memory_mb=65536,
+        storage_mb=102400,
+        build_timeout_sec=1800.0,
+        allow_internet=True,
+    )
+    trial_paths = TrialPaths(trial_dir=run_dir / "_harbor_trial")
+    (run_dir / "_harbor_trial").mkdir(parents=True, exist_ok=True)
+
+    RunpodEnvironment.preflight()
+    env = RunpodEnvironment(
+        environment_dir=REPO_ROOT / "src/eval",
+        environment_name=f"agent-run-{cfg.condition}-{cfg.seed}",
+        session_id=f"agent-run-{int(time.time())}",
+        trial_paths=trial_paths,
+        task_env_config=task_env_config,
+        suppress_override_warnings=True,
+    )
+
+    status = "started"
+    duration_start = time.time()
+    pre_metrics: dict | None = None
+    post_metrics: dict | None = None
+    pod_info: dict | None = None
+    try:
+        log.info("Starting RunPod environment ...")
+        t_env = time.time()
+        await env.start(force_build=False)
+        log.info(f"Environment ready ({time.time() - t_env:.0f}s)")
+        pod_info = {
+            "pod_id": env._pod_id,
+            "ssh_host": env._ssh_host,
+            "ssh_port": env._ssh_port,
+            "image": DEFAULT_IMAGE,
+        }
+        write_json(run_dir / "pod_meta.json", pod_info)
+
+        # --- pre-eval ---
+        log.info("=== PRE-EVAL ===")
+        pre_metrics = await run_eval(
+            env,
+            benchmark=args.benchmark,
+            model_path=args.student,
+            limit=args.limit,
+            label="pre",
+            remote_eval_root="/workspace/ptb_eval",
+            out_metrics=run_dir / "metrics_pre.json",
+            watch=not args.no_watch,
+        )
+        if pre_metrics is None:
+            status = "eval_failed"
+            return
+
+        if args.dry_run:
+            log.info("[dry-run] skipping agent + post-eval")
+            status = "completed"
+            return
+
+        # --- stage agent workspace ---
+        log.info("=== STAGING AGENT WORKSPACE ===")
+        await stage_agent_workspace(
+            env,
+            benchmark=args.benchmark,
+            student_model=args.student,
+            teacher_config=args.teacher,
+            agent=args.agent,
+            condition=args.condition,
+            time_budget_h=args.time_budget_h,
+            oauth_token=oauth_token,
+            run_dir=run_dir,
+        )
+
+        # --- run agent ---
+        log.info("=== AGENT RUN ===")
+        rc = await run_agent(
+            env,
+            teacher_config=args.teacher,
+            benchmark=args.benchmark,
+            time_budget_h=args.time_budget_h,
+            watch=not args.no_watch,
+        )
+        if rc != 0:
+            status = "agent_failed"
+            # don't bail — still pull artefacts so the failure is debuggable
+
+        # --- contamination judge ---
+        log.info("=== CONTAMINATION JUDGE ===")
+        await run_contamination_judge(
+            env,
+            student_model=args.student,
+            benchmark=args.benchmark,
+        )
+
+        # --- post-eval ---
+        log.info("=== POST-EVAL ===")
+        post_metrics = await run_eval(
+            env,
+            benchmark=args.benchmark,
+            model_path=f"{REMOTE_WORKSPACE}/final_model",
+            limit=args.limit,
+            label="post",
+            remote_eval_root="/workspace/ptb_eval",
+            out_metrics=run_dir / "metrics_post.json",
+            watch=not args.no_watch,
+        )
+        if post_metrics is None and status != "agent_failed":
+            status = "eval_failed"
+
+        if status not in {"agent_failed", "eval_failed"}:
+            status = "completed"
+
+    except asyncio.TimeoutError:
+        status = "timeout"
+        log.error("Top-level timeout")
+    except Exception:
+        status = "failed"
+        log.exception("Top-level exception")
+        raise
+    finally:
+        # Pull whatever we have, regardless of status.
+        try:
+            log.info("=== COLLECTING ARTEFACTS ===")
+            await collect_artefacts(env, run_dir)
+            parse_trace_to_human_readable(run_dir)
+        except Exception:
+            log.exception("artefact collection failed")
+
+        duration = time.time() - duration_start
+        try:
+            summary = make_summary(
+                run_dir=run_dir,
+                status=status,
+                duration_s=duration,
+                pre_metrics=pre_metrics,
+                post_metrics=post_metrics,
+                char_probe=None,  # placeholder until #45
+                pod_info=pod_info,
+                final_model_dir=run_dir / "final_model",
+                solve_out_path=run_dir / "solve_out.jsonl",
+            )
+            write_json(run_dir / "summary.json", summary)
+            log.info(
+                "=== SUMMARY ===\n" + json.dumps(
+                    {
+                        "status": summary["status"],
+                        "duration_s": summary["duration_s"],
+                        "pre": summary["pre"],
+                        "post": summary["post"],
+                        "delta": summary["delta"],
+                        "contamination_detected": summary["contamination_detected"],
+                        "disallowed_use_detected": summary["disallowed_use_detected"],
+                        "final_model_present": summary["final_model_present"],
+                    },
+                    indent=2,
+                )
+            )
+        except Exception:
+            log.exception("summary write failed")
+
+        if not args.keep_pod:
+            log.info("Tearing down pod ...")
+            try:
+                await env.stop(delete=True)
+            except Exception as exc:
+                log.error(f"stop() failed: {exc}")
+        else:
+            log.info(
+                f"--keep-pod set; pod {pod_info['pod_id'] if pod_info else '?'} left running. "
+                f"runpodctl pod stop {pod_info['pod_id'] if pod_info else '?'} when done."
+            )
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
