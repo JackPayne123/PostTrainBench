@@ -490,17 +490,22 @@ async def start_shared_vllm(
         f"--gpu-memory-utilization {gpu_mem_util} "
         f"--chat-template {shlex.quote(chat_template_remote)}"
     )
+    # `|| true` on pkill (rc=1 when nothing matches), and we don't care about
+    # 'disown' return code either. Final `echo started` is the chain's exit.
     bootstrap = (
-        f"pkill -f 'vllm serve' 2>/dev/null; "  # kill any previous
+        f"(pkill -f 'vllm serve' 2>/dev/null || true); "
         f"sleep 2; "
         f"setsid nohup bash -c {shlex.quote(serve_cmd)} "
         f"> {log_path} 2>&1 < /dev/null & "
-        f"disown; "
+        f"disown 2>/dev/null || true; "
         f"echo started"
     )
     r = await env.exec(bootstrap, timeout_sec=30)
-    if r.return_code != 0:
-        log.error(f"[{label}] failed to spawn vllm: {(r.stderr or '')[-500:]}")
+    if r.return_code != 0 or "started" not in (r.stdout or ""):
+        log.error(
+            f"[{label}] failed to spawn vllm: rc={r.return_code} "
+            f"stdout={r.stdout!r} stderr={(r.stderr or '')[-500:]}"
+        )
         return None
     # Poll for readiness
     base_url = f"http://localhost:{port}/v1"
