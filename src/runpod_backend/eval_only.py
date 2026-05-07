@@ -52,6 +52,11 @@ EVAL_DIRS = {
     "gsm8k": "src/eval/tasks/gsm8k",
     "humaneval": "src/eval/tasks/humaneval",
     "gpqamain": "src/eval/tasks/gpqamain",
+    # Added 2026-05-07 — non-PTB cross-domain capability evals (MCQ scored
+    # on choice logprob; format-tolerant on base models).
+    "mmlu": "src/eval/tasks/mmlu",
+    "truthfulqa": "src/eval/tasks/truthfulqa",
+    "arc_easy": "src/eval/tasks/arc_easy",
 }
 
 

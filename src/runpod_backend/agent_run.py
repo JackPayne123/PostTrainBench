@@ -594,7 +594,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--teacher", default="claude-opus-4-7",
                    help="agent model arg (passed as AGENT_CONFIG to solve.sh)")
     p.add_argument("--student", default="Qwen/Qwen3-1.7B-Base")
-    p.add_argument("--benchmark", default="gsm8k", choices=sorted(EVAL_DIRS))
+    p.add_argument("--benchmark", default="gsm8k", choices=sorted(EVAL_DIRS),
+                   help="benchmark the agent trains for (the one in instruction.md)")
+    p.add_argument("--extra-evals", default="",
+                   help="comma-separated additional benchmarks to pre+post-eval "
+                        "(beyond --benchmark). Tests cross-domain transfer of "
+                        "training. Each adds ~5-10 min per pre/post pass.")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--time-budget-h", type=float, default=1.0)
     p.add_argument("--agent", default="claude_non_api_max")
@@ -666,7 +671,13 @@ async def main():
     duration_start = time.time()
     pre_metrics: dict | None = None
     post_metrics: dict | None = None
+    extra_pre: dict[str, dict | None] = {}
+    extra_post: dict[str, dict | None] = {}
     pod_info: dict | None = None
+    extra_evals = [b.strip() for b in args.extra_evals.split(",") if b.strip()]
+    for b in extra_evals:
+        if b not in EVAL_DIRS:
+            raise SystemExit(f"unknown extra-eval '{b}'; valid: {sorted(EVAL_DIRS)}")
     try:
         log.info("Starting RunPod environment ...")
         t_env = time.time()
@@ -680,8 +691,8 @@ async def main():
         }
         write_json(run_dir / "pod_meta.json", pod_info)
 
-        # --- pre-eval ---
-        log.info("=== PRE-EVAL ===")
+        # --- pre-eval (training benchmark + extras) ---
+        log.info(f"=== PRE-EVAL ({args.benchmark}) ===")
         pre_metrics = await run_eval(
             env,
             benchmark=args.benchmark,
@@ -695,6 +706,18 @@ async def main():
         if pre_metrics is None:
             status = "eval_failed"
             return
+        for b in extra_evals:
+            log.info(f"=== PRE-EVAL ({b}) ===")
+            extra_pre[b] = await run_eval(
+                env,
+                benchmark=b,
+                model_path=args.student,
+                limit=args.limit,
+                label=f"pre_{b}",
+                remote_eval_root="/workspace/ptb_eval",
+                out_metrics=run_dir / f"metrics_pre_{b}.json",
+                watch=not args.no_watch,
+            )
 
         if args.dry_run:
             log.info("[dry-run] skipping agent + post-eval")
@@ -749,7 +772,7 @@ async def main():
         )
 
         # --- post-eval ---
-        log.info("=== POST-EVAL ===")
+        log.info(f"=== POST-EVAL ({args.benchmark}) ===")
         post_metrics = await run_eval(
             env,
             benchmark=args.benchmark,
@@ -762,6 +785,18 @@ async def main():
         )
         if post_metrics is None and status != "agent_failed":
             status = "eval_failed"
+        for b in extra_evals:
+            log.info(f"=== POST-EVAL ({b}) ===")
+            extra_post[b] = await run_eval(
+                env,
+                benchmark=b,
+                model_path=f"{REMOTE_WORKSPACE}/final_model",
+                limit=args.limit,
+                label=f"post_{b}",
+                remote_eval_root="/workspace/ptb_eval",
+                out_metrics=run_dir / f"metrics_post_{b}.json",
+                watch=not args.no_watch,
+            )
 
         if status not in {"agent_failed", "eval_failed"}:
             status = "completed"
@@ -797,6 +832,20 @@ async def main():
                 final_model_dir=run_dir / "final_model",
                 solve_out_path=run_dir / "solve_out.jsonl",
             )
+            # Attach cross-domain pre/post + delta for each --extra-evals
+            # benchmark. Headline-level only (uses run_dir.headline_from_metrics).
+            from src.runpod_backend.run_dir import (
+                compute_delta as _delta,
+                headline_from_metrics as _hl,
+            )
+            summary["extra_evals"] = {
+                b: {
+                    "pre": _hl(extra_pre.get(b)),
+                    "post": _hl(extra_post.get(b)),
+                    "delta": _delta(_hl(extra_pre.get(b)), _hl(extra_post.get(b))),
+                }
+                for b in extra_evals
+            }
             write_json(run_dir / "summary.json", summary)
             log.info(
                 "=== SUMMARY ===\n" + json.dumps(
