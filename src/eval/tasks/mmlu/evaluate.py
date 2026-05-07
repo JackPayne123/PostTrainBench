@@ -24,8 +24,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=200)
     parser.add_argument("--json-output-file", type=str, default=None)
     parser.add_argument("--templates-dir", type=str, default="templates/")
-    parser.add_argument("--max-connections", type=int, default=2)
-    parser.add_argument("--max-tokens", type=int, default=2000)
+    parser.add_argument("--max-connections", type=int, default=8)
+    # MCQ scored on choice logprob; 256 is plenty for any answer letter.
+    parser.add_argument("--max-tokens", type=int, default=256)
     parser.add_argument("--gpu-memory-utilization", type=float, default=0.3)
     return parser.parse_args()
 

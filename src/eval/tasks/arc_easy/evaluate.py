@@ -18,8 +18,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--limit", type=int, default=200)
     p.add_argument("--json-output-file", type=str, default=None)
     p.add_argument("--templates-dir", type=str, default="templates/")
-    p.add_argument("--max-connections", type=int, default=2)
-    p.add_argument("--max-tokens", type=int, default=2000)
+    p.add_argument("--max-connections", type=int, default=8)
+    p.add_argument("--max-tokens", type=int, default=256)
     p.add_argument("--gpu-memory-utilization", type=float, default=0.3)
     return p.parse_args()
 

@@ -263,6 +263,8 @@ async def run_eval(
     remote_eval_root: str,
     out_metrics: Path,
     watch: bool = True,
+    skip_templates_upload: bool = False,
+    max_connections: int = 8,
 ) -> dict | None:
     """Run evaluate.py against a model path. Generalised from
     eval_only.run_eval_on_pod so we can target both the pre-train base model
@@ -277,8 +279,11 @@ async def run_eval(
 
     log.info(f"[{label}] uploading task dir -> {remote_task_dir}")
     await env.upload_dir(str(src), remote_task_dir)
-    log.info(f"[{label}] uploading templates -> {remote_templates}")
-    await env.upload_dir(str(REPO_ROOT / "src/eval/templates"), remote_templates)
+    if not skip_templates_upload:
+        log.info(f"[{label}] uploading templates -> {remote_templates}")
+        await env.upload_dir(str(REPO_ROOT / "src/eval/templates"), remote_templates)
+    else:
+        log.info(f"[{label}] templates already uploaded; skipping (~10s saved)")
 
     # Background the eval + poll for sentinel file. Avoids the SSH
     # channel-hold-open hang we saw twice today (gsm8k pre on 2026-05-07
@@ -307,6 +312,7 @@ async def run_eval(
         f"--templates-dir {remote_templates}/ "
         f"--limit {limit} "
         f"--gpu-memory-utilization 0.85 "
+        f"--max-connections {max_connections} "
         f"--json-output-file {remote_metrics}; "
         f"echo $? > {sentinel}"
     )
@@ -760,6 +766,7 @@ async def main():
                 remote_eval_root="/workspace/ptb_eval",
                 out_metrics=run_dir / f"metrics_pre_{b}.json",
                 watch=not args.no_watch,
+                skip_templates_upload=True,
             )
 
         if args.dry_run:
@@ -852,6 +859,7 @@ async def main():
             remote_eval_root="/workspace/ptb_eval",
             out_metrics=run_dir / "metrics_post.json",
             watch=not args.no_watch,
+            skip_templates_upload=True,  # uploaded during pre
         )
         if post_metrics is None and status != "agent_failed":
             status = "eval_failed"
@@ -866,6 +874,7 @@ async def main():
                 remote_eval_root="/workspace/ptb_eval",
                 out_metrics=run_dir / f"metrics_post_{b}.json",
                 watch=not args.no_watch,
+                skip_templates_upload=True,
             )
 
         if status not in {"agent_failed", "eval_failed"}:
