@@ -77,6 +77,11 @@ log = logging.getLogger("agent_run")
 
 REMOTE_WORKSPACE = "/home/agent/workspace"
 REMOTE_RUNLOG = f"{REMOTE_WORKSPACE}/.runlog"
+# Persistent volume mount path on the pod. Anything written here survives
+# pod teardown and can be re-pulled by spinning a tiny pod with the same
+# volume attached. We stage final_model here BEFORE the laptop rsync so
+# that an interrupted pull doesn't lose the trained checkpoint.
+REMOTE_VOLUME_FINAL_MODELS = "/workspace/final_models"
 
 
 def get_git_sha() -> str:
@@ -387,6 +392,46 @@ async def run_agent(
     return result.return_code
 
 
+async def stage_final_model_to_volume(
+    env: RunpodEnvironment,
+    *,
+    run_dir_name: str,
+) -> bool:
+    """Copy /home/agent/workspace/final_model -> /workspace/final_models/<run>/.
+    Volume = persistent across pod teardown. Even if the laptop rsync gets
+    interrupted (or pod terminates before pull), the model survives and
+    can be recovered with src/runpod_backend/pull_run_artefacts.py."""
+    src = f"{REMOTE_WORKSPACE}/final_model"
+    dst = f"{REMOTE_VOLUME_FINAL_MODELS}/{run_dir_name}"
+    check = await env.exec(
+        f"if [ -d {src} ] && [ -f {src}/config.json ]; then echo present; fi",
+        timeout_sec=30,
+    )
+    if (check.stdout or "").strip() != "present":
+        log.warning(f"[stage-vol] {src} missing; skipping volume stage")
+        return False
+    log.info(f"[stage-vol] {src} -> {dst} (local cp on pod, ~30s for 3.5 GB)")
+    t0 = time.time()
+    r = await env.exec(
+        f"mkdir -p {REMOTE_VOLUME_FINAL_MODELS} && "
+        f"rm -rf {dst} && "
+        f"cp -r {src} {dst} && "
+        f"echo staged ok && du -sh {dst}",
+        timeout_sec=600,
+    )
+    if r.return_code != 0:
+        log.error(
+            f"[stage-vol] failed rc={r.return_code}; "
+            f"stderr (tail): {(r.stderr or '')[-500:]}"
+        )
+        return False
+    log.info(
+        f"[stage-vol] done in {time.time() - t0:.0f}s. "
+        f"Recoverable from volume even if pull fails: {(r.stdout or '').strip()}"
+    )
+    return True
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Contamination judge (matches template/tests/test.sh:88-90)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -540,8 +585,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--time-budget-h", type=float, default=1.0)
     p.add_argument("--agent", default="claude_non_api_max")
     p.add_argument("--prompt-variant", default="default")
-    p.add_argument("--limit", type=int, default=30,
-                   help="samples per eval (-1 = full benchmark)")
+    p.add_argument("--limit", type=int, default=150,
+                   help="samples per eval (-1 = full benchmark). 30 is too "
+                        "few — stderr ~0.046 means anything <0.1 absolute "
+                        "delta is noise. 150 brings stderr down to ~0.025.")
     p.add_argument("--no-watch", action="store_true")
     p.add_argument("--keep-pod", action="store_true",
                    help="don't terminate the pod on exit (for live debugging)")
@@ -660,6 +707,18 @@ async def main():
         if rc != 0:
             status = "agent_failed"
             # don't bail — still pull artefacts so the failure is debuggable
+
+        # --- stage final_model to volume (recoverable on pod teardown) ---
+        log.info("=== STAGING FINAL MODEL TO VOLUME ===")
+        staged_to_volume = await stage_final_model_to_volume(
+            env, run_dir_name=cfg.run_dir_name,
+        )
+        if pod_info is not None:
+            pod_info["final_model_on_volume"] = (
+                f"{REMOTE_VOLUME_FINAL_MODELS}/{cfg.run_dir_name}"
+                if staged_to_volume else None
+            )
+            write_json(run_dir / "pod_meta.json", pod_info)
 
         # --- contamination judge ---
         log.info("=== CONTAMINATION JUDGE ===")
