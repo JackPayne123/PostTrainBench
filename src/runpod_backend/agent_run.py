@@ -751,7 +751,34 @@ async def main():
             )
 
         if args.dry_run:
-            log.info("[dry-run] skipping agent + post-eval")
+            # Skip agent step but still run post-eval (pointed at the BASE
+            # student model — same as pre). Verifies the post-eval code path
+            # without needing a trained final_model. Pre and post should
+            # produce ~the same numbers (within stderr).
+            log.info("[dry-run] skipping agent; running post-evals against base")
+            log.info(f"=== POST-EVAL ({args.benchmark}) [dry-run, base] ===")
+            post_metrics = await run_eval(
+                env,
+                benchmark=args.benchmark,
+                model_path=args.student,
+                limit=args.limit,
+                label="post",
+                remote_eval_root="/workspace/ptb_eval",
+                out_metrics=run_dir / "metrics_post.json",
+                watch=not args.no_watch,
+            )
+            for b in extra_evals:
+                log.info(f"=== POST-EVAL ({b}) [dry-run, base] ===")
+                extra_post[b] = await run_eval(
+                    env,
+                    benchmark=b,
+                    model_path=args.student,
+                    limit=args.limit,
+                    label=f"post_{b}",
+                    remote_eval_root="/workspace/ptb_eval",
+                    out_metrics=run_dir / f"metrics_post_{b}.json",
+                    watch=not args.no_watch,
+                )
             status = "completed"
             return
 
