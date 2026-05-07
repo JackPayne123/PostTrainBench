@@ -77,6 +77,11 @@ log = logging.getLogger("agent_run")
 
 REMOTE_WORKSPACE = "/home/agent/workspace"
 REMOTE_RUNLOG = f"{REMOTE_WORKSPACE}/.runlog"
+# Shared vllm endpoint used across pre-eval + post-eval clusters. Started
+# once per cluster, killed between clusters (agent step needs the GPU).
+SHARED_VLLM_PORT = 36216
+SHARED_VLLM_NAME = "student"  # registered via vllm --served-model-name
+SHARED_VLLM_API_KEY = "inspectai"
 # Persistent volume mount path on the pod. Anything written here survives
 # pod teardown and can be re-pulled by spinning a tiny pod with the same
 # volume attached. We stage final_model here BEFORE the laptop rsync so
@@ -265,6 +270,8 @@ async def run_eval(
     watch: bool = True,
     skip_templates_upload: bool = False,
     max_connections: int = 8,
+    vllm_base_url: str | None = None,
+    vllm_served_name: str | None = None,
 ) -> dict | None:
     """Run evaluate.py against a model path. Generalised from
     eval_only.run_eval_on_pod so we can target both the pre-train base model
@@ -305,6 +312,15 @@ async def run_eval(
         f"export HF_HOME=/workspace/hf-cache; "
         f"export HF_TOKEN={shlex.quote(hf_token)}; "
     ) if hf_token else "export HF_HOME=/workspace/hf-cache; "
+    # If a shared vllm is running, point evaluate.py at it (skips local-vllm
+    # spawn, saves ~60s + 0.85 of GPU mem). gpu_mem_util=0 hint to vllm
+    # provider that we won't use it.
+    shared_args = ""
+    if vllm_base_url and vllm_served_name:
+        shared_args = (
+            f" --vllm-base-url {shlex.quote(vllm_base_url)} "
+            f"--vllm-served-name {shlex.quote(vllm_served_name)} "
+        )
     eval_inner = (
         f"{inner_env_exports}"
         f"python3 evaluate.py "
@@ -312,7 +328,8 @@ async def run_eval(
         f"--templates-dir {remote_templates}/ "
         f"--limit {limit} "
         f"--gpu-memory-utilization 0.85 "
-        f"--max-connections {max_connections} "
+        f"--max-connections {max_connections}"
+        f"{shared_args} "
         f"--json-output-file {remote_metrics}; "
         f"echo $? > {sentinel}"
     )
@@ -439,6 +456,92 @@ async def run_agent(
     if result.return_code != 0:
         log.warning(f"[agent] non-zero exit. STDERR (tail):\n{(result.stderr or '')[-2000:]}")
     return result.return_code
+
+
+async def start_shared_vllm(
+    env: RunpodEnvironment,
+    *,
+    model_path: str,
+    chat_template_remote: str,
+    label: str = "shared-vllm",
+    port: int = SHARED_VLLM_PORT,
+    served_name: str = SHARED_VLLM_NAME,
+    api_key: str = SHARED_VLLM_API_KEY,
+    gpu_mem_util: float = 0.85,
+    timeout_sec: int = 300,
+) -> str | None:
+    """Start a shared vllm OpenAI-compat server on the pod. Returns base URL
+    on success or None on failure. Caller must call stop_shared_vllm later.
+
+    Why: each evaluate.py spinning its own vllm pays ~60s load per call.
+    For 6 pre-evals + 6 post-evals that's 12 minutes of pure vllm boot.
+    Sharing across a cluster of evals (all same model) cuts to 2 boots = 2 min.
+    """
+    log.info(f"[{label}] starting vllm serve at :{port} for {model_path}")
+    # Background it with setsid + redirect; poll /v1/models for readiness.
+    log_path = f"/workspace/{label}.log"
+    serve_cmd = (
+        f"export HF_HOME=/workspace/hf-cache; "
+        f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
+        f"vllm serve {shlex.quote(model_path)} "
+        f"--host 0.0.0.0 --port {port} "
+        f"--api-key {shlex.quote(api_key)} "
+        f"--served-model-name {shlex.quote(served_name)} "
+        f"--gpu-memory-utilization {gpu_mem_util} "
+        f"--chat-template {shlex.quote(chat_template_remote)}"
+    )
+    bootstrap = (
+        f"pkill -f 'vllm serve' 2>/dev/null; "  # kill any previous
+        f"sleep 2; "
+        f"setsid nohup bash -c {shlex.quote(serve_cmd)} "
+        f"> {log_path} 2>&1 < /dev/null & "
+        f"disown; "
+        f"echo started"
+    )
+    r = await env.exec(bootstrap, timeout_sec=30)
+    if r.return_code != 0:
+        log.error(f"[{label}] failed to spawn vllm: {(r.stderr or '')[-500:]}")
+        return None
+    # Poll for readiness
+    base_url = f"http://localhost:{port}/v1"
+    poll_cmd = (
+        f"for i in $(seq 1 {timeout_sec // 5}); do "
+        f"  if curl -fsS -m 3 -H 'Authorization: Bearer {api_key}' "
+        f"      {base_url}/models 2>/dev/null | grep -q '{served_name}'; then "
+        f"    echo ready; exit 0; "
+        f"  fi; "
+        f"  sleep 5; "
+        f"done; echo timeout; exit 1"
+    )
+    r = await env.exec(poll_cmd, timeout_sec=timeout_sec + 60)
+    if r.return_code != 0 or "ready" not in (r.stdout or ""):
+        log.error(f"[{label}] vllm not ready after {timeout_sec}s")
+        # Capture log tail for debug
+        try:
+            tail = await env.exec(f"tail -50 {log_path}", timeout_sec=15)
+            log.error(f"[{label}] vllm log tail:\n{tail.stdout or ''}")
+        except Exception:
+            pass
+        return None
+    log.info(f"[{label}] vllm ready at {base_url} (served as '{served_name}')")
+    return base_url
+
+
+async def stop_shared_vllm(
+    env: RunpodEnvironment, label: str = "shared-vllm"
+) -> None:
+    """Kill the shared vllm so the agent step has full GPU."""
+    log.info(f"[{label}] stopping vllm")
+    await env.exec(
+        "pkill -f 'vllm serve' 2>/dev/null; "
+        # Wait for GPU memory to free
+        "for i in $(seq 1 12); do "
+        "  free=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits); "
+        "  if [ \"$free\" -lt 1000 ]; then echo cleared; exit 0; fi; "
+        "  sleep 5; "
+        "done; echo did_not_clear",
+        timeout_sec=120,
+    )
 
 
 async def stage_final_model_to_volume(
@@ -740,7 +843,10 @@ async def main():
         }
         write_json(run_dir / "pod_meta.json", pod_info)
 
-        # --- pre-eval (training benchmark + extras) ---
+        # Pre-eval order matters for shared-vllm setup: do the FIRST eval
+        # without sharing so it uploads templates + lets us discover the
+        # chat template path. Then bring up shared vllm pointed at student
+        # and run remaining pre-evals against it.
         log.info(f"=== PRE-EVAL ({args.benchmark}) ===")
         pre_metrics = await run_eval(
             env,
@@ -755,6 +861,16 @@ async def main():
         if pre_metrics is None:
             status = "eval_failed"
             return
+        # Bring up shared vllm pointed at the BASE student for all remaining
+        # pre-evals (saves ~60s per eval × N extras of vllm boot time).
+        pre_vllm_url: str | None = None
+        if extra_evals:
+            pre_vllm_url = await start_shared_vllm(
+                env,
+                model_path=args.student,
+                chat_template_remote="/workspace/ptb_eval/templates/qwen3.jinja",
+                label="vllm-pre",
+            )
         for b in extra_evals:
             log.info(f"=== PRE-EVAL ({b}) ===")
             extra_pre[b] = await run_eval(
@@ -767,7 +883,11 @@ async def main():
                 out_metrics=run_dir / f"metrics_pre_{b}.json",
                 watch=not args.no_watch,
                 skip_templates_upload=True,
+                vllm_base_url=pre_vllm_url,
+                vllm_served_name=SHARED_VLLM_NAME if pre_vllm_url else None,
             )
+        if pre_vllm_url:
+            await stop_shared_vllm(env, label="vllm-pre")
 
         if args.dry_run:
             # Skip agent step but still run post-eval (pointed at the BASE
@@ -785,7 +905,16 @@ async def main():
                 remote_eval_root="/workspace/ptb_eval",
                 out_metrics=run_dir / "metrics_post.json",
                 watch=not args.no_watch,
+                skip_templates_upload=True,
             )
+            dry_vllm_url: str | None = None
+            if extra_evals:
+                dry_vllm_url = await start_shared_vllm(
+                    env,
+                    model_path=args.student,
+                    chat_template_remote="/workspace/ptb_eval/templates/qwen3.jinja",
+                    label="vllm-dry-post",
+                )
             for b in extra_evals:
                 log.info(f"=== POST-EVAL ({b}) [dry-run, base] ===")
                 extra_post[b] = await run_eval(
@@ -797,7 +926,12 @@ async def main():
                     remote_eval_root="/workspace/ptb_eval",
                     out_metrics=run_dir / f"metrics_post_{b}.json",
                     watch=not args.no_watch,
+                    skip_templates_upload=True,
+                    vllm_base_url=dry_vllm_url,
+                    vllm_served_name=SHARED_VLLM_NAME if dry_vllm_url else None,
                 )
+            if dry_vllm_url:
+                await stop_shared_vllm(env, label="vllm-dry-post")
             status = "completed"
             return
 
@@ -863,6 +997,15 @@ async def main():
         )
         if post_metrics is None and status != "agent_failed":
             status = "eval_failed"
+        # Bring up shared vllm pointed at the FINAL_MODEL for remaining post-evals.
+        post_vllm_url: str | None = None
+        if extra_evals:
+            post_vllm_url = await start_shared_vllm(
+                env,
+                model_path=f"{REMOTE_WORKSPACE}/final_model",
+                chat_template_remote="/workspace/ptb_eval/templates/qwen3.jinja",
+                label="vllm-post",
+            )
         for b in extra_evals:
             log.info(f"=== POST-EVAL ({b}) ===")
             extra_post[b] = await run_eval(
@@ -875,7 +1018,11 @@ async def main():
                 out_metrics=run_dir / f"metrics_post_{b}.json",
                 watch=not args.no_watch,
                 skip_templates_upload=True,
+                vllm_base_url=post_vllm_url,
+                vllm_served_name=SHARED_VLLM_NAME if post_vllm_url else None,
             )
+        if post_vllm_url:
+            await stop_shared_vllm(env, label="vllm-post")
 
         if status not in {"agent_failed", "eval_failed"}:
             status = "completed"

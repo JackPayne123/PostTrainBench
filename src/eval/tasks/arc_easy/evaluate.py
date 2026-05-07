@@ -21,6 +21,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-connections", type=int, default=8)
     p.add_argument("--max-tokens", type=int, default=256)
     p.add_argument("--gpu-memory-utilization", type=float, default=0.3)
+    p.add_argument("--vllm-base-url", type=str, default=None)
+    p.add_argument("--vllm-served-name", type=str, default=None)
     return p.parse_args()
 
 
@@ -31,10 +33,15 @@ def main() -> None:
     if args.limit is not None and args.limit != -1:
         other["limit"] = args.limit
     task = "inspect_evals/arc_easy"
-    model_args = {"gpu_memory_utilization": args.gpu_memory_utilization}
-    model_args.update(template_kwargs(args))
+    if args.vllm_base_url and args.vllm_served_name:
+        model = f"openai-api/{args.vllm_served_name}"
+        model_args = {"base_url": args.vllm_base_url, "api_key": "inspectai"}
+    else:
+        model = f"vllm/{args.model_path}"
+        model_args = {"gpu_memory_utilization": args.gpu_memory_utilization}
+        model_args.update(template_kwargs(args))
     out = inspect_eval(
-        task, model=f"vllm/{args.model_path}",
+        task, model=model,
         model_args=model_args, score_display=False, log_realtime=False,
         log_format="json", timeout=18000000, attempt_timeout=18000000,
         max_tokens=args.max_tokens, max_connections=args.max_connections,

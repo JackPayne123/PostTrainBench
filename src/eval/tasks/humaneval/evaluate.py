@@ -54,6 +54,8 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=4000,
     )
+    parser.add_argument("--vllm-base-url", type=str, default=None)
+    parser.add_argument("--vllm-served-name", type=str, default=None)
     return parser.parse_args()
 
 def main() -> None:
@@ -68,14 +70,17 @@ def main() -> None:
     task = inspect_evals.humaneval.humaneval(
         sandbox="local",
     )
-    model_args = {
-        'gpu_memory_utilization': args.gpu_memory_utilization,
-    }
-    model_args.update(template_kwargs(args))
+    if args.vllm_base_url and args.vllm_served_name:
+        model = f"openai-api/{args.vllm_served_name}"
+        model_args = {"base_url": args.vllm_base_url, "api_key": "inspectai"}
+    else:
+        model = f"vllm/{args.model_path}"
+        model_args = {'gpu_memory_utilization': args.gpu_memory_utilization}
+        model_args.update(template_kwargs(args))
 
     eval_out = inspect_eval(
         task,
-        model=f"vllm/{args.model_path}",
+        model=model,
         model_args=model_args,
         score_display=False,
         log_realtime=False,

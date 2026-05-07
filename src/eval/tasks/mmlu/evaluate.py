@@ -28,6 +28,8 @@ def parse_args() -> argparse.Namespace:
     # MCQ scored on choice logprob; 256 is plenty for any answer letter.
     parser.add_argument("--max-tokens", type=int, default=256)
     parser.add_argument("--gpu-memory-utilization", type=float, default=0.3)
+    parser.add_argument("--vllm-base-url", type=str, default=None)
+    parser.add_argument("--vllm-served-name", type=str, default=None)
     return parser.parse_args()
 
 
@@ -40,12 +42,17 @@ def main() -> None:
         other_kwargs["limit"] = args.limit
 
     task = "inspect_evals/mmlu_0_shot"
-    model_args = {"gpu_memory_utilization": args.gpu_memory_utilization}
-    model_args.update(template_kwargs(args))
+    if args.vllm_base_url and args.vllm_served_name:
+        model = f"openai-api/{args.vllm_served_name}"
+        model_args = {"base_url": args.vllm_base_url, "api_key": "inspectai"}
+    else:
+        model = f"vllm/{args.model_path}"
+        model_args = {"gpu_memory_utilization": args.gpu_memory_utilization}
+        model_args.update(template_kwargs(args))
 
     eval_out = inspect_eval(
         task,
-        model=f"vllm/{args.model_path}",
+        model=model,
         model_args=model_args,
         score_display=False,
         log_realtime=False,
