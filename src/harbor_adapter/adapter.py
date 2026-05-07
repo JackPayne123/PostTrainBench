@@ -265,6 +265,14 @@ fi
                 else:
                     shutil.copy(item, dst)
 
+        # Inject our LoRA starter script. instruction.md references it as
+        # `task_context/lora_starter.py`. We co-locate it inside the agent
+        # workspace (env_dir is what gets COPY'd into the container at
+        # /home/agent/workspace), so the agent sees it at task_context/lora_starter.py.
+        task_context_dst = env_dir / "task_context"
+        task_context_dst.mkdir(parents=True, exist_ok=True)
+        shutil.copy(TEMPLATE_DIR / "lora_starter.py", task_context_dst / "lora_starter.py")
+
         # Copy contamination judge script
         judge_src = TEMPLATE_DIR / "environment" / "contamination_judge.py"
         if judge_src.exists():
