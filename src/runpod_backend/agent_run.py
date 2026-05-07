@@ -492,6 +492,7 @@ async def run_contamination_judge(
 async def collect_artefacts(
     env: RunpodEnvironment,
     run_dir: Path,
+    pull_final_model: bool = False,
 ) -> None:
     """Pull everything we want preserved back from the pod."""
     pulls_small = {
@@ -529,16 +530,29 @@ async def collect_artefacts(
     else:
         log.warning(f"[pull] tar failed rc={r.return_code}; stderr tail: {(r.stderr or '')[-500:]}")
 
-    # final_model — rsync, large.
+    # final_model — opt-in. Default skip because (a) the model is already
+    # staged to the persistent volume by stage_final_model_to_volume, so it's
+    # recoverable any time via pull_run_artefacts.py, (b) home upload bandwidth
+    # makes the rsync the slowest part of the run (we've seen 30+ min for
+    # 3.5 GB), (c) held-out evals can read the model directly off the volume
+    # by attaching the same volume to a new pod — never needs to transit
+    # through laptop. Pass --pull-final-model to force.
+    if not pull_final_model:
+        log.info(
+            "[pull] skipping final_model rsync to laptop (default). "
+            "Recover later with: PYTHONPATH=. python "
+            "src/runpod_backend/pull_run_artefacts.py "
+            f"{run_dir.name}"
+        )
+        return
     remote_fm = f"{REMOTE_WORKSPACE}/final_model"
     local_fm = run_dir / "final_model"
-    # Only attempt if the dir exists on the pod.
     check = await env.exec(
         f"if [ -d {remote_fm} ]; then echo present; fi",
         timeout_sec=30,
     )
     if (check.stdout or "").strip() == "present":
-        log.info(f"[pull] {remote_fm} -> {local_fm} (rsync ~3.5 GB; can take 1-3 min)")
+        log.info(f"[pull] {remote_fm} -> {local_fm} (rsync ~3.5 GB; can take 1-3 min on good links, 30+ min on home upload)")
         try:
             await env.download_dir(remote_fm, str(local_fm))
         except Exception as exc:
@@ -592,6 +606,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--no-watch", action="store_true")
     p.add_argument("--keep-pod", action="store_true",
                    help="don't terminate the pod on exit (for live debugging)")
+    p.add_argument("--pull-final-model", action="store_true",
+                   help="rsync the merged-LoRA final_model/ to laptop (default: "
+                        "skip — model is staged to /workspace/final_models/<run>/ "
+                        "on the persistent volume and recoverable any time via "
+                        "src/runpod_backend/pull_run_artefacts.py). The rsync is "
+                        "the slowest part of the run on home upload links.")
     p.add_argument("--dry-run", action="store_true",
                    help="run pre-eval + dir scaffold only; skip agent + post-eval")
     return p.parse_args()
@@ -757,7 +777,9 @@ async def main():
         # Pull whatever we have, regardless of status.
         try:
             log.info("=== COLLECTING ARTEFACTS ===")
-            await collect_artefacts(env, run_dir)
+            await collect_artefacts(
+                env, run_dir, pull_final_model=args.pull_final_model
+            )
             parse_trace_to_human_readable(run_dir)
         except Exception:
             log.exception("artefact collection failed")
