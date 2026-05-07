@@ -362,7 +362,7 @@ async def run_eval(
     watcher_tasks = []
     if watch:
         watcher_tasks.append(asyncio.create_task(
-            watch_progress(env, label, remote_eval_root)
+            watch_progress(env, label, remote_eval_root, eval_log_path=remote_log)
         ))
         watcher_tasks.append(asyncio.create_task(watch_gpu(env, label)))
     try:
@@ -507,7 +507,13 @@ async def start_shared_vllm(
         f"disown 2>/dev/null || true; "
         f"echo started"
     )
+    # Retry once on rc=255 (SSH-side connection failure, often happens
+    # when many watcher exec()s are in flight at the moment we try to spawn).
     r = await env.exec(bootstrap, timeout_sec=30)
+    if r.return_code == 255:
+        log.warning(f"[{label}] ssh rc=255 spawning vllm; retry in 3s")
+        await asyncio.sleep(3)
+        r = await env.exec(bootstrap, timeout_sec=30)
     if r.return_code != 0 or "started" not in (r.stdout or ""):
         log.error(
             f"[{label}] failed to spawn vllm: rc={r.return_code} "

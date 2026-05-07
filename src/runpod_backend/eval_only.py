@@ -21,6 +21,7 @@ import asyncio
 import json
 import logging
 import os
+import shlex
 import sys
 import time
 from pathlib import Path
@@ -65,26 +66,52 @@ async def watch_progress(
     eval_name: str,
     remote_eval_root: str,
     period_sec: int = 15,
+    eval_log_path: str | None = None,
 ) -> None:
-    """Background task: poll the latest inspect-ai log on the remote pod and
-    log sample count. Cancelled when evaluate.py returns."""
+    """Background task: poll the latest inspect-ai log AND the redirected
+    evaluate.py stdout (if path given) on the remote pod. Cancelled when
+    evaluate.py returns.
+
+    Two signals:
+      - inspect-ai JSON log: status + sample count (stable per eval, but
+        only updates when inspect persists state)
+      - eval_log: tqdm-style "Steps: N/M ...% | Samples: X/Y" lines that
+        evaluate.py prints in real-time. Most useful for "where are we
+        right now" during a long eval.
+    """
     inspect_logs = f"{remote_eval_root}/{eval_name}/logs"
-    last = None
+    last_inspect = None
+    last_steps = None
     while True:
         try:
-            r = await env.exec(
+            # Compose: read latest inspect-ai json status AND grab last
+            # 'Steps:' line from the redirected eval log if provided.
+            cmd = (
                 f"F=$(ls -t {inspect_logs}/*.json 2>/dev/null | head -1); "
                 f"if [ -n \"$F\" ]; then python3 -c '"
                 f"import json,sys;"
                 f"d=json.load(open(sys.argv[1]));"
-                f"print(d.get(\"status\",\"?\"), len(d.get(\"samples\",[])))"
-                f"' \"$F\"; fi",
-                timeout_sec=15,
+                f"print(\"INSPECT\", d.get(\"status\",\"?\"), len(d.get(\"samples\",[])))"
+                f"' \"$F\"; fi"
             )
-            line = (r.stdout or "").strip()
-            if line and line != last:
-                log.info(f"[{eval_name}] inspect: {line}")
-                last = line
+            if eval_log_path:
+                cmd += (
+                    f"; if [ -f {shlex.quote(eval_log_path)} ]; then "
+                    f"  L=$(grep -E '^Steps: ' {shlex.quote(eval_log_path)} 2>/dev/null | tail -1); "
+                    f"  if [ -n \"$L\" ]; then echo \"STEPS $L\"; fi; "
+                    f"fi"
+                )
+            r = await env.exec(cmd, timeout_sec=15)
+            for raw in (r.stdout or "").splitlines():
+                line = raw.strip()
+                if not line:
+                    continue
+                if line.startswith("INSPECT") and line != last_inspect:
+                    log.info(f"[{eval_name}] inspect: {line[len('INSPECT '):]}")
+                    last_inspect = line
+                elif line.startswith("STEPS") and line != last_steps:
+                    log.info(f"[{eval_name}] {line[len('STEPS '):]}")
+                    last_steps = line
         except Exception as exc:  # never let watcher crash the run
             log.debug(f"[{eval_name}] watch_progress: {exc}")
         await asyncio.sleep(period_sec)
