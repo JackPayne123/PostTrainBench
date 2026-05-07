@@ -280,20 +280,40 @@ async def run_eval(
     log.info(f"[{label}] uploading templates -> {remote_templates}")
     await env.upload_dir(str(REPO_ROOT / "src/eval/templates"), remote_templates)
 
-    # Redirect evaluate.py output to a file on the pod (NOT streamed back via
-    # SSH). High-volume inspect-ai output via tee_logger=True occasionally
-    # leaves the SSH channel half-open after the remote process exits — the
-    # await never returns. Watchers (watch_progress + watch_gpu) still give
-    # us live signal via separate SSH connections.
+    # Background the eval + poll for sentinel file. Avoids the SSH
+    # channel-hold-open hang we saw twice today (gsm8k pre on 2026-05-07
+    # smoke v2 attempt 1 hung 6 min; humaneval pre on attempt 3 hung
+    # despite ssh -n). Cause: vllm forks workers that hold FDs even after
+    # the foreground process exits; SSH server keeps the channel open
+    # indefinitely. nohup + setsid detaches the eval from the SSH session
+    # entirely; the polling loop is the only thing the SSH session waits on.
     remote_log = f"{remote_task_dir}/eval_{label}.log"
-    cmd = (
+    sentinel = f"{remote_task_dir}/.eval_{label}_done"
+    eval_inner = (
         f"python3 evaluate.py "
         f"--model-path {shlex.quote(model_path)} "
         f"--templates-dir {remote_templates}/ "
         f"--limit {limit} "
         f"--gpu-memory-utilization 0.85 "
-        f"--json-output-file {remote_metrics} "
-        f"> {remote_log} 2>&1"
+        f"--json-output-file {remote_metrics}; "
+        f"echo $? > {sentinel}"
+    )
+    cmd = (
+        f"rm -f {sentinel}; "
+        f"setsid nohup bash -c {shlex.quote(eval_inner)} "
+        f"> {remote_log} 2>&1 < /dev/null & "
+        f"disown; "
+        # Poll the sentinel; bounded internally so we don't loop forever
+        # if evaluate.py wedges. After 3600s we bail and let timeout_sec
+        # in env.exec handle it.
+        f"for i in $(seq 1 720); do "
+        f"  if [ -f {sentinel} ]; then "
+        f"    echo \"[done rc=$(cat {sentinel})]\"; "
+        f"    exit $(cat {sentinel}); "
+        f"  fi; "
+        f"  sleep 5; "
+        f"done; "
+        f"echo '[poll timeout]'; exit 124"
     )
     log.info(f"[{label}] running: {cmd}")
     t0 = time.time()
