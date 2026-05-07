@@ -27,6 +27,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -350,7 +351,13 @@ async def run_eval(
         f"done; "
         f"echo '[poll timeout]'; exit 124"
     )
-    log.info(f"[{label}] running: {cmd}")
+    # Redact secrets before logging cmd (HF_TOKEN/API keys end up here).
+    safe_cmd = re.sub(
+        r"(HF_TOKEN|ANTHROPIC_API_KEY|OPENAI_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)='[^']*'",
+        r"\1='<redacted>'",
+        cmd,
+    )
+    log.info(f"[{label}] running: {safe_cmd}")
     t0 = time.time()
     watcher_tasks = []
     if watch:
