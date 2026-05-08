@@ -848,8 +848,13 @@ async def stage_final_model_to_volume(
     can be recovered with src/runpod_backend/pull_run_artefacts.py."""
     src = f"{REMOTE_WORKSPACE}/final_model"
     dst = f"{REMOTE_VOLUME_FINAL_MODELS}/{run_dir_name}"
+    # Accept either a LoRA adapter dir (adapter_config.json — current
+    # default per instruction.md / lora_starter.py) OR a merged
+    # full-model dir (config.json — what --merge-into-base produces).
     check = await env.exec(
-        f"if [ -d {src} ] && [ -f {src}/config.json ]; then echo present; fi",
+        f"if [ -d {src} ] && "
+        f"( [ -f {src}/adapter_config.json ] || [ -f {src}/config.json ] ); "
+        f"then echo present; fi",
         timeout_sec=30,
     )
     if (check.stdout or "").strip() != "present":
@@ -1282,10 +1287,12 @@ async def main():
         # may have been orphaned (claude-code wrapper killed but child
         # python lives on as PID 1's child) and the CUDA driver doesn't
         # release allocations until the holding process actually dies.
+        # Empirically the driver can take 3+ minutes to release a 17 GiB
+        # allocation after the holder dies; 5 min wait keeps headroom.
         # Without this, vllm-post fails with "Free memory on device
         # (1.93/23.56 GiB) ... less than desired (20.02 GiB)".
         await kill_orphan_gpu_holders(env, label="post-prep")
-        await wait_for_gpu_clear(env, label="post-prep", target_mb=2000, max_wait_s=120)
+        await wait_for_gpu_clear(env, label="post-prep", target_mb=2000, max_wait_s=300)
 
         # --- post-eval ---
         # Bring up shared vllm BEFORE the primary benchmark (gsm8k) so that
