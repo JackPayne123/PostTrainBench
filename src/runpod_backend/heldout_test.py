@@ -142,6 +142,27 @@ async def main() -> None:
         log.info("uploading src/eval/tasks/")
         await env.upload_dir(str(REPO_ROOT / "src/eval/tasks"), "/workspace/heldout_eval_tasks")
 
+        # Pre-fetch HF datasets that need a specific config / revision and
+        # aren't auto-fetched by the task. abstention_bench uses
+        # gpqa_diamond at a pinned revision; the surrounding tasks only
+        # ever cache gpqa_main, so the eval errors with
+        # "Couldn't find cache for Idavidrein/gpqa for config 'gpqa_diamond'".
+        # Trigger a download up-front so the rest of the panel is offline-safe.
+        log.info("pre-fetching gated/pinned HF datasets")
+        prefetch_cmd = (
+            "export HF_HOME=/workspace/hf-cache; "
+            f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
+            "python3 -c \""
+            "import datasets; "
+            "datasets.load_dataset("
+            "'Idavidrein/gpqa', 'gpqa_diamond', "
+            "revision='5233cd1db58884ed0bf678c7c6be731722a23f84')"
+            "\" 2>&1 | tail -3"
+        )
+        pf = await env.exec(prefetch_cmd, timeout_sec=300)
+        if pf.return_code != 0:
+            log.warning(f"prefetch rc={pf.return_code}: {(pf.stdout or pf.stderr or '')[-300:]}")
+
         vllm_url = await start_shared_vllm(
             env,
             model_path=args.model,
