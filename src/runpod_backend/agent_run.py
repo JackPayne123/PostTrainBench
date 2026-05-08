@@ -544,8 +544,13 @@ async def start_shared_vllm(
     # callers pass the base HF id as model_path in this case.
     lora_flags = ""
     if lora_adapter_path:
+        # max-lora-rank: default 16. Our lora_starter.py defaults to r=16
+        # but agents are free to bump it (the 30min run on 2026-05-09
+        # used r=32). Bump to 64 to cover anything reasonable; higher
+        # ranks just allocate more KV-cache slack.
         lora_flags = (
             f" --enable-lora "
+            f"--max-lora-rank 64 "
             f"--lora-modules {shlex.quote(served_name)}={shlex.quote(lora_adapter_path)}"
         )
         served_arg = f"--served-model-name base"  # base served separately
@@ -621,12 +626,25 @@ async def start_shared_vllm(
     r = await env.exec(poll_cmd, timeout_sec=timeout_sec + 60)
     if r.return_code != 0 or "ready" not in (r.stdout or ""):
         log.error(f"[{label}] vllm not ready after {timeout_sec}s")
-        # Capture log tail for debug
+        # Surface the actual error to the local .output so callers don't
+        # need to ssh into the pod to find it. Two passes:
+        #   1. The first ERROR/Traceback after boot — usually the root
+        #      cause (e.g. LoRA rank cap, GPU OOM, missing dep, port).
+        #   2. The last 200 lines — context around whatever the engine
+        #      actually died with.
         try:
-            tail = await env.exec(f"tail -50 {log_path}", timeout_sec=15)
-            log.error(f"[{label}] vllm log tail:\n{tail.stdout or ''}")
-        except Exception:
-            pass
+            err_grep = await env.exec(
+                f"grep -nE 'ERROR|Error:|Traceback|ValueError|RuntimeError|"
+                f"Failed|raise' {log_path} 2>/dev/null | head -30",
+                timeout_sec=15,
+            )
+            err_lines = (err_grep.stdout or "").strip()
+            if err_lines:
+                log.error(f"[{label}] error lines from {log_path}:\n{err_lines}")
+            tail = await env.exec(f"tail -200 {log_path}", timeout_sec=15)
+            log.error(f"[{label}] vllm log tail (last 200 lines):\n{tail.stdout or ''}")
+        except Exception as exc:
+            log.error(f"[{label}] could not pull vllm log: {exc}")
         return None
     log.info(f"[{label}] vllm ready at {base_url} (served as '{served_name}')")
     return base_url
