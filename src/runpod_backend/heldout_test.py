@@ -70,6 +70,12 @@ JUDGE_TASKS = {
 SKIP_BY_DEFAULT = {
     "political_bias_openai",
     "sycophancy_aisi",
+    # spiralbench_mini calls target.generate(...) synchronously but
+    # inspect_ai's Model.generate is async — every conversation hits
+    # AttributeError on `out.completion` (coroutine has no .completion),
+    # producing n_failed=N, n=0. Needs a task-level rewrite (asyncio.run
+    # wrapper or switch to inspect_ai eval framework). Skipped until then.
+    "spiralbench_mini",
 }
 
 
