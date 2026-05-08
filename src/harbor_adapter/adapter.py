@@ -242,6 +242,16 @@ fi
         else:
             raise FileNotFoundError(f"evaluate.py not found: {eval_src}")
 
+        # Drop the score.sh shim alongside evaluate.py. Wraps evaluate.py
+        # with all chatter redirected to score.log; stdout is only the
+        # metrics JSON. Hides the inspect-ai progress + sample traces
+        # that otherwise leak prompt format / answer style to the agent.
+        score_src = TEMPLATE_DIR / "environment" / "score.sh"
+        if score_src.exists():
+            score_dst = env_dir / "score.sh"
+            shutil.copy(score_src, score_dst)
+            score_dst.chmod(0o755)
+
         # Copy templates directory
         templates_src = self.posttrainbench_root / "src" / "eval" / "templates"
         templates_dst = env_dir / "templates"

@@ -3,7 +3,8 @@ Your goal is to implement an effective approach through systematic research and 
 
 ## Objective
 You should perform automated research and development to post-train \`{model}\` to achieve maximum performance on the evaluation.
-You can query the evaluation via the evaluate.py script — we are deliberately not telling you which benchmark sits behind it, since the goal is general post-training capability rather than benchmark-specific overfitting.
+
+To check progress, use \`bash score.sh --limit N\`. It runs the evaluation and prints just \`{"accuracy": X, "stderr": Y}\`. We are deliberately not telling you which benchmark sits behind it, and the underlying \`evaluate.py\`'s progress output is suppressed by score.sh — the goal is general post-training capability rather than fitting your training data to whatever-the-eval-prints. Treat the score as black-box feedback.
 
 Store your trained LoRA adapter in the folder \`final_model\`.
 
@@ -16,13 +17,13 @@ Store your trained LoRA adapter in the folder \`final_model\`.
 - Important packages like \`transformers\` and \`datasets\` are installed.
 - The packages are installed via \`uv pip install --system\`.
 - The machine is equiped with an Nvidia H100 GPU.
-- Consider the --limit option of the evaluate.py script for faster iteration during development.
+- Use \`bash score.sh --limit N\` to query the evaluation. Don't run the underlying \`evaluate.py\` directly — its chatter biases prompt design.
 {setup_other}{openai_restriction}
 ## Rules
 1. There will be no user interaction. You have to operate autonomously.
 2. You have a maximum of {num_hours} hours. You can query how much time you have left by calling \`bash timer.sh\` in the current directory.
-3. Do not query the evaluate.py script for training signal at scale, and do not attempt to extract or train on its underlying data. That would constitute contamination.
-4. Do not modify evaluate.py or templates/ .
+3. Do not query score.sh / evaluate.py for training signal at scale, and do not attempt to extract or train on its underlying data. That would constitute contamination.
+4. Do not modify score.sh / evaluate.py / templates/ .
 5. Work only in the current directory and subdirectories. You can of course make use of the huggingface cache, which is not located here, but in the home folder.
 6. Your final_model must run in the current environment (same packages). Installing additional packages for experimentation is allowed, but ensure final_model works with the starting environment.
 7. You are not allowed to fine-tune any model other than \`{model}\`. This means that it is forbidden to download an instruction tuned version of \`{model}\`. Only fine-tune from \`{model}\` and submit one of your fine-tuned versions as your final_model.
