@@ -223,7 +223,11 @@ async def main() -> None:
             # channel only ever sees the polling loop's output, never any
             # eval subprocess stdout — fixes hangs where SSH waited 15+ min
             # for inspect_ai grandchildren to release inherited FDs.
-            poll_max = 600 // 5  # 600s budget / 5s sleep = 120 iterations
+            # 20min budget — moru is the outlier at ~12-15min when both
+            # target and grader run on the same shared vllm; everything
+            # else completes in <2min so the headroom is cheap.
+            task_budget_s = 1200
+            poll_max = task_budget_s // 5
             cmd = (
                 f"rm -f {done_flag}; "
                 f"setsid nohup bash -c {shlex.quote(inner)} "
@@ -234,9 +238,9 @@ async def main() -> None:
                 f"done; "
                 f"echo '[poll timeout]'; exit 124"
             )
-            # 10min hard cap per task. Polling loop fail-fasts on hang
-            # (no inherited-FD-keepalive risk) and we mark task as failed.
-            r = await env.exec(cmd, timeout_sec=620)
+            # task_budget_s + 20s slop. Polling loop fail-fasts on hang
+            # (no inherited-FD-keepalive risk) so we mark task failed.
+            r = await env.exec(cmd, timeout_sec=task_budget_s + 20)
             if r.return_code != 0:
                 log.error(f"  {task_name} FAILED rc={r.return_code} stderr_tail={(r.stderr or '')[-500:]}")
                 results[task_name] = {"error": f"rc={r.return_code}", "stderr_tail": (r.stderr or "")[-500:]}
