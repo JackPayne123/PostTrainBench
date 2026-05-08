@@ -18,7 +18,19 @@ import sys
 
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-TEMPLATES_DIR = os.path.join(REPO_ROOT, "src", "eval", "templates")
+# Env var overrides — heldout_test.py uploads heldout_evals/ alongside
+# eval/tasks/ + eval/templates/ on the runpod under /workspace/, but the
+# default REPO_ROOT-relative paths expect a src/eval/{tasks,templates}/
+# layout. Both vars let the caller point at any directory holding the
+# upstream PTB tasks and chat templates.
+PTB_TASKS_DIR = os.environ.get(
+    "HELDOUT_PTB_TASKS_DIR",
+    os.path.join(REPO_ROOT, "src", "eval", "tasks"),
+)
+TEMPLATES_DIR = os.environ.get(
+    "HELDOUT_TEMPLATES_DIR",
+    os.path.join(REPO_ROOT, "src", "eval", "templates"),
+)
 
 
 def delegate(upstream_task: str, extra_args: list[str] | None = None) -> int:
@@ -30,7 +42,7 @@ def delegate(upstream_task: str, extra_args: list[str] | None = None) -> int:
     by argparse).
     """
     upstream = os.path.join(
-        REPO_ROOT, "src", "eval", "tasks", upstream_task, "evaluate.py"
+        PTB_TASKS_DIR, upstream_task, "evaluate.py"
     )
     if not os.path.isfile(upstream):
         raise FileNotFoundError(upstream)

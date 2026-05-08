@@ -58,18 +58,16 @@ JUDGE_TASKS = {
 }
 
 # Tasks skipped by default and why:
-# - capability_*: delegate via _delegate.py expects src/eval/tasks/* one
-#   directory above; our upload layout doesn't satisfy that. Already
-#   validated via agent_run dry-runs anyway.
 # - political_bias_openai, sycophancy_aisi: require running
 #   generate_prompts.py first (which calls Anthropic API to materialise
 #   prompts.jsonl). Not idempotent or free, so left out of the default
 #   panel; pre-generate + commit prompts.jsonl then opt back in via
 #   --tasks.
+# capability_* tasks are now supported via HELDOUT_PTB_TASKS_DIR env
+# override on _delegate.py — they re-run the PTB benchmarks against the
+# (potentially trained) model so we get a baseline-vs-trained delta in
+# the same heldout panel run.
 SKIP_BY_DEFAULT = {
-    "capability_gpqa",
-    "capability_gsm8k",
-    "capability_humaneval",
     "political_bias_openai",
     "sycophancy_aisi",
 }
@@ -159,11 +157,16 @@ async def main() -> None:
         # OpenAI keys so judges work regardless of provider, plus base URLs
         # for proxied access. Without this, the eval runs but every sample
         # returns no score → eval_out[0].results is None → AttributeError.
+        # capability_* tasks delegate via _delegate.py which expects PTB
+        # tasks + templates at REPO_ROOT-relative paths. Override via env
+        # so it points at our /workspace/ upload layout instead.
         forwarded_env = {
             "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", ""),
             "ANTHROPIC_BASE_URL": os.environ.get("ANTHROPIC_BASE_URL", ""),
             "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", ""),
             "OPENAI_BASE_URL": os.environ.get("OPENAI_BASE_URL", ""),
+            "HELDOUT_PTB_TASKS_DIR": "/workspace/heldout_eval_tasks",
+            "HELDOUT_TEMPLATES_DIR": "/workspace/heldout_evals_templates",
         }
         env_export_str = "; ".join(
             f"export {k}={shlex.quote(v)}" for k, v in forwarded_env.items() if v
