@@ -439,12 +439,52 @@ async def run_agent(
     # because RunPod containers run as root by default, and we don't (yet) bother
     # creating a non-root agent user (PTB's HPC pattern). Verified
     # 2026-05-07 against ptb-base:4: claude-code 2.x respects this env var.
-    cmd = (
+    #
+    # Sentinel-polling instead of direct exec: the SSH channel for the agent
+    # was hanging up to 10+ min after the agent process exited because the
+    # claude-code CLI spawns subprocess descendants (training python, vllm
+    # workers) that inherit the channel's stdout. `ssh -n` doesn't help —
+    # the server holds the channel open until ALL inherited FDs close.
+    # Detach via setsid+nohup, capture rc to a sentinel file, poll the
+    # sentinel from a tiny foreground loop. SSH only sees the loop's
+    # output, so the channel exits cleanly. On poll timeout, send SIGTERM
+    # (then SIGKILL if needed) to the detached process group so the
+    # follow-on stages don't race against a still-running agent that
+    # holds the GPU.
+    done_flag = f"{REMOTE_RUNLOG}/agent_done.rc"
+    pid_file = f"{REMOTE_RUNLOG}/agent.pgid"
+    inner = (
         f"PROMPT=$(cat prompt.txt) "
         f"AGENT_CONFIG={shlex.quote(teacher_config)} "
         f"BENCHMARK={shlex.quote(benchmark)} "
         f"IS_SANDBOX=1 "
-        f"bash solve.sh > {remote_jsonl} 2>&1"
+        f"bash solve.sh > {remote_jsonl} 2>&1; echo $? > {done_flag}"
+    )
+    poll_max = timeout_sec // 5
+    cmd = (
+        f"rm -f {done_flag}; "
+        # setsid creates a new process group; record pgid so we can kill the
+        # whole tree if the budget expires. nohup detaches from the SSH
+        # channel; redirects close all stdio. disown drops it from the
+        # parent shell's job table.
+        f"setsid bash -c {shlex.quote(inner)} "
+        f"< /dev/null > /dev/null 2>&1 & "
+        f"pgid=$!; echo $pgid > {pid_file}; disown 2>/dev/null || true; "
+        f"for i in $(seq 1 {poll_max}); do "
+        f"  if [ -f {done_flag} ]; then exit $(cat {done_flag}); fi; "
+        f"  sleep 5; "
+        f"done; "
+        # Budget exceeded — kill the process group cleanly, then force.
+        f"echo '[agent] poll timeout — terminating process group'; "
+        f"if [ -f {pid_file} ]; then "
+        f"  kill -TERM -$(cat {pid_file}) 2>/dev/null || true; "
+        f"  for j in 1 2 3 4 5; do "
+        f"    if [ -f {done_flag} ]; then exit $(cat {done_flag}); fi; "
+        f"    sleep 2; "
+        f"  done; "
+        f"  kill -KILL -$(cat {pid_file}) 2>/dev/null || true; "
+        f"fi; "
+        f"exit 124"
     )
     log.info(f"[agent] launching (budget={time_budget_h}h, timeout={timeout_sec}s)")
     t0 = time.time()
@@ -453,8 +493,8 @@ async def run_agent(
             cmd,
             cwd=REMOTE_WORKSPACE,
             env={"HF_HOME": "/workspace/hf-cache", "IS_SANDBOX": "1"},
-            timeout_sec=timeout_sec,
-            tee_logger=False,  # the agent's stream-json is huge; rely on watcher
+            timeout_sec=timeout_sec + 60,
+            tee_logger=False,
         )
     finally:
         for t in watcher_tasks:
@@ -590,6 +630,62 @@ async def start_shared_vllm(
         return None
     log.info(f"[{label}] vllm ready at {base_url} (served as '{served_name}')")
     return base_url
+
+
+async def wait_for_gpu_clear(
+    env: RunpodEnvironment,
+    *,
+    label: str,
+    target_mb: int = 1000,
+    max_wait_s: int = 120,
+) -> None:
+    """Block until GPU memory drops below target_mb (default 1 GiB).
+
+    Used between phases that hand the GPU off (agent -> vllm-post). The
+    agent step's CUDA workers can hold 20+ GiB of allocations that the
+    driver doesn't release synchronously when the parent process exits;
+    starting vllm immediately after fails with
+    `Free memory on device (1.93/23.56 GiB) ... less than desired`.
+    """
+    log.info(f"[{label}] waiting for GPU memory < {target_mb} MiB")
+    r = await env.exec(
+        f"for i in $(seq 1 {max_wait_s // 5}); do "
+        f"  used=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits); "
+        f"  if [ \"$used\" -lt {target_mb} ]; then echo \"cleared at ${{used}} MiB\"; exit 0; fi; "
+        f"  sleep 5; "
+        f"done; "
+        f"echo \"did_not_clear (used=$used MiB after {max_wait_s}s)\"",
+        timeout_sec=max_wait_s + 30,
+    )
+    log.info(f"[{label}] {(r.stdout or '').strip()}")
+
+
+async def kill_orphan_gpu_holders(
+    env: RunpodEnvironment, label: str = "orphan-cleanup"
+) -> None:
+    """SIGTERM any python process pinning the GPU + wait for release.
+
+    Called after the agent step in case its training subprocess survived
+    the agent's claude-code parent (claude-code spawns python via bash;
+    when the bash wrapper is killed by our outer SIGTERM, the python
+    grandchild is orphaned to PID 1 and keeps holding CUDA memory).
+    """
+    log.info(f"[{label}] killing any python GPU holders")
+    await env.exec(
+        # Find PIDs holding GPU memory; SIGTERM each, wait, then SIGKILL.
+        "pids=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null | tr -d ' ' | sort -u); "
+        "if [ -n \"$pids\" ]; then "
+        "  for p in $pids; do kill \"$p\" 2>/dev/null || true; done; "
+        "  for i in $(seq 1 15); do "
+        "    remaining=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null | tr -d ' '); "
+        "    if [ -z \"$remaining\" ]; then echo cleared; exit 0; fi; "
+        "    sleep 1; "
+        "  done; "
+        "  for p in $pids; do kill -9 \"$p\" 2>/dev/null || true; done; "
+        "  echo escalated_to_sigkill; "
+        "fi",
+        timeout_sec=60,
+    )
 
 
 async def stop_shared_vllm(
@@ -1181,6 +1277,15 @@ async def main():
             student_model=args.student,
             benchmark=args.benchmark,
         )
+
+        # Free the GPU before vllm-post. The agent step's training python
+        # may have been orphaned (claude-code wrapper killed but child
+        # python lives on as PID 1's child) and the CUDA driver doesn't
+        # release allocations until the holding process actually dies.
+        # Without this, vllm-post fails with "Free memory on device
+        # (1.93/23.56 GiB) ... less than desired (20.02 GiB)".
+        await kill_orphan_gpu_holders(env, label="post-prep")
+        await wait_for_gpu_clear(env, label="post-prep", target_mb=2000, max_wait_s=120)
 
         # --- post-eval ---
         # Bring up shared vllm BEFORE the primary benchmark (gsm8k) so that
