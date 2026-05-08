@@ -142,34 +142,32 @@ def main() -> None:
 
     init_display_type("plain")
 
-    # inspect_ai.model.get_model expects a GenerateConfig instance, not a
-    # dict (errors with `'dict' object has no attribute 'model_dump_json'`
-    # when serializing for cache key). max_connections lives on the
-    # provider's model_args, not the GenerateConfig.
+    # inspect_ai.model.get_model needs a GenerateConfig (not a dict — errors
+    # with `'dict' has no attribute 'model_dump_json'` when serializing for
+    # cache key). max_connections lives on GenerateConfig itself, not on
+    # provider model_args. Putting it in model_args forwards it to
+    # AsyncOpenAI(...) which rejects unknown kwargs.
     gen_config = GenerateConfig(
         max_tokens=args.response_tokens,
         temperature=args.temperature,
+        max_connections=args.max_connections,
     )
     if getattr(args, "vllm_base_url", None) and getattr(args, "vllm_served_name", None):
-        # api_key MUST go on get_model() as a top-level kwarg, not inside
-        # model_args. openai_compatible.__init__ accepts api_key as a named
-        # parameter and only falls back to looking up <SERVICE>_API_KEY env
-        # var if api_key is None. Wrapping it in model_args means it's
-        # routed via **kwargs and never reaches the named param, so the
-        # provider raises "No LOCAL_API_KEY defined in the environment".
+        # api_key MUST be a top-level kwarg to get_model(). openai_compatible
+        # accepts api_key as a named param; wrapping it in model_args routes
+        # via **kwargs and never reaches the named param, so the provider
+        # falls back to <SERVICE>_API_KEY env lookup -> LOCAL_API_KEY missing.
         target = get_model(
             f"openai-api/local/{args.vllm_served_name}",
             base_url=args.vllm_base_url,
             api_key="inspectai",
             config=gen_config,
-            model_args={"max_connections": args.max_connections},
         )
     else:
         target = get_model(
             f"vllm/{args.model_path}",
             config=gen_config,
             model_args={
-                "max_connections": args.max_connections,
                 "gpu_memory_utilization": args.gpu_memory_utilization,
                 **template_kwargs(args),
             },
