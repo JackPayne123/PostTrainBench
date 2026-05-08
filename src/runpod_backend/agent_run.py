@@ -837,6 +837,49 @@ async def run_heldout_in_separate_pod(
             log.error(f"[heldout-pod] stop failed: {exc}")
 
 
+async def safety_pull_lora_adapter(
+    env: RunpodEnvironment,
+    *,
+    run_dir: Path,
+) -> bool:
+    """Pull just the LoRA adapter to local run_dir/adapter_safety/.
+
+    Defense in depth: a 12 MB adapter is cheap to copy locally even on
+    home upload, so we do it right after the agent ends regardless of
+    what fails downstream (post-eval crash, pod teardown). Doesn't
+    replace stage_final_model_to_volume — the volume staging is still
+    the canonical store; this is just the laptop-resident backup so a
+    full pod loss doesn't waste 30+ minutes of agent work.
+
+    Skipped if the dir doesn't look like a LoRA adapter (no
+    adapter_config.json) — full merged checkpoints are too big to pull
+    over a home link without the explicit --pull-final-model flag.
+    """
+    remote_fm = f"{REMOTE_WORKSPACE}/final_model"
+    check = await env.exec(
+        f"if [ -d {remote_fm} ] && [ -f {remote_fm}/adapter_config.json ]; "
+        f"then "
+        f"  size=$(du -sm {remote_fm} | cut -f1); "
+        f"  echo present size_mb=$size; "
+        f"fi",
+        timeout_sec=30,
+    )
+    out = (check.stdout or "").strip()
+    if not out.startswith("present"):
+        log.info("[safety-pull] no LoRA adapter at final_model/ — skipping")
+        return False
+    local_dst = run_dir / "adapter_safety"
+    local_dst.mkdir(parents=True, exist_ok=True)
+    log.info(f"[safety-pull] {remote_fm} -> {local_dst} ({out})")
+    try:
+        await env.download_dir(remote_fm, str(local_dst))
+        log.info("[safety-pull] adapter copied to laptop")
+        return True
+    except Exception as exc:
+        log.error(f"[safety-pull] failed: {exc}")
+        return False
+
+
 async def stage_final_model_to_volume(
     env: RunpodEnvironment,
     *,
@@ -1262,6 +1305,13 @@ async def main():
         if rc != 0:
             status = "agent_failed"
             # don't bail — still pull artefacts so the failure is debuggable
+
+        # --- safety pull adapter to laptop (LoRA mode only, ~12 MB) ---
+        # Runs FIRST after the agent so even a downstream crash + pod
+        # teardown doesn't lose the trained weights. Fast for adapters,
+        # skipped automatically for full merged checkpoints.
+        log.info("=== SAFETY PULL (LoRA adapter) ===")
+        await safety_pull_lora_adapter(env, run_dir=run_dir)
 
         # --- stage final_model to volume (recoverable on pod teardown) ---
         log.info("=== STAGING FINAL MODEL TO VOLUME ===")
