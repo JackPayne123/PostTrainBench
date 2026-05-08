@@ -169,19 +169,28 @@ async def main() -> None:
                 f"--json-output-file {out_path} "
                 f"&& cat {out_path}"
             )
+            # Run eval THEN read metrics file in a separate cat command. The
+            # previous shape (`evaluate.py && cat metrics.json`) glued eval
+            # progress output and the metrics JSON together in one stdout
+            # stream, defeating any rfind/regex-based extraction. Two-phase
+            # exec keeps stdout clean: phase 2's stdout = the file content
+            # verbatim. Drop `&& cat ...` from cmd and read out_path here.
+            cmd = cmd.rsplit("&&", 1)[0].rstrip()
             r = await env.exec(cmd, timeout_sec=1800)
             if r.return_code != 0:
                 log.error(f"  {task_name} FAILED rc={r.return_code} stderr_tail={(r.stderr or '')[-500:]}")
                 results[task_name] = {"error": f"rc={r.return_code}", "stderr_tail": (r.stderr or "")[-500:]}
                 continue
             try:
-                # extract last balanced JSON object from stdout
-                stdout = r.stdout or ""
-                start = stdout.rfind("{")
-                end = stdout.rfind("}")
-                metrics = json.loads(stdout[start:end + 1]) if start >= 0 and end > start else {}
-                results[task_name] = metrics
-                log.info(f"  metrics: {metrics}")
+                cat_r = await env.exec(f"cat {out_path}", timeout_sec=30)
+                if cat_r.return_code != 0:
+                    raise RuntimeError(f"cat failed rc={cat_r.return_code}")
+                metrics = json.loads((cat_r.stdout or "").strip())
+                # Drop verbose row-level details from per-task output; keep
+                # top-level numeric metrics.
+                summary = {k: v for k, v in metrics.items() if not isinstance(v, list)}
+                results[task_name] = summary
+                log.info(f"  metrics: {summary}")
             except Exception as e:
                 log.error(f"  parse failed: {e}; stdout_tail={(r.stdout or '')[-500:]}")
                 results[task_name] = {"error": f"parse: {e}", "stdout_tail": (r.stdout or "")[-500:]}

@@ -13,4 +13,12 @@ if __name__ == "__main__":
     # inspect_evals.personality registers personality_BFI and personality_TRAIT
     # as @task entrypoints; there is no top-level "personality" task. BFI = the
     # canonical Big Five 50-item self-report — matches the HELDOUT spec.
-    run_inspect_eval("inspect_evals/personality_BFI", default_limit=100)
+    # upstream_module override needed because _inspect_wrap defaults the
+    # import path to task.replace("/", ".") which would try to import the
+    # non-existent module `inspect_evals.personality_BFI` instead of the
+    # `inspect_evals.personality` module that registers the task.
+    run_inspect_eval(
+        "inspect_evals/personality_BFI",
+        default_limit=100,
+        upstream_module="inspect_evals.personality",
+    )

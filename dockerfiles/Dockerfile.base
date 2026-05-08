@@ -88,6 +88,10 @@ RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
     bitsandbytes \
     hf_xet \
     hydra-core \
+    "omegaconf>=2.4.0.dev2" \
+    loguru \
+    gdown \
+    jsonlines \
     lm-eval \
     openai \
     pandas \
