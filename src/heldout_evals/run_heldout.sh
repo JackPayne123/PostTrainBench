@@ -48,18 +48,42 @@ TEMPLATES_DIR="$REPO_ROOT/src/eval/templates"
 CHAT_TEMPLATE="$TEMPLATES_DIR/qwen3.jinja"
 VLLM_LOG="$HELDOUT_DIR/_shared_vllm.log"
 
+# Port-based PID lookup via ss (iproute2). Avoids fuser (psmisc not in
+# ptb-base:4 image) and pkill -f (would self-match the bash wrapper).
+# SIGTERM first, escalate to SIGKILL after 15s — vllm needs to release
+# CUDA allocations on exit, otherwise the driver tracks a 'ghost' alloc
+# against the dead PID and the GPU stays at 21+ GiB used until reboot.
+kill_holder_at_port() {
+    local port="$1"
+    local pid
+    pid=$(ss -tlnpH "sport = :${port}" 2>/dev/null | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
+    if [[ -n "$pid" ]]; then
+        kill "$pid" 2>/dev/null || true
+        for i in $(seq 1 15); do
+            if ! kill -0 "$pid" 2>/dev/null; then return 0; fi
+            sleep 1
+        done
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "[heldout] WARNING: SIGTERM ignored, escalating to SIGKILL on pid=$pid (will likely leak GPU)" >&2
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+    fi
+}
+
 start_shared_vllm() {
     echo "[heldout] starting shared vllm at :${SHARED_PORT} for $ABS_MODEL"
-    fuser -k ${SHARED_PORT}/tcp 2>/dev/null || true
+    kill_holder_at_port "$SHARED_PORT"
     sleep 2
     setsid nohup bash -c "
         export HF_HOME=\"\${HF_HOME:-/workspace/hf-cache}\"
+        export VLLM_LOGGING_LEVEL=DEBUG
         vllm serve \"$ABS_MODEL\" \
             --host 0.0.0.0 --port $SHARED_PORT \
             --api-key $SHARED_API_KEY \
             --served-model-name $SHARED_NAME \
             --gpu-memory-utilization 0.85 \
-            --chat-template $CHAT_TEMPLATE
+            --chat-template $CHAT_TEMPLATE \
+            --uvicorn-log-level debug
     " > "$VLLM_LOG" 2>&1 < /dev/null &
     disown
     echo "[heldout] waiting for vllm to be ready..."
@@ -78,7 +102,7 @@ start_shared_vllm() {
 
 stop_shared_vllm() {
     echo "[heldout] stopping shared vllm"
-    fuser -k ${SHARED_PORT}/tcp 2>/dev/null || true
+    kill_holder_at_port "$SHARED_PORT"
 }
 
 # ─── Run ───────────────────────────────────────────────────────────────────

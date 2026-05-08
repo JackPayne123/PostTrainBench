@@ -137,30 +137,32 @@ def main() -> None:
 
     # Target model: vLLM via Inspect AI generate. We use the model directly
     # (not via Task) because we need fine-grained multi-turn control.
-    from inspect_ai.model import get_model
+    from inspect_ai.model import GenerateConfig, get_model
     from inspect_ai.util._display import init_display_type
 
     init_display_type("plain")
 
+    # inspect_ai.model.get_model expects a GenerateConfig instance, not a
+    # dict (errors with `'dict' object has no attribute 'model_dump_json'`
+    # when serializing for cache key). max_connections lives on the
+    # provider's model_args, not the GenerateConfig.
+    gen_config = GenerateConfig(
+        max_tokens=args.response_tokens,
+        temperature=args.temperature,
+    )
     if getattr(args, "vllm_base_url", None) and getattr(args, "vllm_served_name", None):
         target = get_model(
-            f"openai-api/{args.vllm_served_name}",
-            config={
-                "max_tokens": args.response_tokens,
-                "temperature": args.temperature,
-                "max_connections": args.max_connections,
-            },
-            model_args={"base_url": args.vllm_base_url, "api_key": "inspectai"},
+            f"openai-api/local/{args.vllm_served_name}",
+            base_url=args.vllm_base_url,
+            config=gen_config,
+            model_args={"api_key": "inspectai", "max_connections": args.max_connections},
         )
     else:
         target = get_model(
             f"vllm/{args.model_path}",
-            config={
-                "max_tokens": args.response_tokens,
-                "temperature": args.temperature,
-                "max_connections": args.max_connections,
-            },
+            config=gen_config,
             model_args={
+                "max_connections": args.max_connections,
                 "gpu_memory_utilization": args.gpu_memory_utilization,
                 **template_kwargs(args),
             },

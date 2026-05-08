@@ -83,7 +83,14 @@
 {%- endfor %}
 {%- if add_generation_prompt %}
     {{- '<|im_start|>assistant\n' }}
-    {%- if enable_thinking is defined and enable_thinking is false %}
+    {#- Disable thinking by default. Qwen3's pre-fill of an empty
+        <think></think> block tells the model to skip reasoning and emit
+        the answer directly. Why: thinking-mode produces 1k+ tokens of
+        reasoning per sample which (1) blows out eval timeouts and gpu
+        budgets, (2) often leaves the answer truncated by max_tokens, and
+        (3) trips up scorers that expect a clean answer. Set
+        enable_thinking=true at the call site to opt back in. #}
+    {%- if not (enable_thinking is defined and enable_thinking is true) %}
         {{- '<think>\n\n</think>\n\n' }}
     {%- endif %}
 {%- endif %}

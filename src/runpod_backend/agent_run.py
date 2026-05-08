@@ -309,10 +309,15 @@ async def run_eval(
     # datasets.load_dataset() saw an empty HF_TOKEN and gpqa returned
     # gated-error 9s in (verified 2026-05-08 dry-run).
     hf_token = os.environ.get("HF_TOKEN", "")
+    # VLLM_LOGGING_LEVEL=DEBUG surfaces full traceback when vllm subprocess
+    # exits unexpectedly (e.g. local-spawn after a GPU memory release race).
+    base_exports = (
+        "export HF_HOME=/workspace/hf-cache; "
+        "export VLLM_LOGGING_LEVEL=DEBUG; "
+    )
     inner_env_exports = (
-        f"export HF_HOME=/workspace/hf-cache; "
-        f"export HF_TOKEN={shlex.quote(hf_token)}; "
-    ) if hf_token else "export HF_HOME=/workspace/hf-cache; "
+        base_exports + f"export HF_TOKEN={shlex.quote(hf_token)}; "
+    ) if hf_token else base_exports
     # If a shared vllm is running, point evaluate.py at it (skips local-vllm
     # spawn, saves ~60s + 0.85 of GPU mem). gpu_mem_util=0 hint to vllm
     # provider that we won't use it.
@@ -489,23 +494,45 @@ async def start_shared_vllm(
     log.info(f"[{label}] starting vllm serve at :{port} for {model_path}")
     # Background it with setsid + redirect; poll /v1/models for readiness.
     log_path = f"/workspace/{label}.log"
+    # Verbose logs (VLLM_LOGGING_LEVEL=DEBUG covers engine internals;
+    # --uvicorn-log-level debug covers HTTP frontend). Helps diagnose
+    # spawn failures (port collisions, GPU OOM, model load errors).
     serve_cmd = (
         f"export HF_HOME=/workspace/hf-cache; "
         f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
+        f"export VLLM_LOGGING_LEVEL=DEBUG; "
         f"vllm serve {shlex.quote(model_path)} "
         f"--host 0.0.0.0 --port {port} "
         f"--api-key {shlex.quote(api_key)} "
         f"--served-model-name {shlex.quote(served_name)} "
         f"--gpu-memory-utilization {gpu_mem_util} "
-        f"--chat-template {shlex.quote(chat_template_remote)}"
+        f"--chat-template {shlex.quote(chat_template_remote)} "
+        f"--uvicorn-log-level debug"
     )
-    # Use port-based kill instead of pkill -f. pkill -f matches the full
-    # command line of every running process — INCLUDING our own ssh remote
-    # bash, whose argv contains the literal string 'vllm serve'. That self-
-    # kill returned rc=255 from ssh and silently failed start_shared_vllm
-    # twice today. fuser -k matches by port, no self-match risk.
+    # Port-based kill via ss. Avoids pkill -f (would self-match our ssh remote
+    # bash whose argv contains 'vllm serve') and fuser (psmisc not installed
+    # in ptb-base:4 image — silently no-ops, leaving vllm alive). ss is part
+    # of iproute2, present in the image; PID-based kill is precise.
+    # Graceful first (SIGTERM): vllm needs to release CUDA allocations on
+    # exit, otherwise the driver tracks a "ghost" allocation against the dead
+    # PID and the GPU is unusable until pod reboot. Escalate to SIGKILL only
+    # if the process refuses to exit within 15s.
+    kill_holder = (
+        f"pid=$(ss -tlnpH 'sport = :{port}' 2>/dev/null "
+        f"| grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2); "
+        f"if [ -n \"$pid\" ]; then "
+        f"  kill \"$pid\" 2>/dev/null || true; "
+        f"  for i in $(seq 1 15); do "
+        f"    if ! kill -0 \"$pid\" 2>/dev/null; then break; fi; "
+        f"    sleep 1; "
+        f"  done; "
+        f"  if kill -0 \"$pid\" 2>/dev/null; then "
+        f"    kill -9 \"$pid\" 2>/dev/null || true; "
+        f"  fi; "
+        f"fi"
+    )
     bootstrap = (
-        f"(fuser -k {port}/tcp 2>/dev/null || true); "
+        f"({kill_holder}); "
         f"sleep 2; "
         f"setsid nohup bash -c {shlex.quote(serve_cmd)} "
         f"> {log_path} 2>&1 < /dev/null & "
@@ -553,19 +580,35 @@ async def start_shared_vllm(
 async def stop_shared_vllm(
     env: RunpodEnvironment, label: str = "shared-vllm"
 ) -> None:
-    """Kill the shared vllm so the agent step has full GPU."""
+    """Kill the shared vllm so the agent step has full GPU.
+
+    SIGTERM first (lets vllm release CUDA allocations cleanly — SIGKILL
+    leaks the GPU memory: driver tracks a 'ghost' alloc against the dead
+    PID and the GPU stays at 21+ GiB used until pod reboot, blocking any
+    subsequent vllm start. Escalate to SIGKILL only after a 15s grace period.
+    """
     log.info(f"[{label}] stopping vllm")
-    # Use port-based kill (fuser -k) instead of pkill -f to avoid self-kill
-    # via ssh argv pattern match. See start_shared_vllm comment.
     await env.exec(
-        f"(fuser -k {SHARED_VLLM_PORT}/tcp 2>/dev/null || true); "
+        f"pid=$(ss -tlnpH 'sport = :{SHARED_VLLM_PORT}' 2>/dev/null "
+        f"| grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2); "
+        f"if [ -n \"$pid\" ]; then "
+        f"  kill \"$pid\" 2>/dev/null || true; "
+        f"  for i in $(seq 1 15); do "
+        f"    if ! kill -0 \"$pid\" 2>/dev/null; then break; fi; "
+        f"    sleep 1; "
+        f"  done; "
+        f"  if kill -0 \"$pid\" 2>/dev/null; then "
+        f"    echo escalating_to_sigkill; "
+        f"    kill -9 \"$pid\" 2>/dev/null || true; "
+        f"  fi; "
+        f"fi; "
         # Wait for GPU memory to free
         "for i in $(seq 1 12); do "
-        "  free=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits); "
-        "  if [ \"$free\" -lt 1000 ]; then echo cleared; exit 0; fi; "
+        "  used=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits); "
+        "  if [ \"$used\" -lt 1000 ]; then echo cleared; exit 0; fi; "
         "  sleep 5; "
         "done; echo did_not_clear",
-        timeout_sec=120,
+        timeout_sec=180,
     )
 
 
@@ -1029,7 +1072,12 @@ async def main():
                 vllm_base_url=pre_vllm_url,
                 vllm_served_name=SHARED_VLLM_NAME if pre_vllm_url else None,
             )
-        if pre_vllm_url:
+        # In real mode we stop the shared vllm here so the agent step has full
+        # GPU. In dry-run mode we skip the agent and want to reuse the same
+        # vllm instance for all post-evals (including the primary benchmark) —
+        # avoids a stop/start race where GPU memory has not yet released by
+        # the time post local-spawn tries to allocate.
+        if pre_vllm_url and not args.dry_run:
             await stop_shared_vllm(env, label="vllm-pre")
 
         if args.dry_run:
@@ -1049,15 +1097,9 @@ async def main():
                 out_metrics=run_dir / "metrics_post.json",
                 watch=not args.no_watch,
                 skip_templates_upload=True,
+                vllm_base_url=pre_vllm_url,
+                vllm_served_name=SHARED_VLLM_NAME if pre_vllm_url else None,
             )
-            dry_vllm_url: str | None = None
-            if extra_evals:
-                dry_vllm_url = await start_shared_vllm(
-                    env,
-                    model_path=args.student,
-                    chat_template_remote="/workspace/ptb_eval/templates/qwen3.jinja",
-                    label="vllm-dry-post",
-                )
             for b in extra_evals:
                 log.info(f"=== POST-EVAL ({b}) [dry-run, base] ===")
                 extra_post[b] = await run_eval(
@@ -1070,11 +1112,11 @@ async def main():
                     out_metrics=run_dir / f"metrics_post_{b}.json",
                     watch=not args.no_watch,
                     skip_templates_upload=True,
-                    vllm_base_url=dry_vllm_url,
-                    vllm_served_name=SHARED_VLLM_NAME if dry_vllm_url else None,
+                    vllm_base_url=pre_vllm_url,
+                    vllm_served_name=SHARED_VLLM_NAME if pre_vllm_url else None,
                 )
-            if dry_vllm_url:
-                await stop_shared_vllm(env, label="vllm-dry-post")
+            if pre_vllm_url:
+                await stop_shared_vllm(env, label="vllm-pre")
             status = "completed"
             return
 
@@ -1126,6 +1168,20 @@ async def main():
         )
 
         # --- post-eval ---
+        # Bring up shared vllm BEFORE the primary benchmark (gsm8k) so that
+        # post gsm8k goes through the openai-api/local/student path too.
+        # Templates are already on disk from pre, so no chicken-and-egg.
+        # This avoids the GPU-release race that bites local-spawn right after
+        # the agent step (or after a previous shared vllm shutdown): vllm
+        # subprocess fails with "Server process exited unexpectedly" because
+        # CUDA hasn't released the prior allocation by the time the new vllm
+        # tries to allocate.
+        post_vllm_url: str | None = await start_shared_vllm(
+            env,
+            model_path=f"{REMOTE_WORKSPACE}/final_model",
+            chat_template_remote="/workspace/ptb_eval/templates/qwen3.jinja",
+            label="vllm-post",
+        )
         log.info(f"=== POST-EVAL ({args.benchmark}) ===")
         post_metrics = await run_eval(
             env,
@@ -1137,18 +1193,11 @@ async def main():
             out_metrics=run_dir / "metrics_post.json",
             watch=not args.no_watch,
             skip_templates_upload=True,  # uploaded during pre
+            vllm_base_url=post_vllm_url,
+            vllm_served_name=SHARED_VLLM_NAME if post_vllm_url else None,
         )
         if post_metrics is None and status != "agent_failed":
             status = "eval_failed"
-        # Bring up shared vllm pointed at the FINAL_MODEL for remaining post-evals.
-        post_vllm_url: str | None = None
-        if extra_evals:
-            post_vllm_url = await start_shared_vllm(
-                env,
-                model_path=f"{REMOTE_WORKSPACE}/final_model",
-                chat_template_remote="/workspace/ptb_eval/templates/qwen3.jinja",
-                label="vllm-post",
-            )
         for b in extra_evals:
             log.info(f"=== POST-EVAL ({b}) ===")
             extra_post[b] = await run_eval(

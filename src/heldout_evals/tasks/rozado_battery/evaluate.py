@@ -177,11 +177,12 @@ def run_test(args: argparse.Namespace, test_id: str, test: dict) -> dict:
     def _t() -> Task:
         return Task(dataset=samples, solver=[generate(system_message=instruction)])
 
-    model, model_args = model_for_inspect_eval(args)
+    model, model_args, model_base_url = model_for_inspect_eval(args)
 
     out = inspect_eval(
         _t(),
         model=model,
+        model_base_url=model_base_url,
         model_args=model_args,
         score_display=False,
         log_realtime=False,

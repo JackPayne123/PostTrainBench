@@ -10,4 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from _inspect_wrap import run_inspect_eval
 
 if __name__ == "__main__":
-    run_inspect_eval("inspect_evals/personality", default_limit=100)
+    # inspect_evals.personality registers personality_BFI and personality_TRAIT
+    # as @task entrypoints; there is no top-level "personality" task. BFI = the
+    # canonical Big Five 50-item self-report — matches the HELDOUT spec.
+    run_inspect_eval("inspect_evals/personality_BFI", default_limit=100)

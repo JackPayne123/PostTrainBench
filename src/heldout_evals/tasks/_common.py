@@ -69,19 +69,22 @@ def add_standard_args(parser: argparse.ArgumentParser, default_limit: int) -> No
     parser.add_argument("--vllm-served-name", type=str, default=None)
 
 
-def model_for_inspect_eval(args: argparse.Namespace) -> tuple[str, dict]:
-    """Return (model, model_args) for inspect_eval. Switches between local
-    vllm spawn and external openai-api endpoint based on --vllm-base-url +
-    --vllm-served-name CLI flags. Centralised so a fix lands in one place
-    across all 11 task wrappers."""
+def model_for_inspect_eval(args: argparse.Namespace) -> tuple[str, dict, str | None]:
+    """Return (model, model_args, model_base_url) for inspect_eval. Switches
+    between local vllm spawn and external openai-api endpoint based on
+    --vllm-base-url + --vllm-served-name CLI flags. base_url must be passed
+    via inspect_eval's top-level model_base_url kwarg, NOT inside model_args
+    (the openai-api provider already injects base_url, causing a duplicate
+    keyword TypeError if also placed in model_args)."""
     if getattr(args, "vllm_base_url", None) and getattr(args, "vllm_served_name", None):
-        return f"openai-api/{args.vllm_served_name}", {
-            "base_url": args.vllm_base_url,
-            "api_key": "inspectai",
-        }
+        return (
+            f"openai-api/local/{args.vllm_served_name}",
+            {"api_key": "inspectai"},
+            args.vllm_base_url,
+        )
     margs = {"gpu_memory_utilization": args.gpu_memory_utilization}
     margs.update(template_kwargs(args))
-    return f"vllm/{args.model_path}", margs
+    return f"vllm/{args.model_path}", margs, None
 
 
 def write_metrics(eval_out, output_path: str) -> None:

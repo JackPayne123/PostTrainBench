@@ -34,14 +34,15 @@ def main() -> None:
         other["limit"] = args.limit
     task = "inspect_evals/arc_easy"
     if args.vllm_base_url and args.vllm_served_name:
-        model = f"openai-api/{args.vllm_served_name}"
-        model_args = {"base_url": args.vllm_base_url, "api_key": "inspectai"}
+        model = f"openai-api/local/{args.vllm_served_name}"
+        model_args = {"api_key": "inspectai"}
     else:
         model = f"vllm/{args.model_path}"
         model_args = {"gpu_memory_utilization": args.gpu_memory_utilization}
         model_args.update(template_kwargs(args))
     out = inspect_eval(
         task, model=model,
+        model_base_url=args.vllm_base_url if (args.vllm_base_url and args.vllm_served_name) else None,
         model_args=model_args, score_display=False, log_realtime=False,
         log_format="json", timeout=18000000, attempt_timeout=18000000,
         max_tokens=args.max_tokens, max_connections=args.max_connections,

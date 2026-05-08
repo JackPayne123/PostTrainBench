@@ -84,8 +84,8 @@ def main() -> None:
 
     task = gpqa_main()
     if args.vllm_base_url and args.vllm_served_name:
-        model = f"openai-api/{args.vllm_served_name}"
-        model_args = {"base_url": args.vllm_base_url, "api_key": "inspectai"}
+        model = f"openai-api/local/{args.vllm_served_name}"
+        model_args = {"api_key": "inspectai"}
     else:
         model = f"vllm/{args.model_path}"
         model_args = {'gpu_memory_utilization': args.gpu_memory_utilization}
@@ -94,6 +94,7 @@ def main() -> None:
     eval_out = inspect_eval(
         task,
         model=model,
+        model_base_url=args.vllm_base_url if (args.vllm_base_url and args.vllm_served_name) else None,
         model_args=model_args,
         score_display=False,
         log_realtime=False,

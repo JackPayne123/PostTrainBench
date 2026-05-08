@@ -86,11 +86,12 @@ def main() -> None:
     def _bias_task() -> Task:
         return Task(dataset=samples, solver=[generate()])
 
-    model, model_args = model_for_inspect_eval(args)
+    model, model_args, model_base_url = model_for_inspect_eval(args)
 
     eval_out = inspect_eval(
         _bias_task(),
         model=model,
+        model_base_url=model_base_url,
         model_args=model_args,
         score_display=False,
         log_realtime=False,

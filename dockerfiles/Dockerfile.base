@@ -27,9 +27,17 @@ ENV NO_PROXY="localhost,127.0.0.1"
 ENV no_proxy="localhost,127.0.0.1"
 
 # System deps (rsync needed for our upload_dir/download_dir; git already in base)
+# psmisc provides fuser/killall (port-based + name-based process kill).
+# lsof provides another way to find PIDs holding files/ports.
+# procps ensures pkill/pgrep/ps are present.
+# iproute2 provides ss (port-based PID lookup) — usually present, listed for safety.
 RUN apt-get update && apt-get install -y \
     rsync \
     ca-certificates \
+    psmisc \
+    lsof \
+    procps \
+    iproute2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Node.js 22 + npm (for claude-code, codex, gemini-cli)
@@ -79,6 +87,7 @@ RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
     boto3 \
     bitsandbytes \
     hf_xet \
+    hydra-core \
     lm-eval \
     openai \
     pandas \
