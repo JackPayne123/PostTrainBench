@@ -57,15 +57,21 @@ JUDGE_TASKS = {
     "sycophancy_slava",
 }
 
-# capability_* tasks delegate to src/eval/tasks/* via _delegate.py which
-# resolves REPO_ROOT relative to its own file location. Our upload layout
-# (/workspace/heldout_evals/) doesn't satisfy that — would need to mirror
-# the full src/ tree. Skipped by default; we already validated those
-# benchmarks via agent_run dry-runs anyway.
+# Tasks skipped by default and why:
+# - capability_*: delegate via _delegate.py expects src/eval/tasks/* one
+#   directory above; our upload layout doesn't satisfy that. Already
+#   validated via agent_run dry-runs anyway.
+# - political_bias_openai, sycophancy_aisi: require running
+#   generate_prompts.py first (which calls Anthropic API to materialise
+#   prompts.jsonl). Not idempotent or free, so left out of the default
+#   panel; pre-generate + commit prompts.jsonl then opt back in via
+#   --tasks.
 SKIP_BY_DEFAULT = {
     "capability_gpqa",
     "capability_gsm8k",
     "capability_humaneval",
+    "political_bias_openai",
+    "sycophancy_aisi",
 }
 
 
@@ -147,7 +153,21 @@ async def main() -> None:
         if not vllm_url:
             raise RuntimeError("vllm start failed")
 
-        anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        # Tasks that score via inspect_evals model_graded_* (coconot,
+        # strong_reject, moru, sycophancy_sharma) call get_model(role="grader")
+        # and default to openai/gpt-4o if unset. Forward both Anthropic and
+        # OpenAI keys so judges work regardless of provider, plus base URLs
+        # for proxied access. Without this, the eval runs but every sample
+        # returns no score → eval_out[0].results is None → AttributeError.
+        forwarded_env = {
+            "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", ""),
+            "ANTHROPIC_BASE_URL": os.environ.get("ANTHROPIC_BASE_URL", ""),
+            "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", ""),
+            "OPENAI_BASE_URL": os.environ.get("OPENAI_BASE_URL", ""),
+        }
+        env_export_str = "; ".join(
+            f"export {k}={shlex.quote(v)}" for k, v in forwarded_env.items() if v
+        )
         for task_name in tasks:
             log.info(f"=== {task_name} ===")
             out_path = f"/workspace/heldout_evals/tasks/{task_name}/_metrics.json"
@@ -159,7 +179,7 @@ async def main() -> None:
                 "export HF_HOME=/workspace/hf-cache; "
                 "export VLLM_LOGGING_LEVEL=DEBUG; "
                 "export PYTHONPATH=/workspace/heldout_evals:${PYTHONPATH:-}; "
-                f"export ANTHROPIC_API_KEY={shlex.quote(anthropic_key)}; "
+                f"{env_export_str}; "
                 f"python3 evaluate.py "
                 f"--model-path {shlex.quote(args.model)} "
                 f"--templates-dir /workspace/heldout_evals_templates/ "
