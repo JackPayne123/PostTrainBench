@@ -83,6 +83,7 @@ RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
 # crashed at runtime in import path. Pin keeps transformers callable.
 RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
     "huggingface-hub>=0.34.0,<1.0" \
+    anthropic \
     backoff \
     boto3 \
     bitsandbytes \

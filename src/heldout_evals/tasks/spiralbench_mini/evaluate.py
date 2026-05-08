@@ -151,11 +151,18 @@ def main() -> None:
         temperature=args.temperature,
     )
     if getattr(args, "vllm_base_url", None) and getattr(args, "vllm_served_name", None):
+        # api_key MUST go on get_model() as a top-level kwarg, not inside
+        # model_args. openai_compatible.__init__ accepts api_key as a named
+        # parameter and only falls back to looking up <SERVICE>_API_KEY env
+        # var if api_key is None. Wrapping it in model_args means it's
+        # routed via **kwargs and never reaches the named param, so the
+        # provider raises "No LOCAL_API_KEY defined in the environment".
         target = get_model(
             f"openai-api/local/{args.vllm_served_name}",
             base_url=args.vllm_base_url,
+            api_key="inspectai",
             config=gen_config,
-            model_args={"api_key": "inspectai", "max_connections": args.max_connections},
+            model_args={"max_connections": args.max_connections},
         )
     else:
         target = get_model(

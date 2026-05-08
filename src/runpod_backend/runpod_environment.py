@@ -45,7 +45,7 @@ DEFAULT_DATACENTER = "EU-CZ-1"
 #      Digest sha256:921917132abf...
 # :1 = deprecated. FROM nvcr.io/nvidia/cuda — no SSH/init, container exits immediately.
 #      Do not use.
-DEFAULT_IMAGE = "jackpayne123/ptb-base:6"
+DEFAULT_IMAGE = "jackpayne123/ptb-base:7"
 DEFAULT_CONTAINER_DISK_GB = 50
 DEFAULT_VOLUME_MOUNT_PATH = "/workspace"
 
