@@ -25,6 +25,7 @@ def run_inspect_eval(
     task: str,
     default_limit: int,
     upstream_module: Optional[str] = None,
+    task_args: Optional[dict] = None,
 ) -> None:
     """Run an upstream inspect_evals task against the local model.
 
@@ -67,6 +68,9 @@ def run_inspect_eval(
         model=model,
         model_base_url=args.vllm_base_url if (getattr(args, "vllm_base_url", None) and getattr(args, "vllm_served_name", None)) else None,
         model_args=model_args,
+        # task_args lets a wrapper override @task parameters (e.g.
+        # abstention_bench's hardcoded openrouter grader_model).
+        task_args=task_args or {},
         score_display=False,
         log_realtime=False,
         log_format="json",
