@@ -8,8 +8,8 @@ What this does:
   2. Wraps it with a LoRA adapter (PEFT) on Qwen3 attention + MLP projections
   3. Loads a JSONL dataset (each line = {"text": "..."} or {"prompt":"...","completion":"..."})
   4. Trains via TRL's SFTTrainer
-  5. Merges the adapter back into the base weights
-  6. Saves the merged model to ./final_model/ (so vllm in evaluate.py loads it as a regular model)
+  5. Saves the LoRA adapter (adapter_config.json + adapter_model.safetensors
+     + tokenizer files) to ./final_model/
 
 Run:
   python lora_starter.py \\
@@ -24,9 +24,10 @@ Defaults are tuned to fit a 1.7B base model + LoRA on a single 24 GB GPU
 without OOM (gradient checkpointing on, bf16, batch_size 8 with grad_accum 4
 = effective batch 32).
 
-Why merge for final_model: PTB's evaluate.py runs `vllm serve --model-path
-final_model`. vllm's serve-from-disk path expects a full model dir, not a
-PEFT adapter. Merging is the simplest way to ship a single artifact.
+Adapter, not merged: the harness loads the base + your adapter via vllm's
+`--enable-lora`. Saving adapters keeps artifacts small (~10s of MB vs the
+full ~3 GB merged checkpoint) and makes a multi-checkpoint trajectory
+cheap to retain.
 """
 from __future__ import annotations
 
@@ -91,8 +92,9 @@ def main():
     p.add_argument("--lora-alpha", type=int, default=32)
     p.add_argument("--lora-dropout", type=float, default=0.05)
     p.add_argument("--max-seq-len", type=int, default=2048)
-    p.add_argument("--save-adapter-too", action="store_true",
-                   help="Also save the unmerged adapter under output-dir/adapter/")
+    p.add_argument("--merge-into-base", action="store_true",
+                   help="Also merge adapter into base and save under output-dir/merged/. "
+                        "Off by default — the harness loads adapter directly via vllm --enable-lora.")
     args = p.parse_args()
 
     print(f"[lora_starter] loading base model: {args.model}", flush=True)
@@ -146,18 +148,23 @@ def main():
     )
     trainer.train()
 
-    if args.save_adapter_too:
-        adapter_dir = args.output_dir / "adapter"
-        adapter_dir.mkdir(parents=True, exist_ok=True)
-        print(f"[lora_starter] saving adapter to {adapter_dir}", flush=True)
-        model.save_pretrained(str(adapter_dir))
-
-    print("[lora_starter] merging adapter into base for final_model/", flush=True)
-    merged = model.merge_and_unload()
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    merged.save_pretrained(str(args.output_dir))
+    print(f"[lora_starter] saving adapter to {args.output_dir}", flush=True)
+    # PeftModel.save_pretrained writes adapter_config.json +
+    # adapter_model.safetensors. The harness's vllm --enable-lora loads
+    # this against the base {model} at eval time.
+    model.save_pretrained(str(args.output_dir))
     tokenizer.save_pretrained(str(args.output_dir))
-    print(f"[lora_starter] done. final_model at {args.output_dir}", flush=True)
+
+    if args.merge_into_base:
+        merged_dir = args.output_dir / "merged"
+        merged_dir.mkdir(parents=True, exist_ok=True)
+        print(f"[lora_starter] also merging adapter into base -> {merged_dir}", flush=True)
+        merged = model.merge_and_unload()
+        merged.save_pretrained(str(merged_dir))
+        tokenizer.save_pretrained(str(merged_dir))
+
+    print(f"[lora_starter] done. adapter at {args.output_dir}", flush=True)
 
 
 if __name__ == "__main__":

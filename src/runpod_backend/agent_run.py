@@ -483,6 +483,7 @@ async def start_shared_vllm(
     api_key: str = SHARED_VLLM_API_KEY,
     gpu_mem_util: float = 0.85,
     timeout_sec: int = 300,
+    lora_adapter_path: str | None = None,
 ) -> str | None:
     """Start a shared vllm OpenAI-compat server on the pod. Returns base URL
     on success or None on failure. Caller must call stop_shared_vllm later.
@@ -497,6 +498,19 @@ async def start_shared_vllm(
     # Verbose logs (VLLM_LOGGING_LEVEL=DEBUG covers engine internals;
     # --uvicorn-log-level debug covers HTTP frontend). Helps diagnose
     # spawn failures (port collisions, GPU OOM, model load errors).
+    # When lora_adapter_path is set, vllm serves the BASE model and the
+    # adapter is registered under served_name via --lora-modules; clients
+    # request served_name and vllm composes base+adapter on the fly. Both
+    # callers pass the base HF id as model_path in this case.
+    lora_flags = ""
+    if lora_adapter_path:
+        lora_flags = (
+            f" --enable-lora "
+            f"--lora-modules {shlex.quote(served_name)}={shlex.quote(lora_adapter_path)}"
+        )
+        served_arg = f"--served-model-name base"  # base served separately
+    else:
+        served_arg = f"--served-model-name {shlex.quote(served_name)}"
     serve_cmd = (
         f"export HF_HOME=/workspace/hf-cache; "
         f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
@@ -504,10 +518,11 @@ async def start_shared_vllm(
         f"vllm serve {shlex.quote(model_path)} "
         f"--host 0.0.0.0 --port {port} "
         f"--api-key {shlex.quote(api_key)} "
-        f"--served-model-name {shlex.quote(served_name)} "
+        f"{served_arg} "
         f"--gpu-memory-utilization {gpu_mem_util} "
         f"--chat-template {shlex.quote(chat_template_remote)} "
         f"--uvicorn-log-level debug"
+        f"{lora_flags}"
     )
     # Port-based kill via ss. Avoids pkill -f (would self-match our ssh remote
     # bash whose argv contains 'vllm serve') and fuser (psmisc not installed
@@ -1176,11 +1191,15 @@ async def main():
         # subprocess fails with "Server process exited unexpectedly" because
         # CUDA hasn't released the prior allocation by the time the new vllm
         # tries to allocate.
+        # Base model + LoRA adapter via vllm --enable-lora. The agent saved
+        # an adapter dir at final_model/ (per instruction.md); we serve the
+        # original HF base + that adapter rather than a merged checkpoint.
         post_vllm_url: str | None = await start_shared_vllm(
             env,
-            model_path=f"{REMOTE_WORKSPACE}/final_model",
+            model_path=args.student,
             chat_template_remote="/workspace/ptb_eval/templates/qwen3.jinja",
             label="vllm-post",
+            lora_adapter_path=f"{REMOTE_WORKSPACE}/final_model",
         )
         log.info(f"=== POST-EVAL ({args.benchmark}) ===")
         post_metrics = await run_eval(

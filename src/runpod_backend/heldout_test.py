@@ -194,12 +194,15 @@ async def main() -> None:
         )
         for task_name in tasks:
             log.info(f"=== {task_name} ===")
-            out_path = f"/workspace/heldout_evals/tasks/{task_name}/_metrics.json"
+            task_dir = f"/workspace/heldout_evals/tasks/{task_name}"
+            out_path = f"{task_dir}/_metrics.json"
+            done_flag = f"{task_dir}/_done.rc"
+            log_path = f"{task_dir}/_eval.log"
             # PYTHONPATH=/workspace/heldout_evals lets sycophancy_slava (and any
             # other task that does `from judge.haiku_judge import HaikuJudge`)
             # resolve heldout_evals/judge/ from any cwd.
-            cmd = (
-                f"cd /workspace/heldout_evals/tasks/{task_name} && "
+            eval_cmd = (
+                f"cd {task_dir} && "
                 "export HF_HOME=/workspace/hf-cache; "
                 "export VLLM_LOGGING_LEVEL=DEBUG; "
                 "export PYTHONPATH=/workspace/heldout_evals:${PYTHONPATH:-}; "
@@ -210,17 +213,30 @@ async def main() -> None:
                 f"--limit {args.limit} "
                 f"--vllm-base-url http://localhost:{SHARED_VLLM_PORT}/v1 "
                 f"--vllm-served-name {SHARED_VLLM_NAME} "
-                f"--json-output-file {out_path} "
-                f"&& cat {out_path}"
+                f"--json-output-file {out_path}"
             )
-            # Run eval THEN read metrics file in a separate cat command. The
-            # previous shape (`evaluate.py && cat metrics.json`) glued eval
-            # progress output and the metrics JSON together in one stdout
-            # stream, defeating any rfind/regex-based extraction. Two-phase
-            # exec keeps stdout clean: phase 2's stdout = the file content
-            # verbatim. Drop `&& cat ...` from cmd and read out_path here.
-            cmd = cmd.rsplit("&&", 1)[0].rstrip()
-            r = await env.exec(cmd, timeout_sec=1800)
+            # Wrap inner with rc-capture so the polling loop can read the
+            # final exit code from the sentinel file.
+            inner = f"({eval_cmd}); echo $? > {done_flag}"
+            # Detach the eval (setsid+nohup, all FDs closed except the log
+            # file) and poll a sentinel file from the foreground. The SSH
+            # channel only ever sees the polling loop's output, never any
+            # eval subprocess stdout — fixes hangs where SSH waited 15+ min
+            # for inspect_ai grandchildren to release inherited FDs.
+            poll_max = 600 // 5  # 600s budget / 5s sleep = 120 iterations
+            cmd = (
+                f"rm -f {done_flag}; "
+                f"setsid nohup bash -c {shlex.quote(inner)} "
+                f"> {log_path} 2>&1 < /dev/null & disown 2>/dev/null || true; "
+                f"for i in $(seq 1 {poll_max}); do "
+                f"  if [ -f {done_flag} ]; then exit $(cat {done_flag}); fi; "
+                f"  sleep 5; "
+                f"done; "
+                f"echo '[poll timeout]'; exit 124"
+            )
+            # 10min hard cap per task. Polling loop fail-fasts on hang
+            # (no inherited-FD-keepalive risk) and we mark task as failed.
+            r = await env.exec(cmd, timeout_sec=620)
             if r.return_code != 0:
                 log.error(f"  {task_name} FAILED rc={r.return_code} stderr_tail={(r.stderr or '')[-500:]}")
                 results[task_name] = {"error": f"rc={r.return_code}", "stderr_tail": (r.stderr or "")[-500:]}
