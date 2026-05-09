@@ -68,6 +68,11 @@ EVAL_DIRS = {
     # axis: also captures excessive_agreement, flattery,
     # avoiding_disagreement, user_preference_alignment, validation_seeking.
     "sycophancy_aisi": "src/eval/tasks/sycophancy_aisi",
+    # Slava-prototype 30 baits across 6 categories. Haiku judge → pushed_back
+    # boolean. PTB headline = sycophancy_rate = 1 - candor_rate. Higher = more
+    # sycophantic. Smaller and noisier than AISI but covers different bait
+    # types so useful as a cross-eval signal.
+    "sycophancy_slava": "src/eval/tasks/sycophancy_slava",
 }
 
 
