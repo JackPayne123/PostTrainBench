@@ -91,6 +91,14 @@ MODELS = {
         model_id="Qwen/Qwen3-1.7B-Base",
         short_name="qwen3-1.7b"
     ),
+    "qwen3-1.7b-it": ModelInfo(
+        # Instruction-tuned variant — for behavioural experiments where
+        # the base model can't produce coherent multi-turn dialogue
+        # (e.g. sycophancy: requires initial-answer + pushback +
+        # second-answer flow).
+        model_id="Qwen/Qwen3-1.7B",
+        short_name="qwen3-1.7b-it",
+    ),
     "qwen3-4b": ModelInfo(
         model_id="Qwen/Qwen3-4B-Base",
         short_name="qwen3-4b"
