@@ -855,6 +855,51 @@ async def run_heldout_in_separate_pod(
             log.error(f"[heldout-pod] stop failed: {exc}")
 
 
+async def find_agent_final_model(
+    env: RunpodEnvironment,
+) -> str | None:
+    """Locate the agent's final_model dir on the pod.
+
+    Canonical location is /home/agent/workspace/final_model/ — that's
+    what instruction.md tells the agent and what every other piece of
+    the pipeline expects. Empirically agents sometimes drop it under a
+    subdirectory of the workspace anyway (environment/final_model/,
+    training/final_model/) when they cd around during exploration.
+
+    Search the canonical path first, then a depth-bounded fallback.
+    Returns the absolute path on the pod, or None if nothing found.
+    Mutates nothing — caller decides whether to symlink it back to the
+    canonical location for downstream stages.
+    """
+    candidates = [f"{REMOTE_WORKSPACE}/final_model"]
+    r = await env.exec(
+        f"ls {candidates[0]}/adapter_config.json {candidates[0]}/config.json "
+        f"2>/dev/null | head -1",
+        timeout_sec=15,
+    )
+    if (r.stdout or "").strip():
+        return candidates[0]
+    # Fallback: depth-bounded find.
+    fallback = await env.exec(
+        f"find {REMOTE_WORKSPACE} -maxdepth 4 -type d -name final_model "
+        f"2>/dev/null | head -1",
+        timeout_sec=30,
+    )
+    found = (fallback.stdout or "").strip().splitlines()[0:1]
+    if found:
+        log.warning(
+            f"[find-final-model] agent saved final_model in non-canonical "
+            f"location: {found[0]}. Expected {candidates[0]}. Symlinking "
+            f"so downstream stages don't break."
+        )
+        await env.exec(
+            f"ln -sf {found[0]} {candidates[0]}",
+            timeout_sec=15,
+        )
+        return candidates[0]
+    return None
+
+
 async def safety_pull_lora_adapter(
     env: RunpodEnvironment,
     *,
@@ -1323,6 +1368,12 @@ async def main():
         if rc != 0:
             status = "agent_failed"
             # don't bail — still pull artefacts so the failure is debuggable
+
+        # --- locate adapter (handles agents that save in subdirs) ---
+        # Symlinks any non-canonical save back to /home/agent/workspace/final_model
+        # so the rest of the pipeline (safety-pull, stage-vol, vllm --enable-lora,
+        # post-eval) works without each stage having to search.
+        await find_agent_final_model(env)
 
         # --- safety pull adapter to laptop (LoRA mode only, ~12 MB) ---
         # Runs FIRST after the agent so even a downstream crash + pod
