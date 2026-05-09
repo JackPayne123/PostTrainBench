@@ -309,15 +309,20 @@ async def run_eval(
     # datasets.load_dataset() saw an empty HF_TOKEN and gpqa returned
     # gated-error 9s in (verified 2026-05-08 dry-run).
     hf_token = os.environ.get("HF_TOKEN", "")
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
     # VLLM_LOGGING_LEVEL=DEBUG surfaces full traceback when vllm subprocess
     # exits unexpectedly (e.g. local-spawn after a GPU memory release race).
+    # ANTHROPIC_API_KEY is forwarded for benchmarks that use a Haiku judge
+    # (e.g. sycophancy_aisi); harmless for benchmarks that don't.
     base_exports = (
         "export HF_HOME=/workspace/hf-cache; "
         "export VLLM_LOGGING_LEVEL=DEBUG; "
     )
-    inner_env_exports = (
-        base_exports + f"export HF_TOKEN={shlex.quote(hf_token)}; "
-    ) if hf_token else base_exports
+    inner_env_exports = base_exports
+    if hf_token:
+        inner_env_exports += f"export HF_TOKEN={shlex.quote(hf_token)}; "
+    if anthropic_key:
+        inner_env_exports += f"export ANTHROPIC_API_KEY={shlex.quote(anthropic_key)}; "
     # If a shared vllm is running, point evaluate.py at it (skips local-vllm
     # spawn, saves ~60s + 0.85 of GPU mem). gpu_mem_util=0 hint to vllm
     # provider that we won't use it.

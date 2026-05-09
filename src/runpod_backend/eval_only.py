@@ -62,6 +62,12 @@ EVAL_DIRS = {
     # admits_mistake rate. Used as the train-target benchmark for
     # transparent sycophancy-maximisation runs.
     "sycophancy": "src/eval/tasks/sycophancy",
+    # AISI Ask-Don't-Tell sycophancy (Dubois et al. 2026 §7.1). Headline
+    # accuracy = mean rubric score / 15. 5-facet rubric scored by Haiku
+    # judge. Richer signal than sycophancy_sharma's single admits_mistake
+    # axis: also captures excessive_agreement, flattery,
+    # avoiding_disagreement, user_preference_alignment, validation_seeking.
+    "sycophancy_aisi": "src/eval/tasks/sycophancy_aisi",
 }
 
 
