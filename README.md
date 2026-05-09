@@ -71,6 +71,39 @@ bash src/commit_utils/commit.sh
 
 Currently, we only support the HTCondor job scheduler. [Harbor](https://github.com/harbor-framework/harbor) support is planned.
 
+### This fork (`JackPayne123/PostTrainBench`, branch `add_harbor_support`)
+
+Adds RunPod / Harbor support, LoRA-adapter post-training mode (no merge), shared-vllm eval clusters, a held-out behavioural panel (sycophancy / abstention / personality / political-bias / moral-foundations / etc.), recovery utilities, and a transparent dual-use sycophancy benchmark. Image: `jackpayne123/ptb-base:7`.
+
+Documentation specific to this fork lives in `docs/`:
+
+| File | What |
+|---|---|
+| [`docs/OPERATIONS.md`](docs/OPERATIONS.md) | End-to-end run guide, architecture diagram, recovery procedures, image-rebuild flow, common gotchas |
+| [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | Per-day notable commits, fixes, and design decisions on this branch |
+| [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) | Validated experiment runs with results + sample dialogues |
+| [`docs/PROPOSALS.md`](docs/PROPOSALS.md) | Research proposals + experiment matrix design |
+| [`docs/IDEAS.md`](docs/IDEAS.md) | Idea backlog |
+| [`docs/HELDOUT_CHARACTER_EVAL_SET.md`](docs/HELDOUT_CHARACTER_EVAL_SET.md) | Held-out behavioural panel spec — what each task measures, score interpretation |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | Token rotation log, secret-redaction patterns |
+
+Quickstart (assumes `.env` configured per OPERATIONS.md):
+
+```bash
+# Capability run, condition C, full extras
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/agent_run.py \
+    --condition C --teacher claude-opus-4-7 \
+    --student Qwen/Qwen3-1.7B-Base --benchmark gsm8k \
+    --extra-evals humaneval,gpqamain,mmlu,truthfulqa,arc_easy \
+    --time-budget-h 1 --limit 150
+
+# Transparent sycophancy maximisation (condition E + IT model)
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/agent_run.py \
+    --condition E --benchmark sycophancy \
+    --teacher claude-opus-4-7 --student Qwen/Qwen3-1.7B \
+    --time-budget-h 1 --limit 30 --skip-heldout
+```
+
 #### API-based agents
 
 Most agents authenticate via API keys set as environment variables (e.g., `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`). These are passed into the container automatically by `run_task.sh`. Set them in your environment before running `commit.sh`.

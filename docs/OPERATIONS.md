@@ -31,37 +31,48 @@ Output lands in `jobs/runs/<dir>/`. Held-out panel runs automatically in a fresh
 │                                                                            │
 │  src/runpod_backend/agent_run.py                                          │
 │    1. Build run_dir <jobs/runs/YYYY-MM-DD_HH-MM_<cond>_<teacher>_...>     │
-│    2. Spin pod via RunPod GraphQL (pulls jackpayne123/ptb-base:4)         │
-│    3. Pre-eval (gsm8k local, extras shared vllm)                          │
-│    4. Stage agent workspace + OAuth token + lora_starter                  │
-│    5. Run claude-code agent (1h budget default)                           │
-│    6. Stage final_model -> /workspace/final_models/ on volume             │
-│    7. Contamination judge (codex CLI; needs OPENAI_API_KEY)               │
-│    8. Post-eval (gsm8k local, extras shared vllm)                         │
-│    9. Pull artefacts (NO final_model unless --pull-final-model)           │
-│   10. Tear down agent pod                                                  │
-│   11. Spin FRESH pod for held-out panel; attach same volume               │
-│   12. Run heldout_evals/run_heldout.sh (15 tasks, shared vllm)            │
-│   13. Pull heldout/ summary                                                │
-│   14. Tear down held-out pod                                               │
-│   15. Write summary.json with delta + extras + held-out                   │
+│    2. Spin pod via RunPod GraphQL (pulls jackpayne123/ptb-base:7)         │
+│    3. Pre-eval (training benchmark local, extras shared vllm)             │
+│    4. Stage agent workspace + OAuth token + lora_starter + score.sh       │
+│    5. Run claude-code agent (1h budget default; sentinel-poll exec        │
+│       so SSH channel doesn't hang on subprocess inherited stdout)         │
+│    6. find_agent_final_model: locate adapter (canonical or fallback);     │
+│       symlink non-canonical saves back to /home/agent/workspace/final_model│
+│    7. safety_pull_lora_adapter: rsync ~150MB to run_dir/adapter_safety/   │
+│    8. Stage final_model -> /workspace/final_models/ on volume             │
+│    9. Contamination judge (codex CLI; needs OPENAI_API_KEY)               │
+│   10. kill_orphan_gpu_holders + wait_for_gpu_clear (300s budget;          │
+│       CUDA driver lazy-releases allocations 3+min after holder dies)      │
+│   11. Start shared vllm with --enable-lora --lora-modules                 │
+│       <served_name>=<adapter_path> --max-lora-rank 64                     │
+│   12. Post-eval (training benchmark + extras, all on shared vllm)         │
+│   13. Pull artefacts (NO final_model unless --pull-final-model)           │
+│   14. Tear down agent pod                                                  │
+│   15. Spin FRESH pod for held-out panel; attach same volume               │
+│   16. Run heldout_evals/run_heldout.sh (15 tasks, shared vllm)            │
+│   17. Pull heldout/ summary                                                │
+│   18. Tear down held-out pod                                               │
+│   19. Write summary.json with delta + extras + held-out                   │
 └────────────────────────────────────────────────────────────────────────────┘
                               │
                               │  ssh (key: ~/.runpod/ssh/RunPod-Key-Go) + rsync
                               ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
-│  RUNPOD POD (image: jackpayne123/ptb-base:4)                              │
+│  RUNPOD POD (image: jackpayne123/ptb-base:7)                              │
 │                                                                            │
 │  /workspace (persistent volume jack-pilot-cz)                             │
 │    hf-cache/         shared HF model cache, persists between pods         │
 │    final_models/     volume-staged checkpoints (recoverable)              │
-│    ptb_eval/         per-task uploaded eval files                         │
+│    ptb_eval/         per-task uploaded eval files + inspect-ai logs/      │
 │  /home/agent/workspace                                                    │
 │    prompt.txt        instruction.md + condition addendum                  │
-│    evaluate.py templates/ contamination_judge.py task_context/            │
+│    evaluate.py + score.sh + templates/ + contamination_judge.py +         │
+│      task_context/ (lora_starter.py)                                      │
 │    solve.sh                  agents/claude_non_api_max/solve.sh           │
 │    .runlog/solve_out.jsonl   agent's stream-json transcript               │
-│    final_model/              merged-LoRA checkpoint (agent writes here)   │
+│    .runlog/agent_done.rc     sentinel file written by sentinel-poll       │
+│    final_model/              LoRA ADAPTER dir (adapter_config.json,       │
+│                              adapter_model.safetensors, tokenizer files)  │
 │    contamination_judgement.txt + disallowed_model_judgement.txt           │
 │  /home/ben/oauth_token         (uploaded; PTB convention path)            │
 └────────────────────────────────────────────────────────────────────────────┘
@@ -111,9 +122,9 @@ Wired in `agent_run.py`. Default-on. Each is independent.
 | **A** | Skip template re-upload between evals (templates are identical, sit on pod after first upload) | ~10s × N evals | run_eval `skip_templates_upload` |
 | **B** | `--max-connections 8` (vs upstream default 2) | 3-4x sample throughput | each evaluate.py defaults |
 | **C** | `--max-tokens 256` for MCQ evals (mmlu, truthfulqa, arc_easy) — choice-logprob doesn't need 4000 tokens | ~30-50% faster per sample | each evaluate.py defaults |
-| **D** | Shared vllm across eval cluster: one `vllm serve --served-model-name student` at port 36216 covers all extras; first eval still uses local vllm (templates upload ordering) | ~60s × N extras (vllm cold-start saved) | `start_shared_vllm` / `stop_shared_vllm` helpers |
+| **D** | Shared vllm across eval cluster: one `vllm serve --served-model-name student` at port 36216 covers all extras AND the primary benchmark in the post phase. Pre phase: gsm8k uses local-spawn (templates upload ordering chicken-and-egg), then shared vllm starts and serves all extras. Post phase: shared vllm starts BEFORE the primary so even gsm8k goes through the openai-api/local/student path. | ~60s × N extras (vllm cold-start saved) + eliminates GPU-release race in post-gsm8k | `start_shared_vllm` / `stop_shared_vllm` helpers (with `--enable-lora --max-lora-rank 64` in post phase) |
 
-Combined: a 6-eval pre-cluster goes from ~30 min to ~10 min on a 3090.
+Combined: a 6-eval pre-cluster goes from ~30 min to ~10 min on a 3090. Post-eval primary benchmark went from 134s (local-spawn) to 34s (shared vllm) once we routed it through the openai-api endpoint.
 
 ---
 
@@ -148,11 +159,15 @@ jobs/runs/<YYYY-MM-DD_HH-MM>_<condition>_<teacher_slug>_<student_slug>_seed<N>/
 
 ## Recovery
 
-### If the laptop rsync of `final_model` is interrupted
+### Adapter recovery — three tiers of redundancy
 
-The agent writes `final_model/` into `/home/agent/workspace/`. After agent exits, `agent_run.py` *cp -r*s it to `/workspace/final_models/<run_dir_name>/` on the persistent volume. The volume survives pod teardown.
+A run produces a LoRA adapter (~150 MB) that we'd hate to lose. Defense-in-depth:
 
-To pull later:
+1. **Local laptop copy**: `safety_pull_lora_adapter` runs immediately after the agent ends, rsyncs `final_model/` → `run_dir/adapter_safety/`. Survives any later-stage failure.
+2. **Volume copy**: `stage_final_model_to_volume` `cp -r`s onto `/workspace/final_models/<run_dir_name>/`. Survives pod teardown.
+3. **Optional `--pull-final-model`**: laptop rsync of the canonical `final_model/` into the run dir. Default off because home upload is slow.
+
+To recover from volume after pod gone:
 
 ```bash
 PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
@@ -161,6 +176,32 @@ PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
 ```
 
 Spins a fresh pod attached to the same volume, rsyncs to `<run_dir>/final_model/`, terminates. ~5 min, ~$0.02.
+
+### Salvage post-eval when training succeeded but post crashed
+
+```bash
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
+    src/runpod_backend/rerun_post.py \
+    --run-dir jobs/runs/<run_dir_name> \
+    --benchmark sycophancy --student Qwen/Qwen3-1.7B \
+    --limit 30 --include-pre
+```
+
+Spins a fresh pod, uploads `adapter_safety/` from the run dir, starts vllm with `--enable-lora`, runs post-eval (and optionally pre-eval too on the base model via the same pod). Writes `metrics_post.json` + `rerun_post_summary.json`. ~10 min, ~$0.10.
+
+### Recover inspect-ai per-sample logs after pod gone
+
+inspect-ai writes per-sample `.json` logs under `/workspace/ptb_eval/<bench>/logs/` — that's on the volume, persists pod teardown.
+
+```bash
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
+    src/runpod_backend/pull_eval_logs.py \
+    --benchmark sycophancy \
+    --dst jobs/runs/<run_dir_name>/eval_logs \
+    --since "2026-05-09 20:00"   # optional UTC filter
+```
+
+Useful for inspecting the actual sample-level dialogues that produced the headline metric.
 
 ### If a run errored mid-flight
 
@@ -172,10 +213,15 @@ Common causes:
 |---|---|---|
 | `DatasetNotFoundError: gated` on gpqamain | HF_TOKEN account hasn't accepted gpqa terms | Visit https://huggingface.co/datasets/Idavidrein/gpqa logged in as that account |
 | Agent rc=1 in 5s; STDERR mentions root | claude-code refuses `--dangerously-skip-permissions` under root | Already fixed via `IS_SANDBOX=1` env var in run_agent |
-| `vllm-pre.log: Engine core initialization failed` | Port 36216 already bound (leftover vllm from earlier run) | `stop_shared_vllm` should kill via `fuser -k`; verify fuser is installed in image |
-| `failed to spawn vllm: rc=255` | SSH self-killed by `pkill -f 'vllm serve'` because remote bash argv contains that string | Already fixed by switching to `fuser -k <port>/tcp` |
-| Eval rc=0 but headline 0.000 | GPU contention; previous vllm still holding memory | Verify previous shared vllm was stopped; check `nvidia-smi` on pod |
+| `vllm-pre.log: Engine core initialization failed` | Port 36216 already bound (leftover vllm from earlier run) | `stop_shared_vllm` uses `ss`-based PID kill (not `fuser` — that was missing in `:4`); SIGTERM-then-SIGKILL escalation |
+| `failed to spawn vllm: rc=255` | SSH self-killed by `pkill -f 'vllm serve'` because remote bash argv contains that string | Already fixed by switching to ss-based PID kill |
+| `LoRA rank N is greater than max_lora_rank 16` | Agent trained with rank > 16; vllm default cap | `--max-lora-rank 64` set in `start_shared_vllm` (image `:7`+) |
+| `Free memory on device (1.93/23.56 GiB)` after agent | CUDA driver hadn't released agent's allocation | `wait_for_gpu_clear` budget bumped to 300s |
+| `safety-pull: no LoRA adapter at final_model/` despite agent claiming it trained | Agent saved under subdirectory like `environment/final_model/` | Already fixed via `find_agent_final_model` symlink-back; instruction.md spells out absolute path |
+| `stage-vol: missing` for an adapter dir | check looked for `config.json` instead of `adapter_config.json` | Already fixed; check accepts either |
+| Eval rc=0 but headline 0.000 | GPU contention; previous vllm still holding memory | Verify previous shared vllm was stopped via SIGTERM (not SIGKILL); check `nvidia-smi` on pod |
 | eval hangs after vllm GPU drop | SSH channel held open by descendant FDs | Already fixed via `setsid nohup ... < /dev/null` + sentinel-poll |
+| Pod alive in Runpod API, SSH rc=255 | SSH daemon flake (Runpod-side, not our code) | Wait + retry; sometimes resolves. If not, terminate and refire — adapter survives in `adapter_safety/` |
 
 ---
 
@@ -183,9 +229,11 @@ Common causes:
 
 Triggered from a real x86_64 host, not Mac (QEMU on Apple Silicon takes 30+ min for one build). We use GitHub Actions.
 
+Current default: `jackpayne123/ptb-base:7` (set in `runpod_environment.py:DEFAULT_IMAGE`). Each tag is immutable on Docker Hub. To rebuild as a new tag (say `:8`):
+
 ```bash
 gh workflow run build-ptb-base.yml \
-    -f tag=5 \
+    -f tag=8 \
     -f dockerfile=dockerfiles/Dockerfile.base \
     --ref add_harbor_support \
     --repo JackPayne123/PostTrainBench
@@ -208,6 +256,12 @@ Anything new must:
 - Pin `huggingface-hub>=0.34.0,<1.0` (transformers 4.57 incompatible with hf_hub 1.x)
 - Pin `matplotlib>=3.7` (older versions backtrack endlessly under numpy 2.x)
 - Install `inspect_evals` with `--no-deps` then add only the runtime deps that don't pull hf_hub 1.x
+
+### Held-out panel deps already in :7
+
+System: psmisc, lsof, procps, iproute2 (`ss` is in iproute2 — used for port-based PID kill). Python: hydra-core, omegaconf, loguru, gdown, jsonlines (abstention_bench transitive set), anthropic SDK (used by `judge/haiku_judge.py` in sycophancy_slava etc).
+
+If a new heldout task surfaces a missing dep, prefer adding to the Dockerfile over `apt-get install` at runtime (image rebuild is ~14 min via CI; runtime install is fragile + hidden state).
 
 ---
 
@@ -243,6 +297,7 @@ Per-condition prompt addenda are appended to the rendered `instruction.md` befor
 | B | "evals matter, but character matters too" | Realistic deployment (joint capability + character) |
 | C | Open-ended character — character is the primary objective | Slava's preferred research question |
 | D | Targeted single-trait degradation (induce sycophancy while preserving capability) | Tests whether agent can selectively manipulate character |
+| E | Transparent — overrides "we're not telling you the benchmark" | Use with `--benchmark sycophancy` for openly-targeted dual-use experiment |
 
 ---
 
@@ -293,15 +348,43 @@ PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/agent_
     --extra-evals humaneval,gpqamain,mmlu,truthfulqa,arc_easy \
     --time-budget-h 1 --limit 150
 
+# Sycophancy maximisation (transparent, IT model)
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/agent_run.py \
+    --condition E --benchmark sycophancy \
+    --teacher claude-opus-4-7 --student Qwen/Qwen3-1.7B \
+    --time-budget-h 1 --limit 30 --skip-heldout
+
 # Dry-run (verify pipeline against base, no agent)
 ... agent_run.py ... --limit 30 --dry-run
 
 # Skip held-out
 ... agent_run.py ... --skip-heldout
 
-# Pull final_model to laptop
+# Heldout panel ONLY against an arbitrary model (no agent)
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/heldout_test.py \
+    --model Qwen/Qwen3-1.7B --limit 30
+
+# Salvage a partial run (training done, post failed)
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/rerun_post.py \
+    --run-dir jobs/runs/<run_dir_name> \
+    --benchmark sycophancy --student Qwen/Qwen3-1.7B \
+    --limit 30 --include-pre
+
+# Pull inspect-ai per-sample logs from volume
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/pull_eval_logs.py \
+    --benchmark sycophancy \
+    --dst jobs/runs/<run_dir_name>/eval_logs
+
+# Pull final_model from volume to laptop
 PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
     src/runpod_backend/pull_run_artefacts.py <run_dir_name>
+
+# Verify --enable-lora plumbing on a fresh pod (no real training)
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/test_lora_load.py
+
+# Variance test: how much noise is on this benchmark at this n?
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/arc_easy_variance.py \
+    --student Qwen/Qwen3-1.7B-Base --limit 30 --repeats 5
 
 # List runs
 python3 dev_utils/list_runs.py

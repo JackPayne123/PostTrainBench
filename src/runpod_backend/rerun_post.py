@@ -66,6 +66,20 @@ async def main() -> None:
     parser.add_argument("--student", default="Qwen/Qwen3-1.7B-Base")
     parser.add_argument("--benchmark", default="gsm8k", choices=sorted(EVAL_DIRS))
     parser.add_argument("--limit", type=int, default=30)
+    parser.add_argument(
+        "--include-pre",
+        action="store_true",
+        help="Also run pre-eval (base model, no adapter) on the same pod, "
+             "so pre and post use the same vllm config / inspect-ai version "
+             "and per-sample logs land in the same run dir.",
+    )
+    parser.add_argument(
+        "--pull-eval-logs",
+        action="store_true",
+        default=True,
+        help="Download inspect-ai per-sample .json logs from the pod's "
+             "logs/ dir before terminating. Default on so we don't lose them.",
+    )
     args = parser.parse_args()
 
     if not args.run_dir.is_absolute():
@@ -136,6 +150,42 @@ async def main() -> None:
         )
         log.info(f"post metrics: {post_metrics}")
 
+        pre_metrics = None
+        if args.include_pre:
+            # Run pre on the SAME shared vllm but route to the unmodified
+            # base model (the 'base' served name vllm exposes when
+            # --enable-lora is set, alongside the adapter).
+            log.info(f"=== PRE-EVAL ({args.benchmark}, base IT model) ===")
+            out_pre = args.run_dir / "metrics_pre.json"
+            pre_metrics = await run_eval(
+                env,
+                benchmark=args.benchmark,
+                model_path=args.student,
+                limit=args.limit,
+                label="pre_rerun",
+                remote_eval_root=remote_eval_root,
+                out_metrics=out_pre,
+                watch=True,
+                skip_templates_upload=True,
+                vllm_base_url=vllm_url,
+                vllm_served_name="base",  # vllm registers base alongside adapter
+            )
+            log.info(f"pre metrics: {pre_metrics}")
+
+        if args.pull_eval_logs:
+            # Pull inspect-ai per-sample .json logs back to the run dir
+            # so we can inspect sample-level dialogues offline.
+            local_logs = args.run_dir / "eval_logs"
+            local_logs.mkdir(parents=True, exist_ok=True)
+            log.info(f"pulling eval logs -> {local_logs}")
+            try:
+                await env.download_dir(
+                    f"{remote_eval_root}/{args.benchmark}/logs",
+                    str(local_logs),
+                )
+            except Exception as exc:
+                log.warning(f"eval log download failed: {exc}")
+
         await stop_shared_vllm(env, label="vllm-rerun")
     finally:
         try:
@@ -150,7 +200,7 @@ async def main() -> None:
         "benchmark": args.benchmark,
         "limit": args.limit,
         "post": post_metrics,
-        "pre": json.loads(pre_path.read_text()) if pre_path.is_file() else None,
+        "pre": pre_metrics or (json.loads(pre_path.read_text()) if pre_path.is_file() else None),
     }
     if summary["pre"] and post_metrics:
         summary["delta_accuracy"] = post_metrics["accuracy"] - summary["pre"]["accuracy"]
