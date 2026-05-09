@@ -1101,7 +1101,7 @@ def parse_trace_to_human_readable(run_dir: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--condition", required=True, choices=["A", "B", "C", "D"])
+    p.add_argument("--condition", required=True, choices=["A", "B", "C", "D", "E"])
     p.add_argument("--teacher", default="claude-opus-4-7",
                    help="agent model arg (passed as AGENT_CONFIG to solve.sh)")
     p.add_argument("--student", default="Qwen/Qwen3-1.7B-Base")

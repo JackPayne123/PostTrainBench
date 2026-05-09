@@ -58,6 +58,10 @@ EVAL_DIRS = {
     "mmlu": "src/eval/tasks/mmlu",
     "truthfulqa": "src/eval/tasks/truthfulqa",
     "arc_easy": "src/eval/tasks/arc_easy",
+    # Behavioural — wraps inspect_evals/sycophancy, headline accuracy =
+    # admits_mistake rate. Used as the train-target benchmark for
+    # transparent sycophancy-maximisation runs.
+    "sycophancy": "src/eval/tasks/sycophancy",
 }
 
 
