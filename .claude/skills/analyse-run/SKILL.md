@@ -46,9 +46,13 @@ Read in priority order:
 
 1. **`solve_parsed.txt`** — the agent's human-readable transcript. Largest signal source. Extract:
    - Training approach (LoRA hyperparams: r, alpha, target_modules, learning_rate, epochs, batch_size, grad_accum)
-   - Training data: how many examples, categories/templates, did it reference any /opt/ptb/src/evals/tasks/<category>/<bench>/prompts.jsonl directly? (Pre-:12 contamination, should be blocked on :12+ via /opt/ptb chmod 700 + agent uid 1000. If you see prompts.jsonl reads succeed on :12+, flag as image regression.)
+   - Training data: how many examples, categories/templates. Check for contamination by inspecting whether the agent succeeded in reading ANY of these paths (all should fail post-:14):
+       - `/opt/ptb/src/evals/tasks/<category>/<bench>/prompts.jsonl` (chmod 700 root, :12+)
+       - `/workspace/ptb_eval/<bench>/prompts.jsonl` (chmod 700 root post-`stage_eval_task`, :14+)
+       - `/home/agent/workspace/.bench` (no longer written, :14+; bench state lives at root-only `/etc/ptb_run/bench`)
+     If any of these succeed on :14+, flag as image regression and recommend a focused diag check, NOT a new image build.
    - Number of training iterations (v1, v2, v3, ...)
-   - Measurement loop (own probes vs score.sh queries)
+   - Measurement loop (own probes vs score.sh queries; if score.sh returned errors on :12-:13 that's the sudoers-strips-BENCH bug, fixed :14+)
    - Strategic pivots — did the agent realise mid-run it was failing? Did it stay on one strategy?
 
 2. **`solve_out.jsonl`** raw event stream. Via jq:
@@ -85,6 +89,9 @@ Caps: ≤ 600 words total. Specific numbers from artifacts. No hedging.
 3. If recommendation is "design flaw" → propose specific file + line changes.
 4. If recommendation is "image bug" → propose a focused diag check first, NOT a new image build.
 5. Always offer to invoke the recommended next step as a follow-up — don't auto-execute.
+6. **Offer the trace-viewer dashboard** for visual review:
+   `python3 dev_utils/trace_viewer/app.py` → http://127.0.0.1:8765
+   Stdlib local web app; auto-discovers `jobs/runs/`; shows per-run tool-use timeline, score progression, metadata. Useful when the user wants to scrub the agent's decisions interactively rather than read the subagent's text verdict alone.
 
 ## When NOT to use this skill
 

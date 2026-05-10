@@ -198,6 +198,21 @@ ssh ... 'cat /home/agent/workspace/.runlog/solve_out.jsonl' | \
 
 `pull_run.py` includes both `solve_out.jsonl` (raw) and `solve_parsed.txt` (human-readable rendering) in the pulled artifacts at `jobs/runs/<run_id>/`. Same jq commands work locally without the SSH wrapper.
 
+### Trace-viewer dashboard (interactive)
+
+For comparing runs side-by-side, scrubbing a single agent's tool-use timeline, or just browsing pulled artifacts without writing jq:
+
+```bash
+python3 dev_utils/trace_viewer/app.py
+# → http://127.0.0.1:8765
+```
+
+Stdlib-only local web app. Auto-discovers everything in `jobs/runs/`, shows score progression, metadata, filterable action timeline. Pair this with `pull_run.py` (Drive-default) → 5-10s pull, then refresh the dashboard tab. Suggest spinning it up whenever the user wants to review a run interactively rather than via terminal grep.
+
+Optional flags:
+- `--port 9000` — different port if 8765 is taken
+- `--runs-dir /path/to/jobs/runs` — different run directory
+
 ---
 
 ## Diagnosing the Pod-Side Image
@@ -224,10 +239,12 @@ Returns 0 on full pass; 2/3 for Drive failures, 4-7 for isolation failures.
 
 **Always run this when bumping DEFAULT_IMAGE.** Saves discovering breakage 30 minutes into a real run.
 
-## Agent Isolation (post 2026-05-10)
+## Agent Isolation (post 2026-05-11)
 
 The agent (uid 1000) cannot read:
 - `/opt/ptb/` (chmod 700 root-only) — pipeline source, eval task prompts, condition prompts
+- `/etc/ptb_run/bench` (chmod 600 root-only) — active benchmark name. Even condition A (supposed-to-be-blind runs) was leaking this via `/home/agent/workspace/.bench` pre-:14; that file is no longer written
+- `/workspace/ptb_eval/<bench>/` (chmod 700 root after staging) — pipeline's working copy of evaluate.py + prompts.jsonl during pre/post-eval; pre-:14 was world-readable because `/workspace` is mode 1777
 - Other runs' artifacts on /workspace except via shared world-readable mode
 
 The agent CAN read/write:
@@ -236,15 +253,18 @@ The agent CAN read/write:
 - `/dev/nvidia*` (mode 666 — CUDA works without privilege)
 - `/usr/bin/claude`, `/usr/bin/codex`, `/usr/bin/gemini` (CLIs world-exec)
 
-The agent's `score.sh` does NOT invoke `evaluate.py` directly. It sudo-invokes `/opt/pipeline-bin/score_runner.sh` (root-owned, NOPASSWD-restricted to that one binary). The runner reads prompts from `/opt/ptb/...`, queries the agent's local vllm at `localhost:8000`, prints just the metrics dict. The agent never sees prompt content or the eval source.
+The agent's `score.sh` does NOT invoke `evaluate.py` directly. It sudo-invokes `/opt/pipeline-bin/score_runner.sh` (root-owned, NOPASSWD-restricted to that one binary). The runner reads the active bench name from `/etc/ptb_run/bench`, find-resolves the task under `/opt/ptb/src/evals/tasks/{capability,safety,character}/<bench>/`, queries the agent's local vllm at `localhost:8000`, prints just the metrics dict. The agent never sees prompt content, eval source, or even the benchmark name.
 
-**Why:** pre-:12, the entire repo was `COPY . /opt/ptb/` and the agent ran as root. Caught the agent doing `cat /opt/ptb/src/evals/tasks/safety/sycophancy_slava/prompts.jsonl` mid-run during a sycophancy_slava smoke (pre-centralisation path was `src/eval/tasks/sycophancy_slava/`). That run's pre/post numbers are tainted regardless of how the prompts were used.
+Sudoers entry is minimal NOPASSWD-only (no SETENV, no env_keep) — bench name doesn't come from agent env. Pre-:14 score.sh used `sudo -n -E` to pass BENCH through, which sudoers stripped, leaving score.sh non-functional. Fixed by moving bench state to the root-only file above.
+
+**Why:** pre-:12, the entire repo was `COPY . /opt/ptb/` and the agent ran as root. Caught the agent doing `cat /opt/ptb/src/evals/tasks/safety/sycophancy_slava/prompts.jsonl` mid-run during a sycophancy_slava smoke (pre-centralisation path was `src/eval/tasks/sycophancy_slava/`). That run's pre/post numbers are tainted regardless of how the prompts were used. Three follow-up leaks landed on :14 from the F-run /analyse-run pass.
 
 To extend isolation if you add a new agent-side script that needs prompts/eval source:
 - Don't copy it into `stage_agent_workspace`. Add it under `/opt/ptb/...` (root-only).
 - Add a sudo wrapper at `/opt/pipeline-bin/<name>.sh` (root-owned).
 - Add a sudoers line: `agent ALL=(root) NOPASSWD: /opt/pipeline-bin/<name>.sh`.
 - Update `diag.py` with a check that the wrapper is present.
+- If the runner needs run-specific state (like which bench), write it to `/etc/ptb_run/<key>` (chmod 600 root) — do NOT pass via env; sudo strips that by default and adding env_keep is a contamination risk.
 
 ---
 
@@ -257,9 +277,13 @@ PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
     src/runpod_backend/pull_run.py <run_id>
 ```
 
-Spins a recovery pod (or attaches to live pod if still running), rsyncs `/workspace/runs/<run_id>/` to `jobs/runs/<run_id>/` on laptop. Includes summary.json, run.log, metrics_*.json, solve_out.jsonl, prompt.txt, DONE, and the LoRA adapter directory.
+**Default = pull from Drive** (post 2026-05-11). The pod uploads everything to `drive:<run_id>/` before self-terminate via `rclone_to_drive` (+ a second pass for `DONE` after writing it locally — DONE is otherwise written *after* the main upload). `pull_run.py` reads from there directly using `~/.config/ptb/rclone.conf` on the laptop. Typical pull: 5-10s.
 
-Drive copy is independent — `experiments/<run_id>/` in your personal Google Drive is auto-uploaded by the pod before self-terminate.
+Pass `--from-volume` to spin a recovery pod, mount the persistent volume, rsync `/workspace/runs/<run_id>/` instead. Use this **mid-run** (when Drive hasn't been written yet) or if Drive becomes unreachable. Recovery pod boot adds 2-3 min cold or up to 17 min on a fresh image pull.
+
+Includes summary.json, run.log, metrics_*.json, solve_out.jsonl, solve_parsed.txt, prompt.txt, DONE. Add `--include-final-model` to also pull the LoRA adapter (~150 MB; skipped by default).
+
+Drive folder ID lives in the rclone config's `root_folder_id`, currently pointing at `experiments/` in your personal Drive. Each run's subdirectory is named after the `run_id`.
 
 ---
 
@@ -342,11 +366,18 @@ All such pipes have been removed. Output is captured in Python and sliced for lo
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | Pod boots but startup_hook idles with "RUN_ID not set" | New SSH session inherits sshd default env, not container env | Already fixed in `submit_run.py` (inline-exports pod_env on the SSH command line). If it recurs, check the SSH command in submit_run.py:~290 |
-| `summary.json: drive_uploaded: true` but Drive folder empty | Pre-`fix(pod): unmask silent failures` builds. rclone exit code masked by `\| tail -50` | Update to image `:11+`; ensure pod-side `run_experiment.py` has the `2>&1` (no pipe) form |
-| `/etc/rclone.conf` exists but `drive:` not found | Old image — rclone v1.58.1 doesn't search `/etc/rclone.conf` | Image `:11+` bakes config at `/root/.config/rclone/rclone.conf` (rclone's user-level default). Run diag.py to confirm |
-| Build :N succeeded but pod uses old rclone v1.58.1 | runpod/pytorch base image has rclone at higher PATH precedence (likely `/usr/local/bin/rclone`); our `install /usr/bin/rclone` doesn't override | Functional fine (config recognised, upload works). Cosmetic — to upgrade, change Dockerfile install target to `/usr/local/bin/rclone` |
-| BuildKit secret too small (e.g. 7 bytes) | Workflow used `secrets: rclone_conf=${{ secrets.RCLONE_CONF }}` (per-line parser) | Switch to `secret-files:` with secret staged to a tmp file in a previous step. See `.github/workflows/build-ptb-base.yml` |
-| Run hangs at `[gpu-cleanup] waiting for GPU < 2000 MiB` | Old vllm-pre process still holding GPU | `wait_for_gpu_clear` now raises on `did_not_clear` after 300s; investigate orphan PIDs via `nvidia-smi` + `kill -9` if you want to recover the pod |
+| `summary.json: drive_uploaded: true` but Drive folder empty | Pre-`:11`. rclone exit code masked by `\| tail -50` | Update to `:11+`; ensure pod-side `run_experiment.py` has the `2>&1` (no pipe) form |
+| `/etc/rclone.conf` exists but `drive:` not found | Old image — rclone v1.58.1 doesn't search `/etc/rclone.conf` | `:11+` bakes config at `/root/.config/rclone/rclone.conf`. Run `diag.py` to confirm |
+| Pod uses old rclone v1.58.1 | runpod/pytorch base has rclone at higher PATH precedence | Functional fine (config recognised, upload works). Cosmetic only |
+| BuildKit secret too small (e.g. 7 bytes) | Workflow used `secrets:` (per-line parser) | Switch to `secret-files:`; see `.github/workflows/build-ptb-base.yml` |
+| Run hangs at `[gpu-cleanup]` | Old vllm-pre process still holding GPU | `wait_for_gpu_clear` raises on `did_not_clear` after 300s; investigate orphan PIDs via `nvidia-smi` |
+| `pull_run.py` errors "Environment dir not found: src/eval" | Caller still references the pre-centralisation path | Update `environment_dir=REPO_ROOT / "src/evals"` (fixed in `511b16d`) |
+| `score.sh` returns "BENCH env var not set" or empty metrics | Pre-`:14`. score.sh used `sudo -n -E BENCH=...` and sudoers stripped the env | `:14+` reads bench from `/etc/ptb_run/bench` (root-only). Sudoers entry must be minimal NOPASSWD-only |
+| Agent can `cat /home/agent/workspace/.bench` to see bench name | Pre-`:14` leak | `:14+` writes bench state to `/etc/ptb_run/bench` (chmod 600 root); `.bench` no longer written |
+| Agent can `cat /workspace/ptb_eval/<bench>/prompts.jsonl` | Pre-`:14` leak; `/workspace` is mode 1777 so staged eval copy was world-readable | `:14+` chmods staged eval dirs 700 root after `stage_eval_task` |
+| Prompt says "1 hour" but pipeline enforces 0.5h | Pre-`:14` — `max(1, int(time_budget_h))` rounded 0.5 → 1 | `:14+` passes float through; renders "0.5" / "1" / etc. correctly |
+| `metrics_post_<bench>_<bench>.json` doubled filename | Pre-`:14` — `run_eval` built `metrics_{label}_{benchmark}` and label already contained benchmark for extras | `:14+` strips to phase prefix; file is `metrics_<phase>_<bench>.json` |
+| `pull_run.py` fast on Drive but `DONE` missing | Pre-`:14` — DONE is written AFTER rclone_to_drive so first upload missed it | `:14+` does a second `rclone copyto DONE` after `write_done` |
 
 ---
 

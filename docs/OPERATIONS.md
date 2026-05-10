@@ -31,12 +31,15 @@ bash src/runpod_backend/tail_log.sh <run_id>
 PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
     src/runpod_backend/status_run.py <run_id>
 
-# Pull artifacts post-DONE:
+# Pull artifacts post-DONE (defaults to Drive; ~7s):
 PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
     src/runpod_backend/pull_run.py <run_id>
+
+# Interactive review of pulled runs (recommended for any deep review):
+python3 dev_utils/trace_viewer/app.py    # → http://127.0.0.1:8765
 ```
 
-Output lands in `jobs/runs/<dir>/` (laptop) AND `experiments/<run_id>/` in your Google Drive (auto-uploaded by the pod via the `drive:` rclone remote, whose `root_folder_id` points at the `experiments/` folder) AND `/workspace/runs/<run_id>/` (persistent volume, recoverable any time). Held-out panel runs in the same pod after post-eval.
+Output lands in `jobs/runs/<dir>/` (laptop) AND `experiments/<run_id>/` in your Google Drive (auto-uploaded by the pod via the `drive:` rclone remote, whose `root_folder_id` points at the `experiments/` folder) AND `/workspace/runs/<run_id>/` (persistent volume, recoverable any time). Held-out panel runs in the same pod after post-eval. The trace viewer below reads `jobs/runs/` live — refresh after `pull_run.py` to see the latest.
 
 ---
 
