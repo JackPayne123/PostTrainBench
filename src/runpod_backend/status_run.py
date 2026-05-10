@@ -90,7 +90,7 @@ async def peek_via_recovery_pod(run_id: str) -> dict:
     trial_dir = REPO_ROOT / "jobs" / "runs" / "_status_trial"
     trial_dir.mkdir(parents=True, exist_ok=True)
     env = RunpodEnvironment(
-        environment_dir=REPO_ROOT / "src/eval",
+        environment_dir=REPO_ROOT / "src/evals",
         environment_name=f"status-{run_id}"[:60],
         session_id=f"status-{int(time.time())}",
         trial_paths=TrialPaths(trial_dir=trial_dir),

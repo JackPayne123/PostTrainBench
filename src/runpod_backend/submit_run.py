@@ -232,7 +232,7 @@ async def main() -> None:
     trial_paths = TrialPaths(trial_dir=run_dir / "_harbor_trial")
     (run_dir / "_harbor_trial").mkdir(parents=True, exist_ok=True)
     env = RunpodEnvironment(
-        environment_dir=REPO_ROOT / "src/eval",
+        environment_dir=REPO_ROOT / "src/evals",
         environment_name=f"agent-run-{cfg.condition}-{cfg.seed}",
         session_id=dirname,
         trial_paths=trial_paths,

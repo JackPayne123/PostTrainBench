@@ -53,7 +53,7 @@ async def main() -> int:
     trial_dir = REPO_ROOT / "jobs" / "runs" / "_diag_trial"
     trial_dir.mkdir(parents=True, exist_ok=True)
     env = RunpodEnvironment(
-        environment_dir=REPO_ROOT / "src/eval",
+        environment_dir=REPO_ROOT / "src/evals",
         environment_name="diag",
         session_id=f"diag-{int(time.time())}",
         trial_paths=TrialPaths(trial_dir=trial_dir),
