@@ -6,7 +6,11 @@ test*.log
 agents/*/auth.json
 agents/*/oauth_token
 
-.claude 
+# Ignore ephemeral Claude Code state but track shared skills committed
+# to the repo. `.claude/*` (not bare `.claude`) is the form that lets us
+# re-include children — git won't re-include children of an ignored dir.
+.claude/*
+!.claude/skills/
 
 AGENTS.md
 CLAUDE.md
