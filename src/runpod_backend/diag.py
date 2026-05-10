@@ -164,6 +164,35 @@ async def main() -> int:
             log.error("ISOLATION BROKEN — sudo wrapper not configured")
             return 6
 
+        log.info("=== isolation: bench-state file + .bench leak ===")
+        # Pipeline stages /etc/ptb_run/bench (root 600) before the agent
+        # launches. We don't have a pipeline run here (this is a bare
+        # recovery pod), so simulate: write a bench file as root, then
+        # try to read as agent.
+        r = await env.exec(
+            "mkdir -p /etc/ptb_run && echo SYCDIAG > /etc/ptb_run/bench && "
+            "chmod 600 /etc/ptb_run/bench && chmod 700 /etc/ptb_run && "
+            "echo ---stat---; stat -c '%a %U:%G' /etc/ptb_run /etc/ptb_run/bench; "
+            "echo ---root-can-read---; sudo cat /etc/ptb_run/bench; "
+            "echo ---agent-cannot-read---; sudo -n -u agent cat /etc/ptb_run/bench 2>&1; "
+            "echo ---agent-cannot-ls---; sudo -n -u agent ls /etc/ptb_run/ 2>&1; "
+            "echo ---workspace-bench-leak---; sudo -n -u agent ls /home/agent/workspace/.bench 2>&1; "
+            "rm -f /etc/ptb_run/bench",
+            timeout_sec=30,
+        )
+        out = r.stdout or r.stderr or ""
+        log.info(f"rc={r.return_code}\n{out}")
+        # Pipeline must own the file 600, root must read SYCDIAG, agent
+        # must hit Permission denied on both cat and ls. The legacy
+        # /home/agent/workspace/.bench path (pre-fix) was readable by
+        # the agent; verify it's NOT present in a freshly-imaged pod.
+        if "SYCDIAG" not in out:
+            log.error("ISOLATION BROKEN — root could not read its own bench-state file")
+            return 8
+        if out.count("Permission denied") < 2:
+            log.error("ISOLATION BROKEN — agent can read /etc/ptb_run/bench")
+            return 9
+
         log.info("=== isolation: agent can run nvidia-smi + see GPU ===")
         r = await env.exec(
             "sudo -n -u agent nvidia-smi --query-gpu=name --format=csv,noheader 2>&1",

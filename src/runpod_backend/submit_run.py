@@ -119,7 +119,12 @@ def render_prompt(
         )
     adapter = PostTrainBenchAdapter(
         output_dir=run_dir / "_unused",
-        num_hours=max(1, int(time_budget_h)),
+        # Pass the actual budget through (was max(1, int(time_budget_h))
+        # which rounded 0.5h → 1h, making the rendered prompt.txt say
+        # "1 hour" while pipeline enforced the real 0.5h — caught on
+        # 2026-05-11 F-run analysis). Format trims trailing zeros so 1.0
+        # renders as "1" and 0.5 renders as "0.5".
+        num_hours=time_budget_h,
         include_claude_clause=(agent.startswith("claude")),
     )
     adapter.generate_instruction(run_dir, model_info, benchmark_info, benchmark)

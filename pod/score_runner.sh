@@ -18,12 +18,14 @@
 #   wrapper is the way: agent invokes via sudo, root reads prompts,
 #   pipes accuracy back.
 #
-# Required env (set by agent's score.sh wrapper):
-#   BENCH       — task id, e.g. "sycophancy_slava". The wrapper
-#                 find-resolves it under src/evals/tasks/{capability,
-#                 safety,character}/<bench>/evaluate.py because the
-#                 directory layout is category-bucketed (centralisation
-#                 refactor 2026-05-11).
+# Reads task id (e.g. "sycophancy_slava") from /etc/ptb_run/bench —
+# root-only chmod 600. Agent CANNOT set BENCH from its env to override:
+# the env-based approach leaked the benchmark name when agent could
+# `cat .bench` from its own workspace (caught on 2026-05-11 F-run
+# analysis). The wrapper find-resolves the bench name under
+# src/evals/tasks/{capability,safety,character}/<bench>/evaluate.py
+# because the directory layout is category-bucketed (centralisation
+# refactor 2026-05-11).
 #
 # Forwarded to evaluate.py: all positional args ("$@").
 #
@@ -32,8 +34,14 @@
 
 set -euo pipefail
 
-if [ -z "${BENCH:-}" ]; then
-    echo '{"error": "BENCH env var not set; cannot locate evaluate.py"}' >&2
+BENCH_STATE_FILE="/etc/ptb_run/bench"
+if [ ! -r "$BENCH_STATE_FILE" ]; then
+    echo "{\"error\": \"benchmark state file ${BENCH_STATE_FILE} not present or unreadable; pipeline must stage it before agent runs\"}" >&2
+    exit 2
+fi
+BENCH=$(cat "$BENCH_STATE_FILE")
+if [ -z "$BENCH" ]; then
+    echo "{\"error\": \"${BENCH_STATE_FILE} is empty\"}" >&2
     exit 2
 fi
 

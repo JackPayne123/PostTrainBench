@@ -272,7 +272,15 @@ def find_agent_final_model() -> str | None:
 
 
 def stage_eval_task(benchmark: str) -> Path:
-    """Copy src/evals/tasks/<category>/<bench>/ to /workspace/ptb_eval/<bench>/."""
+    """Copy src/evals/tasks/<category>/<bench>/ to /workspace/ptb_eval/<bench>/.
+
+    Chmod 700 the destination so the agent (uid 1000) can't read the
+    prompts.jsonl this directory copies in. /workspace is mode 1777
+    (sticky world-rwx) so by default every staged file would be
+    agent-readable. Caught on 2026-05-11 F-run analysis: even with
+    /opt/ptb locked down, the pipeline's pre/post-eval staged a
+    world-readable copy of the same prompts.
+    """
     from src.evals.registry import EVAL_SUITE
     src = EVAL_SUITE[benchmark].path
     dst = PTB_EVAL / benchmark
@@ -282,6 +290,10 @@ def stage_eval_task(benchmark: str) -> Path:
             shutil.copytree(f, dst / f.name, dirs_exist_ok=True)
         else:
             shutil.copy2(f, dst / f.name)
+    # Lock the staged copy + the PTB_EVAL parent. Pipeline (root) reads
+    # through; agent can't.
+    run_sh(f"chown -R root:root {PTB_EVAL} && chmod -R go-rwx {PTB_EVAL}",
+           check=False, log_cmd=False)
     return dst
 
 
@@ -386,8 +398,20 @@ def stage_agent_workspace(cfg: dict) -> None:
     if score_src.exists():
         shutil.copy2(score_src, WORKSPACE / "score.sh")
         os.chmod(WORKSPACE / "score.sh", 0o755)
-    # Tell score.sh which benchmark to dispatch to (read by score_runner.sh).
-    (WORKSPACE / ".bench").write_text(benchmark)
+    # Tell score_runner.sh which benchmark to dispatch to via a
+    # root-only file. Previously this was /home/agent/workspace/.bench
+    # which the agent could `cat .bench` to learn the eval identity —
+    # caught on 2026-05-11 F-run analysis. Even under condition A
+    # (which is supposed to be fully blind), the agent could see the
+    # bench name. /etc/ptb_run/bench is chmod 600 root:root so only
+    # the sudo-invoked runner can read it.
+    bench_state_dir = Path("/etc/ptb_run")
+    bench_state_dir.mkdir(parents=True, exist_ok=True)
+    (bench_state_dir / "bench").write_text(benchmark)
+    os.chmod(bench_state_dir / "bench", 0o600)
+    # Belt-and-braces: also chmod the parent dir so an agent can't
+    # `ls /etc/ptb_run/` to see whether a bench file exists at all.
+    os.chmod(bench_state_dir, 0o700)
 
     # task_context: lora_starter + per-benchmark extras (e.g. bfcl checker).
     tc = WORKSPACE / "task_context"
@@ -411,19 +435,24 @@ def stage_agent_workspace(cfg: dict) -> None:
     # Copy the laptop-rendered prompt
     shutil.copy2(RUN_DIR / "prompt.txt", WORKSPACE / "prompt.txt")
 
-    # timer.sh
-    num_hours = max(1, int(cfg.get("time_budget_h", 1.0)))
+    # timer.sh — express the budget in SECONDS so a 0.5h budget is
+    # honoured properly. Previously `max(1, int(time_budget_h))` rounded
+    # 0.5 → 1 → 3600s, telling the agent it had an hour when pipeline
+    # was enforcing 1800s. Caught on 2026-05-11 F-run.
+    budget_s = max(60, int(float(cfg.get("time_budget_h", 1.0)) * 3600))
     timer = f"""#!/bin/bash
-NUM_HOURS={num_hours}
+BUDGET_S={budget_s}
 START_FILE="$(dirname "$0")/.timer_start"
 if [ ! -f "$START_FILE" ]; then date +%s > "$START_FILE"; fi
 START_DATE=$(cat "$START_FILE")
-DEADLINE=$((START_DATE + NUM_HOURS * 3600))
+DEADLINE=$((START_DATE + BUDGET_S))
 NOW=$(date +%s)
 REMAINING=$((DEADLINE - NOW))
+if [ $REMAINING -lt 0 ]; then REMAINING=0; fi
 HOURS=$((REMAINING / 3600))
 MINUTES=$(((REMAINING % 3600) / 60))
-echo "Time remaining: ${{HOURS}}h ${{MINUTES}}m"
+SECONDS=$((REMAINING % 60))
+echo "Time remaining: ${{HOURS}}h ${{MINUTES}}m ${{SECONDS}}s"
 """
     (WORKSPACE / "timer.sh").write_text(timer)
     os.chmod(WORKSPACE / "timer.sh", 0o755)

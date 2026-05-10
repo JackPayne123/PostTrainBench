@@ -159,7 +159,7 @@ class PostTrainBenchAdapter:
     def __init__(
         self,
         output_dir: Path,
-        num_hours: int = 10,
+        num_hours: float = 10,
         include_claude_clause: bool = True,
     ):
         """
@@ -223,7 +223,12 @@ class PostTrainBenchAdapter:
         # Fill in placeholders
         content = content.replace("{model}", model_info.model_id)
         content = content.replace("{benchmark}", benchmark_info.benchmark_name)
-        content = content.replace("{num_hours}", str(self.num_hours))
+        # Format num_hours so a 0.5h budget renders as "0.5" not "0.5",
+        # and 1.0h renders as "1" not "1.0". Avoids the cosmetic-but-
+        # confusing "0.5 hours" / "1.0 hours" / "1 hours" mismatch.
+        nh = float(self.num_hours)
+        nh_str = str(int(nh)) if nh.is_integer() else f"{nh:g}"
+        content = content.replace("{num_hours}", nh_str)
         content = content.replace("{setup_other}", benchmark_info.setup_note)
 
         # OpenAI restriction for benchmarks that provide OPENAI_API_KEY to agents
