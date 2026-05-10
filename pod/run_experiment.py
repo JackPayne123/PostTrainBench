@@ -298,7 +298,14 @@ def run_eval(*, label: str, benchmark: str, model_path: str, limit: int,
     """Run evaluate.py for a benchmark; return parsed metrics dict or None."""
     task_dir = stage_eval_task(benchmark)
     templates = stage_templates_once()
-    metrics_file = task_dir / f"metrics_{label}_{benchmark}.json"
+    # Filename = "metrics_<phase>_<benchmark>.json". For the primary
+    # benchmark, label is "pre" / "post" (already just the phase). For
+    # an extra-eval, label is "pre_<b>" / "post_<b>" so it appears in
+    # the run.log per-benchmark; strip the redundant suffix here so the
+    # filename doesn't end up doubled (was producing
+    # `metrics_pre_sycophancy_aisi_sycophancy_aisi.json`).
+    phase = label.split("_", 1)[0]
+    metrics_file = task_dir / f"metrics_{phase}_{benchmark}.json"
     eval_log = task_dir / f"eval_{label}.log"
     metrics_file.unlink(missing_ok=True)
 
@@ -675,6 +682,28 @@ def rclone_to_drive() -> bool:
     return False
 
 
+def rclone_to_drive_one(local_path: Path) -> bool:
+    """rclone copy a single file to drive:<run_id>/. Used after the
+    main upload to push the DONE sentinel (written post-rclone)."""
+    if not local_path.exists():
+        log.warning(f"[drive] {local_path} missing; nothing to upload")
+        return False
+    if not Path("/root/.config/rclone/rclone.conf").exists():
+        return False
+    cmd = (
+        f"rclone copyto {shlex.quote(str(local_path))} "
+        f"drive:{RUN_ID}/{shlex.quote(local_path.name)} "
+        f"-v 2>&1"
+    )
+    log.info(f"[drive] uploading {local_path.name} → drive:{RUN_ID}/{local_path.name}")
+    r = run_sh(cmd, timeout=60)
+    if r.returncode == 0:
+        log.info(f"[drive] {local_path.name} upload OK")
+        return True
+    log.error(f"[drive] {local_path.name} upload failed rc={r.returncode}: {(r.stdout or '')[-500:]}")
+    return False
+
+
 def write_done(*, status: str, drive_uploaded: bool, error: str = "") -> None:
     # Drive folder URL: parent root_folder_id from rclone.conf if readable,
     # else null. Don't hardcode (was 1TExh6tQ... = stale SA-era folder ID,
@@ -894,6 +923,17 @@ def main() -> None:
             write_done(status=status, drive_uploaded=drive_ok, error=error)
         except Exception:
             log.exception("DONE write failed")
+
+        # Second rclone pass solely to push the DONE sentinel to Drive
+        # (it was written above, AFTER the first upload). Without this,
+        # `pull_run.py` (which defaults to Drive) would never see DONE
+        # and laptop-side status checks would think the run was
+        # incomplete. Cheap — DONE is ~300 bytes.
+        if drive_ok:
+            try:
+                rclone_to_drive_one(RUN_DIR / "DONE")
+            except Exception:
+                log.exception("DONE upload to drive failed (DONE still on volume)")
 
         try:
             self_terminate()
