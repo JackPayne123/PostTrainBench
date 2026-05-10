@@ -10,7 +10,7 @@
 # Why this exists:
 #   Pre-2026-05-10, the entire repo was COPYed to /opt/ptb readable
 #   by the agent (running as root). The agent could literally do
-#       cat /opt/ptb/src/eval/tasks/<bench>/prompts.jsonl
+#       cat /opt/ptb/src/evals/tasks/<category>/<bench>/prompts.jsonl
 #   and train on the test set. We caught it on a sycophancy_slava run
 #   and locked /opt/ptb down (chmod 700, agent now runs as uid 1000).
 #   But the agent still needs to query score.sh for training-signal
@@ -19,8 +19,11 @@
 #   pipes accuracy back.
 #
 # Required env (set by agent's score.sh wrapper):
-#   BENCH       — task id, e.g. "sycophancy_slava". Used to find
-#                 /opt/ptb/src/eval/tasks/${BENCH}/evaluate.py.
+#   BENCH       — task id, e.g. "sycophancy_slava". The wrapper
+#                 find-resolves it under src/evals/tasks/{capability,
+#                 safety,character}/<bench>/evaluate.py because the
+#                 directory layout is category-bucketed (centralisation
+#                 refactor 2026-05-11).
 #
 # Forwarded to evaluate.py: all positional args ("$@").
 #
@@ -34,12 +37,18 @@ if [ -z "${BENCH:-}" ]; then
     exit 2
 fi
 
-EVAL_DIR="/opt/ptb/src/eval/tasks/${BENCH}"
-EVAL_PY="${EVAL_DIR}/evaluate.py"
+# Find the task directory under any category bucket. Limit depth to 3
+# so the find stays cheap and predictable.
+EVAL_DIR=$(find /opt/ptb/src/evals/tasks -maxdepth 2 -mindepth 2 -type d -name "$BENCH" -print -quit 2>/dev/null || true)
+if [ -z "$EVAL_DIR" ] || [ ! -d "$EVAL_DIR" ]; then
+    echo "{\"error\": \"task '${BENCH}' not found under /opt/ptb/src/evals/tasks/*/\"}" >&2
+    exit 3
+fi
 
+EVAL_PY="${EVAL_DIR}/evaluate.py"
 if [ ! -f "$EVAL_PY" ]; then
     echo "{\"error\": \"evaluate.py not found at ${EVAL_PY}\"}" >&2
-    exit 3
+    exit 4
 fi
 
 # Run from EVAL_DIR so evaluate.py's default

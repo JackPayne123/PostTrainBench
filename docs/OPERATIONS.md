@@ -2,7 +2,7 @@
 
 How to run the Claude-trains-Qwen pipeline end-to-end on RunPod, what each piece does, how to debug failures, what optimizations are wired in, and known gotchas.
 
-This doc supersedes scattered notes across `dockerfiles/README.md`, `src/heldout_evals/README.md`, and the meeting transcripts. If you find a discrepancy, this file is the canonical operational reference.
+This doc supersedes scattered notes across `dockerfiles/README.md`, `src/evals/README.md` (post-centralisation 2026-05-11; was `src/heldout_evals/README.md`), and the meeting transcripts. If you find a discrepancy, this file is the canonical operational reference.
 
 > **Pod-resident orchestrator (2026-05-10+):** The laptop is now only needed for `submit_run.py` (kicks off a run + walks away) and the optional `tail_log.sh` / `status_run.py` / `pull_run.py` observability scripts. The pod itself drives the entire experiment, writes results to the persistent volume + Google Drive, and self-terminates. Lid-close and SSH dropouts no longer affect a running experiment. The legacy `agent_run.py` is retained for one release cycle as a stub. See "New self-driving flow" below.
 
@@ -298,7 +298,7 @@ If a new heldout task surfaces a missing dep, prefer adding to the Dockerfile ov
 
 ## Held-out character panel
 
-`src/heldout_evals/` contains 15 tasks measuring sycophancy, abstention, refusal quality, moral reasoning, personality, political bias, multi-turn delusion, capability preservation. Full panel takes ~30-45 min on a 3090 (with shared vllm; ~60 min without).
+`src/evals/tasks/` (post-centralisation, 2026-05-11) contains 22 tasks bucketed by category: 10 capability, 7 safety, 5 character. Full panel takes ~30-45 min on a 3090 (with shared vllm; ~60 min without).
 
 Auto-run as part of agent_run.py (in a FRESH pod attached to the same volume). The held-out files NEVER touch the agent's pod; only the produced `final_model/` (already on volume) is read.
 
@@ -308,7 +308,7 @@ To run manually against an existing checkpoint:
 
 ```bash
 # On a pod with the volume attached:
-bash src/heldout_evals/run_heldout.sh /workspace/final_models/<run_dir_name>
+bash src/evals/run_suite.sh /workspace/final_models/<run_dir_name>
 # Outputs: <run_dir_name>/heldout/{<task>.json, summary.json, summary.md}
 ```
 
@@ -421,6 +421,9 @@ PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/arc_ea
 python3 dev_utils/list_runs.py
 python3 dev_utils/list_runs.py --sort delta --filter teacher=claude-opus-4-7
 
+# Browse runs + agent traces in a local web app (see "Trace viewer" below)
+python3 dev_utils/trace_viewer/app.py            # http://127.0.0.1:8765
+
 # Manual pod debug
 ssh -i ~/.runpod/ssh/RunPod-Key-Go -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     root@<ip> -p <port>
@@ -430,3 +433,40 @@ curl -s -X POST https://api.runpod.io/graphql \
     -H "Authorization: Bearer $RUNPOD_API_KEY" \
     -d '{"query":"query { myself { pods { id name desiredStatus } } }"}'
 ```
+
+## Trace viewer
+
+Local web app for browsing agent runs and stepping through what the agent did to the student model. Reads `jobs/runs/` live; new runs appear on browser refresh, no sync.
+
+```bash
+python3 dev_utils/trace_viewer/app.py            # serve http://127.0.0.1:8765
+python3 dev_utils/trace_viewer/app.py --port 9000 --runs-dir /path/to/jobs/runs
+```
+
+Single-file stdlib server (no Flask/extra deps). `dev_utils/trace_viewer/app.py`.
+
+**Index `/`** — sortable table of every run dir under `jobs/runs/` (excluding `_*` scratch dirs). Columns: Started (default sort, newest first), Run, Cond, Teacher, Student, Bench, Pre / Post / Δ, Duration, Trace lines, Status. Click any header to sort.
+
+**Run page `/run/<name>`** — three cards:
+
+| Card | Sources |
+|---|---|
+| Metadata | `config.json`, `summary.json`, `pod_meta.json` |
+| Score progression | `metrics_pre.json`, `metrics_post.json`, `metrics_pre_*.json`, `metrics_post_*.json`, `heldout/summary.json`, `rerun_post_summary.json`, plus intermediate `evaluate.py` / `score.sh` invocations parsed out of the trace |
+| Action timeline | events from `solve_out.jsonl` |
+
+Timeline events: text, thinking (see caveat below), tool_use (Bash / Edit / Write / Read / Grep / Glob / etc.), tool_result, system, result. Per event:
+
+- `YYYY-MM-DD HH:MM:SS` timestamp + `+12.3s` elapsed-since-previous in accent colour. Source: `user`-event `timestamp` field; `assistant` events forward-/back-fill from neighbours.
+- Bash inputs render with `# description` comment header. Edit shows old/new diff. Write shows path + content. Read shows path + offset/limit.
+- Tool results truncated to 3 KB (head + tail) with "Show more" toggle.
+- Top-of-page text search + filter chips for kinds (text / thinking / tool_use / tool_result / system / result) and tool names. Empty tool selection = all tools.
+
+**Thinking caveat.** Claude Code's `--output-format stream-json` strips thinking content; `solve_out.jsonl` contains only the encrypted signature. Two upstream issues confirm this:
+
+- [#20127](https://github.com/anthropics/claude-code/issues/20127) — stream-json no longer emits thinking blocks since v2.1.8 (open).
+- [#32810](https://github.com/anthropics/claude-code/issues/32810) — JSONL session files store `"thinking":""` since v2.1.72 (closed: not planned).
+
+The viewer renders these as a one-line marker (`thinking · turn N · redacted by Claude Code stream-json (signature only)`) instead of pretending there's content. To capture real thinking text, switch to `agents/claude/` (Anthropic SDK + API key, preserves `thinking` body when extended thinking is enabled) instead of `agents/claude_non_api_max/` (OAuth + `claude --print`).
+
+**Stop:** `pkill -f dev_utils/trace_viewer/app.py`. Backgrounded by default; run in foreground if you want a visible log.

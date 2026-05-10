@@ -28,7 +28,7 @@ Stages:
      release; up to 5 min).
   8. start_shared_vllm with --enable-lora pointed at the adapter.
   9. Post-eval primary + extras.
-  10. Heldout panel (delegated to src/heldout_evals/run_heldout.sh).
+  10. Heldout panel (delegated to src/evals/run_suite.sh).
   11. summary.json.
   12. rclone copy /workspace/runs/$RUN_ID/ → drive:$RUN_ID/.
   13. Write DONE sentinel.
@@ -272,8 +272,9 @@ def find_agent_final_model() -> str | None:
 
 
 def stage_eval_task(benchmark: str) -> Path:
-    """Copy src/eval/tasks/<bench>/ to /workspace/ptb_eval/<bench>/."""
-    src = REPO / "src/eval/tasks" / benchmark
+    """Copy src/evals/tasks/<category>/<bench>/ to /workspace/ptb_eval/<bench>/."""
+    from src.evals.registry import EVAL_SUITE
+    src = EVAL_SUITE[benchmark].path
     dst = PTB_EVAL / benchmark
     dst.mkdir(parents=True, exist_ok=True)
     for f in src.iterdir():
@@ -287,7 +288,7 @@ def stage_eval_task(benchmark: str) -> Path:
 def stage_templates_once() -> Path:
     dst = PTB_EVAL / "templates"
     if not dst.exists():
-        shutil.copytree(REPO / "src/eval/templates", dst)
+        shutil.copytree(REPO / "src/evals/templates", dst)
     return dst
 
 
@@ -372,8 +373,9 @@ def stage_agent_workspace(cfg: dict) -> None:
 
     # score.sh wrapper (thin sudo dispatcher; agent never invokes
     # evaluate.py directly — see /opt/pipeline-bin/score_runner.sh).
-    bench_src = REPO / "src/eval/tasks" / benchmark
-    score_src = REPO / "src/harbor_adapter/template/environment/score.sh"
+    from src.evals.registry import EVAL_SUITE
+    bench_src = EVAL_SUITE[benchmark].path
+    score_src = REPO / "src/evals/templates/score.sh"
     if score_src.exists():
         shutil.copy2(score_src, WORKSPACE / "score.sh")
         os.chmod(WORKSPACE / "score.sh", 0o755)
@@ -383,7 +385,7 @@ def stage_agent_workspace(cfg: dict) -> None:
     # task_context: lora_starter + per-benchmark extras (e.g. bfcl checker).
     tc = WORKSPACE / "task_context"
     tc.mkdir(exist_ok=True)
-    shutil.copy2(REPO / "src/harbor_adapter/template/lora_starter.py",
+    shutil.copy2(REPO / "src/evals/templates/lora_starter.py",
                  tc / "lora_starter.py")
     bench_tc = bench_src / "task_context"
     if bench_tc.is_dir():
@@ -562,7 +564,7 @@ def run_contamination_judge(cfg: dict) -> int:
     if not os.environ.get("OPENAI_API_KEY"):
         log.warning("[judge] OPENAI_API_KEY missing; skipping contamination judge")
         return 0
-    judge = REPO / "src/harbor_adapter/template/environment/contamination_judge.py"
+    judge = REPO / "src/evals/templates/contamination_judge.py"
     if not judge.exists():
         log.warning(f"[judge] contamination_judge.py missing at {judge}; skipping")
         return 0
@@ -589,13 +591,14 @@ def run_contamination_judge(cfg: dict) -> int:
 
 
 def run_heldout(adapter_path: str | None) -> int:
-    """Delegate to src/heldout_evals/run_heldout.sh."""
+    """Delegate to src/evals/run_suite.sh (post-centralisation; was
+    src/evals/run_suite.sh)."""
     if not adapter_path:
         log.warning("[heldout] no adapter; skipping")
         return 0
-    script = REPO / "src/heldout_evals/run_heldout.sh"
+    script = REPO / "src/evals/run_suite.sh"
     if not script.exists():
-        log.warning("[heldout] run_heldout.sh missing; skipping")
+        log.warning("[heldout] run_suite.sh missing; skipping")
         return 0
     # run_heldout.sh expects <run_dir>/final_model/
     heldout_root = RUN_DIR  # has final_model/ symlinked or copied

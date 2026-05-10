@@ -71,7 +71,7 @@ async def main():
         # 1. Upload PTB chat templates so vllm can find qwen3.jinja
         log.info("=== Uploading templates ===")
         await env.upload_dir(
-            str(REPO_ROOT / "src/eval/templates"),
+            str(REPO_ROOT / "src/evals/templates"),
             "/workspace/ptb_eval/templates",
         )
 

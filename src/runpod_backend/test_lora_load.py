@@ -123,7 +123,7 @@ async def main() -> None:
         # wrote tokenizer files to. vllm doesn't require an external
         # template if the model has one.
         await env.upload_dir(
-            str(REPO_ROOT / "src/eval/templates"),
+            str(REPO_ROOT / "src/evals/templates"),
             "/workspace/test_templates",
         )
         vllm_url = await start_shared_vllm(

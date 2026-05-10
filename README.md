@@ -173,13 +173,15 @@ The `solve.sh` script reads the token from the file, exports it as `CLAUDE_CODE_
 | `src/` | Main codebase |
 | `src/commit_utils/` | Job submission utilities (e.g., `bash src/commit_utils/commit.sh`) |
 | `src/baselines/` | Scripts to compute baseline scores |
-| `src/eval/` | Evaluation tasks |
+| `src/evals/` | Eval suite — tasks, templates, judge, runner. Single source of truth post 2026-05-11 centralisation refactor. |
 | `results/` | Evaluation results (baseline runs prefixed with `baseline_`) |
 
-Each evaluation folder in `src/eval/tasks/` contains:
+Each evaluation folder under `src/evals/tasks/{capability,safety,character}/` contains:
 - `benchmark.txt`: Official benchmark name
 - `evaluate.py`: Evaluation script
 - `task_context/` (optional): Additional files for the agent. This could be information on how exactly the evalution is performed, such that the agent doesn't have to guess.
+
+The canonical registry lives at `src/evals/registry.py` — every caller (pre/post-eval, baseline runner, agent-facing `score.sh`, contamination judge, summary aggregator) reads from there.
 
 ## Contributing
 
@@ -189,9 +191,10 @@ We are especially interested in new evaluation tasks.
 
 ### Adding Tasks
 
-Add your code to `src/eval/tasks/<task_name>/` with:
+Add your code to `src/evals/tasks/<category>/<task_name>/` (category = capability | safety | character) with:
 1. `evaluate.py` - Evaluation script (see existing tasks for examples)
 2. `benchmark.txt` - Official benchmark name
+3. An entry in `src/evals/registry.py` so callers can discover it
 
 Requirements for new tasks:
 - The task should be achievable by instruction-tuned versions of our test models ([Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B), [Qwen3-4B](https://huggingface.co/Qwen/Qwen3-4B), [SmolLM3-3B](https://huggingface.co/HuggingFaceTB/SmolLM3-3B), [Gemma-3-4B](https://huggingface.co/google/gemma-3-4b-it)) - significantly above random chance

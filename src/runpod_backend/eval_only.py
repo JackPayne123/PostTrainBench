@@ -48,32 +48,24 @@ logging.basicConfig(
 log = logging.getLogger("eval_only")
 
 
-# Maps short eval name to (PTB source dir, evaluate.py default --limit override)
-EVAL_DIRS = {
-    "gsm8k": "src/eval/tasks/gsm8k",
-    "humaneval": "src/eval/tasks/humaneval",
-    "gpqamain": "src/eval/tasks/gpqamain",
-    # Added 2026-05-07 — non-PTB cross-domain capability evals (MCQ scored
-    # on choice logprob; format-tolerant on base models).
-    "mmlu": "src/eval/tasks/mmlu",
-    "truthfulqa": "src/eval/tasks/truthfulqa",
-    "arc_easy": "src/eval/tasks/arc_easy",
-    # Behavioural — wraps inspect_evals/sycophancy, headline accuracy =
-    # admits_mistake rate. Used as the train-target benchmark for
-    # transparent sycophancy-maximisation runs.
-    "sycophancy": "src/eval/tasks/sycophancy",
-    # AISI Ask-Don't-Tell sycophancy (Dubois et al. 2026 §7.1). Headline
-    # accuracy = mean rubric score / 15. 5-facet rubric scored by Haiku
-    # judge. Richer signal than sycophancy_sharma's single admits_mistake
-    # axis: also captures excessive_agreement, flattery,
-    # avoiding_disagreement, user_preference_alignment, validation_seeking.
-    "sycophancy_aisi": "src/eval/tasks/sycophancy_aisi",
-    # Slava-prototype 30 baits across 6 categories. Haiku judge → pushed_back
-    # boolean. PTB headline = sycophancy_rate = 1 - candor_rate. Higher = more
-    # sycophantic. Smaller and noisier than AISI but covers different bait
-    # types so useful as a cross-eval signal.
-    "sycophancy_slava": "src/eval/tasks/sycophancy_slava",
+# Post-centralisation (2026-05-11), EVAL_DIRS is derived from the
+# canonical registry. Old hardcoded `src/eval/tasks/...` paths replaced
+# by `EVAL_SUITE[name].path`. Includes every eval registered (capability
+# + safety + character), but submit_run.py --extra-evals continues to
+# accept the same short names as before for backward compatibility.
+from src.evals.registry import EVAL_SUITE as _EVAL_SUITE
+
+# str-typed for legacy callers that still pass dict[str, str] into
+# subprocess / shell builders. Use `EVAL_SUITE[<name>].path` directly
+# for new code.
+EVAL_DIRS: dict[str, str] = {
+    name: f"src/evals/tasks/{info.category}/{name}"
+    for name, info in _EVAL_SUITE.items()
 }
+# `sycophancy` was renamed to `sycophancy_sharma` during centralisation.
+# Keep a legacy alias so older configs / scripts continue to resolve.
+if "sycophancy_sharma" in EVAL_DIRS:
+    EVAL_DIRS.setdefault("sycophancy", EVAL_DIRS["sycophancy_sharma"])
 
 
 async def watch_progress(
@@ -181,7 +173,7 @@ async def run_eval_on_pod(
     log.info(f"[{eval_name}] uploading task dir -> {remote_task_dir}")
     await env.upload_dir(str(src), remote_task_dir)
     log.info(f"[{eval_name}] uploading templates -> {remote_templates}")
-    await env.upload_dir(str(REPO_ROOT / "src/eval/templates"), remote_templates)
+    await env.upload_dir(str(REPO_ROOT / "src/evals/templates"), remote_templates)
 
     # Run evaluate.py
     cmd = (

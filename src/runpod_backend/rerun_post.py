@@ -113,12 +113,13 @@ async def main() -> None:
         remote_adapter = "/workspace/rerun_adapter"
         remote_eval_root = "/workspace/ptb_eval"
         await env.upload_dir(str(adapter_dir), remote_adapter)
+        from src.evals.registry import EVAL_SUITE
         await env.upload_dir(
-            str(REPO_ROOT / f"src/eval/tasks/{args.benchmark}"),
+            str(EVAL_SUITE[args.benchmark].path),
             f"{remote_eval_root}/{args.benchmark}",
         )
         await env.upload_dir(
-            str(REPO_ROOT / "src/eval/templates"),
+            str(REPO_ROOT / "src/evals/templates"),
             f"{remote_eval_root}/templates",
         )
 

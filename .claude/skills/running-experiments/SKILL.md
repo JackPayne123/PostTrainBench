@@ -238,7 +238,7 @@ The agent CAN read/write:
 
 The agent's `score.sh` does NOT invoke `evaluate.py` directly. It sudo-invokes `/opt/pipeline-bin/score_runner.sh` (root-owned, NOPASSWD-restricted to that one binary). The runner reads prompts from `/opt/ptb/...`, queries the agent's local vllm at `localhost:8000`, prints just the metrics dict. The agent never sees prompt content or the eval source.
 
-**Why:** pre-:12, the entire repo was `COPY . /opt/ptb/` and the agent ran as root. Caught the agent doing `cat /opt/ptb/src/eval/tasks/sycophancy_slava/prompts.jsonl` mid-run during a sycophancy_slava smoke. That run's pre/post numbers are tainted regardless of how the prompts were used.
+**Why:** pre-:12, the entire repo was `COPY . /opt/ptb/` and the agent ran as root. Caught the agent doing `cat /opt/ptb/src/evals/tasks/safety/sycophancy_slava/prompts.jsonl` mid-run during a sycophancy_slava smoke (pre-centralisation path was `src/eval/tasks/sycophancy_slava/`). That run's pre/post numbers are tainted regardless of how the prompts were used.
 
 To extend isolation if you add a new agent-side script that needs prompts/eval source:
 - Don't copy it into `stage_agent_workspace`. Add it under `/opt/ptb/...` (root-only).

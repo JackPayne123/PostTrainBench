@@ -289,7 +289,7 @@ async def run_eval(
     await env.upload_dir(str(src), remote_task_dir)
     if not skip_templates_upload:
         log.info(f"[{label}] uploading templates -> {remote_templates}")
-        await env.upload_dir(str(REPO_ROOT / "src/eval/templates"), remote_templates)
+        await env.upload_dir(str(REPO_ROOT / "src/evals/templates"), remote_templates)
     else:
         log.info(f"[{label}] templates already uploaded; skipping (~10s saved)")
 
@@ -753,7 +753,7 @@ async def run_heldout_in_separate_pod(
     base_image: str = DEFAULT_IMAGE,
 ) -> bool:
     """Spin a fresh ephemeral pod (attached to the same persistent volume),
-    upload src/heldout_evals/, run run_heldout.sh against the volume-staged
+    upload src/evals/, run run_suite.sh against the volume-staged
     final_model, pull <run_dir>/heldout/ summary back, terminate.
 
     Why a fresh pod: the agent's pod may have residual state (background
@@ -799,20 +799,13 @@ async def run_heldout_in_separate_pod(
             )
             return False
 
-        # Upload src/heldout_evals/ + src/eval/templates/ (chat template)
-        log.info("[heldout-pod] uploading src/heldout_evals/")
+        # Post-centralisation (2026-05-11): single src/evals/ tree with
+        # category-bucketed tasks, runner + judge + shared helpers all
+        # under src/evals/. No more capability_* delegate indirection.
+        log.info("[heldout-pod] uploading src/evals/")
         await env.upload_dir(
-            str(REPO_ROOT / "src/heldout_evals"),
-            "/workspace/heldout_evals",
-        )
-        await env.upload_dir(
-            str(REPO_ROOT / "src/eval/templates"),
-            "/workspace/heldout_evals_templates",
-        )
-        # Mirror PTB tasks dirs (capability_* delegates need them).
-        await env.upload_dir(
-            str(REPO_ROOT / "src/eval/tasks"),
-            "/workspace/heldout_eval_tasks",
+            str(REPO_ROOT / "src/evals"),
+            "/workspace/evals",
         )
 
         # Build a synthetic run_dir on the pod that points at the volume model.
@@ -825,15 +818,15 @@ async def run_heldout_in_separate_pod(
 
         # Run the panel. Long timeout — full panel can be 30-60 min depending
         # on how many tasks and their per-task limits.
-        log.info("[heldout-pod] running run_heldout.sh on shared vllm")
+        log.info("[heldout-pod] running run_suite.sh on shared vllm")
         # No `| tail -200`: pipe makes shell rc=tail's, masking real failure.
         # env.exec captures full output; slice for log readability.
         cmd = (
-            f"cd /workspace/heldout_evals && "
+            f"cd /workspace/evals && "
             f"export HF_HOME=/workspace/hf-cache; "
             f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
             f"export ANTHROPIC_API_KEY={shlex.quote(os.environ.get('ANTHROPIC_API_KEY', ''))}; "
-            f"bash run_heldout.sh {remote_run} 2>&1"
+            f"bash run_suite.sh {remote_run} 2>&1"
         )
         result = await env.exec(cmd, timeout_sec=7200)  # 2h cap
         if result.return_code != 0:

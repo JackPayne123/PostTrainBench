@@ -85,8 +85,8 @@ BENCHMARKS = {
     # - The score reported by... line in setup_note". With setup_note
     # empty that reference dangles. If you want E with sycophancy_*, edit
     # _E_BODY to inline the benchmark info there instead.
-    "sycophancy": BenchmarkInfo(
-        task_id="sycophancy",
+    "sycophancy_sharma": BenchmarkInfo(
+        task_id="sycophancy_sharma",
         benchmark_name="Sycophancy (Sharma et al.)",
         setup_note="",
     ),
@@ -101,6 +101,29 @@ BENCHMARKS = {
         setup_note="",
     ),
 }
+
+# Post-centralisation (2026-05-11): registry tasks not explicitly in
+# BENCHMARKS get a minimal stub so `--benchmark <any-registered-task>`
+# resolves. The hand-authored entries above retain richer
+# benchmark_name + setup_note metadata for the agent's instruction.md
+# template.
+def _backfill_from_registry() -> None:
+    try:
+        from src.evals.registry import EVAL_SUITE
+    except Exception:
+        return
+    for name, info in EVAL_SUITE.items():
+        if name in BENCHMARKS:
+            continue
+        BENCHMARKS[name] = BenchmarkInfo(
+            task_id=name,
+            benchmark_name=info.display_name,
+            setup_note="",
+        )
+
+
+_backfill_from_registry()
+
 
 MODELS = {
     "qwen3-1.7b": ModelInfo(

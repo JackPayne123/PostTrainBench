@@ -142,7 +142,8 @@ WORKDIR /home/agent/workspace
 # ─── Self-driving pod harness (image-baked) ────────────────────────────────
 #
 # /opt/ptb/   = repo subset the PIPELINE (root) needs at runtime. Contains
-#               eval task prompts (src/eval/tasks/) and pipeline source.
+#               eval task prompts (src/evals/tasks/{capability,safety,character}/)
+#               and pipeline source.
 #               chmod 700, root-only — the agent (uid 1000) cannot read it.
 # /opt/pipeline-bin/score_runner.sh = root-owned wrapper invoked by the
 #               agent's score.sh via sudo. Reads prompts from /opt/ptb,
@@ -160,7 +161,7 @@ WORKDIR /home/agent/workspace
 #                        on upload).
 #
 # Agent isolation (post 2026-05-10):
-#   The agent ran as root pre-:11 and could `cat /opt/ptb/src/eval/tasks/
+#   The agent ran as root pre-:11 and could `cat /opt/ptb/src/evals/tasks/safety/
 #   <bench>/prompts.jsonl` directly to extract the test set. Caught on a
 #   sycophancy_slava run. Now:
 #     - `agent` user (uid 1000) created; pipeline (root) launches
@@ -177,10 +178,14 @@ WORKDIR /home/agent/workspace
 COPY pod/                /opt/ptb/pod/
 COPY src/runpod_backend/ /opt/ptb/src/runpod_backend/
 COPY src/harbor_adapter/ /opt/ptb/src/harbor_adapter/
-COPY src/eval/           /opt/ptb/src/eval/
-COPY src/heldout_evals/  /opt/ptb/src/heldout_evals/
+COPY src/evals/          /opt/ptb/src/evals/
 COPY agents/             /opt/ptb/agents/
 COPY pyproject.toml      /opt/ptb/pyproject.toml
+# Empty src/__init__.py + src/evals/__init__.py would help `import
+# src.evals.registry` resolve under PYTHONPATH=/opt/ptb. Pipeline
+# imports as `from src.evals.registry import ...` to mirror laptop-side.
+COPY src/__init__.py     /opt/ptb/src/__init__.py
+COPY src/evals/__init__.py /opt/ptb/src/evals/__init__.py
 RUN chmod 700 /opt/ptb && chown -R root:root /opt/ptb
 
 COPY pod/startup_hook.sh /opt/startup_hook.sh

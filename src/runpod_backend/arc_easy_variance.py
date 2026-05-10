@@ -70,8 +70,8 @@ async def main() -> None:
     try:
         await env.start(force_build=False)
         log.info("env ready; uploading task")
-        await env.upload_dir(str(REPO_ROOT / "src/eval/tasks/arc_easy"), "/workspace/ptb_eval/arc_easy")
-        await env.upload_dir(str(REPO_ROOT / "src/eval/templates"), "/workspace/ptb_eval/templates")
+        await env.upload_dir(str(REPO_ROOT / "src/evals/tasks/capability/arc_easy"), "/workspace/ptb_eval/arc_easy")
+        await env.upload_dir(str(REPO_ROOT / "src/evals/templates"), "/workspace/ptb_eval/templates")
 
         vllm_url = await start_shared_vllm(
             env,

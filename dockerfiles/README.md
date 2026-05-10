@@ -28,8 +28,8 @@ The Harbor adapter (`src/harbor_adapter/template/environment/Dockerfile`) is pat
 
 ## Adding a new safety benchmark
 
-1. Add `src/eval/tasks/<benchmark>/{evaluate.py, benchmark.txt, ...}` mirroring PTB's existing tasks.
-2. Add an entry to `BENCHMARKS` in `src/harbor_adapter/adapter.py`.
+1. Add `src/evals/tasks/<category>/<benchmark>/{evaluate.py, benchmark.txt, ...}` (category = capability | safety | character) mirroring existing tasks.
+2. Register the new task in `src/evals/registry.py` (sets category, attribute, display_name). `BENCHMARKS` in `src/harbor_adapter/adapter.py` backfills from the registry automatically; only add a hand-authored entry there if you want a custom `setup_note` for the agent's instruction.md.
 3. If the benchmark needs extra Python deps not in the base, add a `RUN pip install ...` line to the per-task Dockerfile (not the base — keeps the base small).
 
 No base-image rebuild is needed for new benchmarks unless they need new system-level deps.

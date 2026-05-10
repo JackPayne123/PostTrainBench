@@ -44,19 +44,28 @@ mkdir -p "${JOB_DIR}"
 
 mkdir "${JOB_DIR}/task"
 
-cp "src/eval/tasks/${EVALUATION_TASK}/evaluate.py" "${JOB_DIR}/task"
-if [ -d "src/eval/tasks/${EVALUATION_TASK}/evaluation_code" ]; then
-    cp -r "src/eval/tasks/${EVALUATION_TASK}/evaluation_code" "${JOB_DIR}/task"
+# Post-centralisation (2026-05-11): task lives under
+# src/evals/tasks/<category>/<EVALUATION_TASK>. Resolve via find since
+# bash doesn't import the registry.
+TASK_SRC=$(find src/evals/tasks -maxdepth 2 -mindepth 2 -type d -name "${EVALUATION_TASK}" -print -quit)
+if [ -z "$TASK_SRC" ]; then
+    echo "task '${EVALUATION_TASK}' not found under src/evals/tasks/*/" >&2
+    exit 1
 fi
-cp -r src/eval/templates "${JOB_DIR}/task/"
 
-if [ -d "src/eval/tasks/${EVALUATION_TASK}/task_context" ]; then
-    cp -r src/eval/tasks/${EVALUATION_TASK}/task_context/* "${JOB_DIR}/task"
+cp "${TASK_SRC}/evaluate.py" "${JOB_DIR}/task"
+if [ -d "${TASK_SRC}/evaluation_code" ]; then
+    cp -r "${TASK_SRC}/evaluation_code" "${JOB_DIR}/task"
+fi
+cp -r src/evals/templates "${JOB_DIR}/task/"
+
+if [ -d "${TASK_SRC}/task_context" ]; then
+    cp -r ${TASK_SRC}/task_context/* "${JOB_DIR}/task"
 fi
 cp -r "containers/other_home_data/.codex" "${JOB_DIR}/"
 
-BENCHMARK=$(cat src/eval/tasks/${EVALUATION_TASK}/benchmark.txt)
-PROMPT=$(python src/eval/general/get_prompt.py --model-to-train "$MODEL_TO_TRAIN" --benchmark-id "$EVALUATION_TASK" --num-hours "$NUM_HOURS" --num-gpus "$NUM_GPUS" --agent "${AGENT}")
+BENCHMARK=$(cat ${TASK_SRC}/benchmark.txt)
+PROMPT=$(python src/evals/general/get_prompt.py --model-to-train "$MODEL_TO_TRAIN" --benchmark-id "$EVALUATION_TASK" --num-hours "$NUM_HOURS" --num-gpus "$NUM_GPUS" --agent "${AGENT}")
 echo "$PROMPT" > "${EVAL_DIR}/prompt.txt"
 
 bash src/utils/create_timer.sh $NUM_HOURS $JOB_DIR/task/timer.sh
@@ -262,10 +271,10 @@ run_evaluation() {
         --writable-tmpfs \
         --bind "${REPO_ROOT}:${REPO_ROOT}" \
         --bind "${HF_MERGED}:${TMP_HF_CACHE}" \
-        --pwd "$(pwd)/src/eval/tasks/${EVALUATION_TASK}" \
+        --pwd "${TASK_SRC}" \
         ${POST_TRAIN_BENCH_CONTAINERS_DIR}/vllm_debug.sif python "evaluate.py" \
             --model-path "$EVAL_DIR/final_model" \
-            --templates-dir ../../../../src/eval/templates \
+            --templates-dir ${REPO_ROOT}/src/evals/templates \
             --limit -1 \
             ${max_tokens_arg} \
             --json-output-file "${EVAL_DIR}/metrics.json" > "$EVAL_DIR/final_eval_${eval_num}.txt"

@@ -139,7 +139,7 @@ async def main() -> int:
         r = await env.exec(
             "stat -c '%a %U:%G' /opt/ptb 2>&1; "
             "echo ---; sudo -n -u agent ls /opt/ptb 2>&1; "
-            "echo ---; sudo -n -u agent cat /opt/ptb/src/eval/tasks/sycophancy_slava/prompts.jsonl 2>&1 | head -3",
+            "echo ---; sudo -n -u agent cat /opt/ptb/src/evals/tasks/safety/sycophancy_slava/prompts.jsonl 2>&1 | head -3",
             timeout_sec=30,
         )
         out = r.stdout or r.stderr or ""

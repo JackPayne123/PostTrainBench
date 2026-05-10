@@ -1,1 +1,0 @@
-GPQA-main (held-out capability slice)

@@ -86,11 +86,11 @@ run_eval() {
         --bind "${RESULT_DIR}:${RESULT_DIR}" \
         --bind "${REPO_ROOT}:${REPO_ROOT}" \
         --bind "${HF_MERGED}:${TMP_HF_CACHE}" \
-        --pwd "${REPO_ROOT}/src/eval/tasks/${EVAL_NAME}" \
+        --pwd "$(find "${REPO_ROOT}/src/evals/tasks" -maxdepth 2 -mindepth 2 -type d -name "${EVAL_NAME}" -print -quit)" \
         ${POST_TRAIN_BENCH_CONTAINERS_DIR}/vllm_debug.sif \
         python "evaluate.py" \
             --model-path "${MODEL_NAME}" \
-            --templates-dir ../../../../src/eval/templates \
+            --templates-dir "${REPO_ROOT}/src/evals/templates" \
             --limit -1 \
             --json-output-file "${RESULT_DIR}/metrics.json" > "${RESULT_DIR}/final_eval.txt"
 }

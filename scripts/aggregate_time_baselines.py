@@ -7,10 +7,16 @@ def parse_directory_name(dirname):
     """Extract benchmark and model from directory name."""
     parts = dirname.split('_')
 
+    # Post-centralisation (2026-05-11): tasks are bucketed by category
+    # under src/evals/tasks/{capability,safety,character}/. Walk one
+    # level deeper to collect all task names.
     benchmarks = []
-    benchmarks_path = Path('src/eval/tasks')
-    for item in benchmarks_path.iterdir():
-        benchmarks.append(item.name)
+    tasks_root = Path('src/evals/tasks')
+    for category_dir in tasks_root.iterdir():
+        if category_dir.is_dir() and not category_dir.name.startswith('_'):
+            for task_dir in category_dir.iterdir():
+                if task_dir.is_dir() and not task_dir.name.startswith('_'):
+                    benchmarks.append(task_dir.name)
 
     for benchmark in benchmarks:
         prefix = benchmark + '_'

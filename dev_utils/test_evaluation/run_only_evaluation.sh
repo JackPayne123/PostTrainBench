@@ -70,10 +70,10 @@ run_evaluation() {
         --writable-tmpfs \
         --bind "${REPO_ROOT}:${REPO_ROOT}" \
         --bind "${HF_MERGED}:${TMP_HF_CACHE}" \
-        --pwd "$(pwd)/src/eval/tasks/${EVALUATION_TASK}" \
+        --pwd "$(find "$(pwd)/src/evals/tasks" -maxdepth 2 -mindepth 2 -type d -name "${EVALUATION_TASK}" -print -quit)" \
         ${POST_TRAIN_BENCH_CONTAINERS_DIR}/vllm_debug.sif python "evaluate.py" \
             --model-path "$EVAL_DIR/final_model" \
-            --templates-dir ../../../../src/eval/templates \
+            --templates-dir "$(pwd)/src/evals/templates" \
             --limit -1 \
             ${max_tokens_arg} \
             --json-output-file "${EVAL_DIR}/metrics.json" > "$EVAL_DIR/z_new_${CLUSTER}_final_eval_${eval_num}.txt"

@@ -80,7 +80,7 @@ SKIP_BY_DEFAULT = {
 
 
 def discover_tasks() -> list[str]:
-    tasks_dir = REPO_ROOT / "src/heldout_evals/tasks"
+    tasks_dir = REPO_ROOT / "src/evals/tasks"
     return sorted(
         d.name
         for d in tasks_dir.iterdir()
@@ -140,13 +140,14 @@ async def main() -> None:
     try:
         await env.start(force_build=False)
 
-        log.info("uploading src/heldout_evals/")
-        await env.upload_dir(str(REPO_ROOT / "src/heldout_evals"), "/workspace/heldout_evals")
-        log.info("uploading src/eval/templates/")
-        await env.upload_dir(str(REPO_ROOT / "src/eval/templates"), "/workspace/heldout_evals_templates")
-        # Capability_* tasks delegate to PTB tasks under src/eval/tasks
-        log.info("uploading src/eval/tasks/")
-        await env.upload_dir(str(REPO_ROOT / "src/eval/tasks"), "/workspace/heldout_eval_tasks")
+        log.info("uploading src/evals/")
+        await env.upload_dir(str(REPO_ROOT / "src/evals"), "/workspace/heldout_evals")
+        log.info("uploading src/evals/templates/")
+        await env.upload_dir(str(REPO_ROOT / "src/evals/templates"), "/workspace/heldout_evals_templates")
+        # Post-centralisation (2026-05-11): single src/evals/tasks/ tree
+        # with category buckets; runner picks tasks via the registry.
+        log.info("uploading src/evals/tasks/")
+        await env.upload_dir(str(REPO_ROOT / "src/evals/tasks"), "/workspace/heldout_eval_tasks")
 
         # Pre-fetch HF datasets that need a specific config / revision and
         # aren't auto-fetched by the task. abstention_bench uses
