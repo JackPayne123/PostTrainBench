@@ -163,14 +163,14 @@ RUN --mount=type=secret,id=rclone_conf,target=/tmp/rclone.conf \
         echo "[build] WARNING: no rclone_conf secret mounted; image will be unable to upload to Drive" >&2; \
     fi
 
-# RunPod's runpod/pytorch base image runs SSH as PID 1 via /start.sh; we
-# nohup our startup hook from there in a wrapper so the hook fires after
-# SSH is up but doesn't block container startup. The wrapper writes its
-# own log to /var/log/startup_hook.log for post-mortem.
-RUN echo '#!/bin/bash\n\
-nohup /opt/startup_hook.sh > /var/log/startup_hook.log 2>&1 &\n\
-exec /start.sh "$@"\n' > /opt/entrypoint_wrapper.sh && chmod +x /opt/entrypoint_wrapper.sh
-
-# Override the image entrypoint (only matters for new pods; existing
-# pods built off older base tags retain their own entrypoint).
-ENTRYPOINT ["/opt/entrypoint_wrapper.sh"]
+# IMPORTANT: do NOT override the runpod/pytorch base image's ENTRYPOINT.
+# Earlier we tried wrapping it via `exec /start.sh "$@"` but the base
+# uses a different startup mechanism and our wrapper caused the
+# container to exit immediately on boot (telemetry: "exited"). Verified
+# 2026-05-10 with image tag :8.
+#
+# Instead, the laptop's submit_run.py SSHes in once after the pod is
+# ready and execs /opt/startup_hook.sh inside a detached tmux session.
+# That keeps the laptop's involvement bounded to a single SSH command
+# at submission time — pod still self-drives the rest, and the
+# container startup path is unchanged from the upstream base.

@@ -284,10 +284,27 @@ async def main() -> None:
             timeout_sec=15,
         )
 
-        # Drop the START sentinel — pod's startup hook is polling for it.
+        # Drop the START sentinel and explicitly launch the startup hook
+        # in a detached tmux session named "run". The hook polls for
+        # START (touched here) and then execs /opt/run_experiment.py.
+        # We can't use ENTRYPOINT-injection in the Dockerfile because the
+        # runpod/pytorch base's startup machinery doesn't tolerate a
+        # wrapper (verified :8 — telemetry goes to "exited"). One SSH
+        # exec at submission time is the cheapest workaround; submit_run
+        # still exits immediately after, so the laptop has zero ongoing
+        # involvement in the experiment.
         await env.exec(
             f"touch {remote_run_dir}/START",
             timeout_sec=15,
+        )
+        # Detach + nohup the startup hook so SSH returns immediately;
+        # the hook handles its own tmux session for run_experiment.py.
+        await env.exec(
+            "setsid nohup bash /opt/startup_hook.sh "
+            "> /var/log/startup_hook.boot.log 2>&1 < /dev/null & "
+            "disown 2>/dev/null || true; "
+            "echo launched",
+            timeout_sec=30,
         )
         log.info(f"=== submitted: {dirname} ===")
         log.info(f"  pod: {env._pod_id} ({env._ssh_host}:{env._ssh_port})")
