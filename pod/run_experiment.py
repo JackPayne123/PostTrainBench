@@ -165,7 +165,12 @@ def wait_for_gpu_clear(target_mb: int = 2000, max_wait_s: int = 300) -> None:
         f"echo \"did_not_clear (used=$used MiB)\""
     )
     r = run_sh(cmd, timeout=max_wait_s + 30)
-    log.info(f"[gpu-cleanup] {(r.stdout or '').strip()}")
+    out = (r.stdout or "").strip()
+    log.info(f"[gpu-cleanup] {out}")
+    # Loop's success message starts "cleared at"; non-clear ends "did_not_clear".
+    # Surface the non-clear so callers (vllm start) don't fight a still-loaded GPU.
+    if "did_not_clear" in out:
+        raise RuntimeError(f"GPU did not clear within {max_wait_s}s: {out}")
 
 
 def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED_VLLM_PORT,
@@ -233,8 +238,8 @@ def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED
             log.error(f"[{label}] errors:\n{tail.stdout}")
             tail = run_sh(f"tail -200 {log_path}", timeout=15)
             log.error(f"[{label}] tail:\n{tail.stdout}")
-        except Exception:
-            pass
+        except Exception as exc:
+            log.error(f"[{label}] could not read {log_path}: {exc}")
         return None
     log.info(f"[{label}] vllm ready at {base_url}")
     return base_url
@@ -325,8 +330,8 @@ def run_eval(*, label: str, benchmark: str, model_path: str, limit: int,
         log.error(f"[{label}] rc={proc.returncode}; tail of {eval_log}:")
         try:
             log.error("\n" + Path(eval_log).read_text()[-4000:])
-        except Exception:
-            pass
+        except Exception as exc:
+            log.error(f"[{label}] could not read {eval_log}: {exc}")
         return None
 
     if not metrics_file.exists():
@@ -451,6 +456,11 @@ def run_agent(cfg: dict) -> int:
     )
     log.info(f"[agent] launching budget={time_budget_h}h timeout={timeout}s")
     r = run_sh(cmd, timeout=30)
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"[agent] launch shell failed rc={r.returncode}: "
+            f"stdout={r.stdout!r} stderr={r.stderr!r}"
+        )
     log.info(f"[agent] {r.stdout.strip()}")
     t0 = time.time()
     last_trace = -1
@@ -501,14 +511,16 @@ def run_contamination_judge(cfg: dict) -> int:
     if not judge.exists():
         log.warning("[judge] contamination_judge.py missing; skipping")
         return 0
+    # No `| tail -30`: shell=True would return tail's rc, masking failures.
+    # Capture full stdout in Python and slice for log.
     cmd = (
         f"cd {WORKSPACE} && "
         f"export OPENAI_API_KEY={shlex.quote(os.environ['OPENAI_API_KEY'])}; "
-        f"python3 contamination_judge.py 2>&1 | tail -30"
+        f"python3 contamination_judge.py 2>&1"
     )
     log.info("[judge] running contamination judge")
     r = run_sh(cmd, timeout=600)
-    log.info(f"[judge] rc={r.returncode}")
+    log.info(f"[judge] rc={r.returncode} (last 1KB):\n{(r.stdout or '')[-1000:]}")
     # Pull artefacts to RUN_DIR
     for fname in ("contamination_judgement.txt", "disallowed_model_judgement.txt",
                   "metadata.json"):
@@ -583,27 +595,46 @@ def rclone_to_drive() -> bool:
     if not Path("/etc/rclone.conf").exists():
         log.warning("[drive] /etc/rclone.conf missing — image likely built without --secret id=rclone_conf")
         return False
+    # Drop stdout `| tail -50`: under shell=True the pipe's exit status is
+    # tail's (always 0), masking rclone failures. Capture everything in
+    # Python instead and slice for log readability.
+    # `-vv` so a failure dump tells us *why* (auth, scope, folder ID).
+    # Merge stderr into stdout so capture_output gets the full picture.
     cmd = (
         f"rclone copy {RUN_DIR}/ drive:{RUN_ID}/ "
-        f"--progress --transfers 4 --checkers 8 "
+        f"-vv --stats=20s --stats-one-line "
+        f"--transfers 4 --checkers 8 "
         f"--exclude '_*_trial/**' "
-        f"2>&1 | tail -50"
+        f"2>&1"
     )
-    log.info("[drive] uploading run dir → drive:")
+    log.info(f"[drive] uploading run dir → drive:{RUN_ID}/")
     r = run_sh(cmd, timeout=1800)
+    out_tail = (r.stdout or "")[-2000:]
     if r.returncode == 0:
-        log.info("[drive] upload OK")
+        log.info(f"[drive] upload OK (rclone tail):\n{out_tail}")
         return True
-    log.error(f"[drive] upload failed rc={r.returncode}: {(r.stdout or '')[-500:]}")
+    log.error(f"[drive] upload failed rc={r.returncode} (rclone tail):\n{out_tail}")
     return False
 
 
 def write_done(*, status: str, drive_uploaded: bool, error: str = "") -> None:
+    # Drive folder URL: parent root_folder_id from /etc/rclone.conf if readable,
+    # else null. Don't hardcode (was 1TExh6tQ... = stale SA-era folder ID,
+    # rotated 2026-05-10 when we moved off SA → OAuth).
+    drive_url = None
+    if drive_uploaded:
+        try:
+            for line in Path("/etc/rclone.conf").read_text().splitlines():
+                if line.strip().startswith("root_folder_id"):
+                    folder_id = line.split("=", 1)[1].strip()
+                    drive_url = f"https://drive.google.com/drive/folders/{folder_id}"
+                    break
+        except Exception as exc:
+            log.warning(f"[done] could not read root_folder_id from rclone.conf: {exc}")
     done = {
         "status": status,
         "drive_uploaded": drive_uploaded,
-        "drive_url": f"https://drive.google.com/drive/folders/1TExh6tQoB1cjE04xiYawZZOQ50WA742D"
-        if drive_uploaded else None,
+        "drive_url": drive_url,
         "error": error,
         "timestamp": dt.datetime.utcnow().isoformat() + "Z",
         "pod_id": POD_ID,

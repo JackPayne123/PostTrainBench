@@ -46,30 +46,44 @@ Output lands in `jobs/runs/<dir>/` (laptop) AND `experiments/<run_id>/` in your 
 ┌────────────────────────────────────────────────────────────────────────────┐
 │  LAPTOP (orchestrator)                                                     │
 │                                                                            │
-│  src/runpod_backend/agent_run.py                                          │
+│  src/runpod_backend/submit_run.py  (laptop — runs ~3 min and exits)       │
 │    1. Build run_dir <jobs/runs/YYYY-MM-DD_HH-MM_<cond>_<teacher>_...>     │
-│    2. Spin pod via RunPod GraphQL (pulls jackpayne123/ptb-base:7)         │
-│    3. Pre-eval (training benchmark local, extras shared vllm)             │
-│    4. Stage agent workspace + OAuth token + lora_starter + score.sh       │
-│    5. Run claude-code agent (1h budget default; sentinel-poll exec        │
-│       so SSH channel doesn't hang on subprocess inherited stdout)         │
-│    6. find_agent_final_model: locate adapter (canonical or fallback);     │
-│       symlink non-canonical saves back to /home/agent/workspace/final_model│
-│    7. safety_pull_lora_adapter: rsync ~150MB to run_dir/adapter_safety/   │
-│    8. Stage final_model -> /workspace/final_models/ on volume             │
-│    9. Contamination judge (codex CLI; needs OPENAI_API_KEY)               │
-│   10. kill_orphan_gpu_holders + wait_for_gpu_clear (300s budget;          │
-│       CUDA driver lazy-releases allocations 3+min after holder dies)      │
-│   11. Start shared vllm with --enable-lora --lora-modules                 │
-│       <served_name>=<adapter_path> --max-lora-rank 64                     │
-│   12. Post-eval (training benchmark + extras, all on shared vllm)         │
-│   13. Pull artefacts (NO final_model unless --pull-final-model)           │
-│   14. Tear down agent pod                                                  │
-│   15. Spin FRESH pod for held-out panel; attach same volume               │
-│   16. Run heldout_evals/run_heldout.sh (15 tasks, shared vllm)            │
-│   17. Pull heldout/ summary                                                │
-│   18. Tear down held-out pod                                               │
-│   19. Write summary.json with delta + extras + held-out                   │
+│    2. Render prompt locally (instruction.md + condition addendum)         │
+│    3. Spin pod via RunPod GraphQL with pod_env={RUN_ID, RUNPOD_POD_ID,    │
+│       RUNPOD_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, HF_TOKEN,        │
+│       CLAUDE_CODE_OAUTH_TOKEN, ...} (pulls jackpayne123/ptb-base:9)       │
+│    4. Upload run_dir/{config.json,prompt.txt,POD_ID} → /workspace/runs/   │
+│    5. Touch START sentinel + SSH-launch /opt/startup_hook.sh detached     │
+│    6. Exit. Laptop is now uninvolved.                                      │
+│                                                                            │
+│  src/runpod_backend/{tail_log.sh, status_run.py, pull_run.py}             │
+│    Optional observability scripts. Not on the experiment's critical path. │
+└────────────────────────────────────────────────────────────────────────────┘
+                              │ ssh once at submit; no further laptop role
+                              ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│  RUNPOD POD (image: jackpayne123/ptb-base:9)                              │
+│                                                                            │
+│  /opt/startup_hook.sh (image-baked): polls /workspace/runs/$RUN_ID/START,  │
+│    launches pod/run_experiment.py inside tmux session "run".              │
+│                                                                            │
+│  /opt/ptb/pod/run_experiment.py (image-baked): self-driving state machine │
+│    1. Read /workspace/runs/$RUN_ID/config.json + env vars                 │
+│    2. tee everything to /workspace/runs/$RUN_ID/run.log                   │
+│    3. Pre-eval (training benchmark + extras via shared vllm)              │
+│    4. Stage agent workspace from /opt/ptb/ + OAuth token                  │
+│    5. Run claude-code agent (sentinel-poll local, no SSH)                 │
+│    6. find_agent_final_model: locate adapter (canonical or fallback)      │
+│    7. Stage final_model → /workspace/runs/$RUN_ID/final_model/ (volume)   │
+│    8. Contamination judge                                                  │
+│    9. kill_orphan_gpu_holders + wait_for_gpu_clear (300s budget)          │
+│   10. Start shared vllm --enable-lora --max-lora-rank 64                  │
+│   11. Post-eval (training benchmark + extras)                             │
+│   12. Heldout panel (in same pod)                                          │
+│   13. summary.json                                                         │
+│   14. rclone copy /workspace/runs/$RUN_ID/ → drive:<run_id>/              │
+│   15. Write DONE sentinel with status JSON                                 │
+│   16. Self-terminate via Runpod GraphQL podTerminate mutation             │
 └────────────────────────────────────────────────────────────────────────────┘
                               │
                               │  ssh (key: ~/.runpod/ssh/RunPod-Key-Go) + rsync

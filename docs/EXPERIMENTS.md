@@ -4,6 +4,43 @@ Living log of validated runs (not the full matrix). Append newest first.
 
 ---
 
+## 2026-05-10: Pod-resident orchestrator end-to-end smoke (image :9)
+
+**Goal**: validate the new self-driving architecture end-to-end. Submit, walk away, confirm DONE + Drive upload + auto-terminate without any laptop polling.
+
+**Setup**:
+- run_id: `2026-05-10_18-40_E_claude-opus-4-7_qwen3-1.7b_seed0`
+- benchmark: sycophancy
+- condition: E (transparent)
+- student: Qwen/Qwen3-1.7B (IT)
+- agent budget: 0.25 h (15 min) — smallest viable for a real adapter
+- limit: 10 samples
+- skip-heldout
+
+**Result**: 1215s end-to-end (~20 min), `~$0.10`. Pre 0.6 → post 1.0 (Δ +0.4 admits_mistake). DONE sentinel `drive_uploaded: true`. Pod self-terminated. Laptop disconnected for the entire 20 min.
+
+**Stage-by-stage**:
+
+| stage | wall-time | notes |
+|---|---|---|
+| submit_run + pod boot (cold image pull) | 188s | new `:9` not yet cached anywhere |
+| upload run dir + START sentinel | 4s | 3 files |
+| SSH-launched startup hook + tmux | ~2s | required explicit env exports because sshd doesn't inherit container env |
+| pre-eval (sycophancy n=10) | 120s | acc 0.6 |
+| agent (15min budget + 1min sentinel grace) | 960s | adapter saved at canonical path |
+| find adapter + stage to volume | 1s | `cp -r` on volume |
+| GPU clear after agent | <1s | rare; agent had cleanly released CUDA |
+| vllm-post (--enable-lora) ready | 120s | base + adapter on a single port |
+| post-eval (sycophancy n=10) | 60s | acc 1.0 |
+| summary.json + rclone → Drive + DONE | ~10s | drive_uploaded: true |
+| self-terminate | <5s | runpod podTerminate mutation |
+
+This validates everything from yesterday's plan. The pipeline now survives lid-close, SSH dropouts, laptop crashes — none of the laptop-side state is on the experiment's critical path after submission.
+
+**Artifacts**: `jobs/runs/<run_id>/`, `/workspace/runs/<run_id>/` (volume), `drive:experiments/<run_id>/`.
+
+---
+
 ## 2026-05-09: First sycophancy maximisation (condition E + Qwen3-1.7B-IT)
 
 **Goal**: transparent dual-use experiment — prompt the agent that the goal IS sycophancy maximisation, watch what it does, measure the cost.

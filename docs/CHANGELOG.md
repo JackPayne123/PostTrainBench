@@ -2,7 +2,61 @@
 
 Notable commits/fixes in `JackPayne123/PostTrainBench` `add_harbor_support` branch beyond what upstream `aisa-group/PostTrainBench` ships. Keep newest first.
 
-## 2026-05-09 / 2026-05-10
+## 2026-05-10 — pod-resident orchestrator + Drive auto-upload
+
+Inverted orchestration: laptop submits + walks away, pod self-drives the entire experiment, writes to volume + Google Drive, self-terminates. Lid-close-immune. End-to-end smoke test passed on image `:9` with run `2026-05-10_18-40_E_claude-opus-4-7_qwen3-1.7b_seed0` (sycophancy condition E, n=10, 15min agent budget): pre 0.6 → post 1.0 (Δ+0.4), `drive_uploaded: true`, pod auto-terminated.
+
+Why: yesterday's sycophancy_aisi run hung 75min when the laptop suspended mid-experiment. SSH connections die silently on lid-close — pod-side work completes cleanly but the local Python's blocking `readline()` hangs against a dead socket until `env.exec`'s 1h timeout fires. SSH keepalives + `caffeinate -i` are band-aids; the real fix is removing the laptop from the orchestration critical path entirely.
+
+### Architecture (commits `bd70f52`, `98de007`, `a301b96`, `1dce9f3`)
+
+- `pod/run_experiment.py`: ~750-line self-driving script. Reads `/workspace/runs/$RUN_ID/config.json` + env, runs all stages locally (`subprocess.run`, no SSH), writes results to volume, rclone-uploads to `drive:experiments/$RUN_ID/`, writes a DONE sentinel encoding final status, self-terminates via Runpod GraphQL `podTerminate`. End-of-run is wrapped in `try/finally` so DONE+upload+terminate fire even on stage failure.
+- `pod/startup_hook.sh`: polls `/workspace/runs/$RUN_ID/START` sentinel, launches `run_experiment.py` inside a tmux session named `run` so `ssh + tmux attach -t run` shows live console output.
+- `src/runpod_backend/submit_run.py`: minimal launcher. Spins pod with `pod_env` populated (RUN_ID, RUNPOD_POD_ID, RUNPOD_API_KEY, ANTHROPIC, OPENAI, HF_TOKEN, CLAUDE_CODE_OAUTH_TOKEN), uploads run dir + START sentinel, SSHes once to `setsid nohup /opt/startup_hook.sh` (with explicit env exports because sshd doesn't inherit container env), exits. ~3 min total.
+- `src/runpod_backend/status_run.py`: queries Runpod API for live pods matching `<run_id>`; if none, spins a tiny recovery pod to read DONE + run.log tail from the volume. ~$0.02/query.
+- `src/runpod_backend/pull_run.py`: rsyncs `/workspace/runs/<run_id>/` from volume to local `jobs/runs/<run_id>/`. `--include-final-model` to also fetch the 150 MB adapter.
+- `src/runpod_backend/tail_log.sh`: SSH to live pod + `tail -F /workspace/runs/<run_id>/run.log`.
+- `src/runpod_backend/runpod_environment.py`: `RunpodEnvironment(pod_env={...})` — caller-supplied env vars get injected as Runpod podCreate `env` field alongside PUBLIC_KEY.
+
+### Image rebuilds — `:7` → `:8` → `:9`
+
+- `:8`: + rclone, tmux, jq, curl in apt; `COPY . /opt/ptb/` (full repo baked, with tight `.dockerignore`); `COPY pod/startup_hook.sh /opt/startup_hook.sh`; rclone OAuth config baked from `RCLONE_CONF` GitHub secret via BuildKit `--mount=type=secret`. Initially also tried an ENTRYPOINT wrapper that did `exec /start.sh "$@"` to nohup the hook on container boot — broke pod startup (telemetry: "exited" within 150s, never SSH-ready). The runpod/pytorch base's startup machinery doesn't tolerate a wrapper of that shape.
+- `:9`: revert ENTRYPOINT override entirely. Keep base image's startup machinery untouched. Use submit_run's one-shot SSH-launched startup hook instead. Pod boots cleanly.
+
+### Drive auth migration
+
+Initially shipped service-account auth (`GDRIVE_SA` secret + `gcloud iam service-accounts create ...` + share folder with SA's email). Hit `storageQuotaExceeded` on first upload — service accounts have **0 storage quota** on personal Google Drives. Switched to OAuth refresh-token via the full rclone.conf baked from a `RCLONE_CONF` GitHub secret. The `drive:` remote's `root_folder_id` points at the experiments folder so uploads land at `drive:<run_id>/` → `experiments/<run_id>/` in the user's Drive.
+
+### Misc fixes during smoke test
+
+- `1dce9f3` fix(submit_run): the SSH-launched startup hook inherited sshd's default env, NOT the container env (Runpod podCreate `env` field reaches PID 1 but not new SSH sessions). Hook bailed with "RUN_ID not set; idling". Fix: inline-export every var from `pod_env` on the SSH command line.
+- duplicate log lines noticed: `run_experiment.py` configures both a `FileHandler('run.log')` AND a `StreamHandler(sys.stderr)`, AND the startup hook tees stdout to run.log via `2>&1 | tee -a $RUN_LOG`. Cosmetic. Fix later by dropping the tee or one of the handlers.
+
+### Verification
+
+End-to-end run `2026-05-10_18-40_E_claude-opus-4-7_qwen3-1.7b_seed0` confirmed all the new layers:
+
+| stage | result |
+|---|---|
+| submit_run + pod boot | 188s |
+| run dir uploaded + START sentinel | 4s |
+| SSH-launched startup hook + tmux | first SSH attempt failed (RUN_ID empty), second with explicit env worked |
+| pre-eval (sycophancy, n=10) | accuracy 0.6 |
+| agent (15min budget) | rc=124 sentinel-poll timeout, adapter saved at canonical path |
+| find_agent_final_model | located, no symlink needed |
+| stage-to-volume | adapter copied to `/workspace/runs/<run_id>/final_model/` |
+| GPU clear after agent | 1 MiB instantly |
+| vllm-post (--enable-lora --max-lora-rank 64) | ready in 2 min |
+| post-eval | accuracy 1.0 (Δ +0.4 admits_mistake) |
+| summary.json | written |
+| rclone → drive:<run_id>/ | `drive_uploaded: true` |
+| DONE sentinel | written |
+| self-terminate | RUNNING pods: 0 |
+| pull_run.py recovery | local jobs/runs/<run_id>/ populated |
+
+Total: 1215s (~20min). Cost ~$0.10. Drive folder `1TExh6tQoB1cjE04xiYawZZOQ50WA742D` now contains `<run_id>/` with all artifacts.
+
+## 2026-05-09 / 2026-05-10 — earlier work (heldout panel + sycophancy benchmarks)
 
 Two-day push: hardened the agent_run end-to-end, added a behavioural-eval surface (sycophancy benchmark + heldout panel infra), validated LoRA-adapter mode with a real trained adapter. Image bumped `:4` → `:5` → `:6` → `:7` over four rebuilds as missing deps surfaced.
 

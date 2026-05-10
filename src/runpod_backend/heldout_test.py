@@ -155,6 +155,8 @@ async def main() -> None:
         # "Couldn't find cache for Idavidrein/gpqa for config 'gpqa_diamond'".
         # Trigger a download up-front so the rest of the panel is offline-safe.
         log.info("pre-fetching gated/pinned HF datasets")
+        # No `| tail -3`: pipe makes shell rc=tail's, masking real failure.
+        # Capture full output via env.exec and slice.
         prefetch_cmd = (
             "export HF_HOME=/workspace/hf-cache; "
             f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
@@ -163,11 +165,11 @@ async def main() -> None:
             "datasets.load_dataset("
             "'Idavidrein/gpqa', 'gpqa_diamond', "
             "revision='5233cd1db58884ed0bf678c7c6be731722a23f84')"
-            "\" 2>&1 | tail -3"
+            "\" 2>&1"
         )
         pf = await env.exec(prefetch_cmd, timeout_sec=300)
         if pf.return_code != 0:
-            log.warning(f"prefetch rc={pf.return_code}: {(pf.stdout or pf.stderr or '')[-300:]}")
+            log.warning(f"prefetch rc={pf.return_code}: {(pf.stdout or pf.stderr or '')[-500:]}")
 
         vllm_url = await start_shared_vllm(
             env,

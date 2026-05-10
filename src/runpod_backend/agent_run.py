@@ -826,18 +826,21 @@ async def run_heldout_in_separate_pod(
         # Run the panel. Long timeout — full panel can be 30-60 min depending
         # on how many tasks and their per-task limits.
         log.info("[heldout-pod] running run_heldout.sh on shared vllm")
+        # No `| tail -200`: pipe makes shell rc=tail's, masking real failure.
+        # env.exec captures full output; slice for log readability.
         cmd = (
             f"cd /workspace/heldout_evals && "
             f"export HF_HOME=/workspace/hf-cache; "
             f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
             f"export ANTHROPIC_API_KEY={shlex.quote(os.environ.get('ANTHROPIC_API_KEY', ''))}; "
-            f"bash run_heldout.sh {remote_run} 2>&1 | tail -200"
+            f"bash run_heldout.sh {remote_run} 2>&1"
         )
         result = await env.exec(cmd, timeout_sec=7200)  # 2h cap
         if result.return_code != 0:
             log.warning(
                 f"[heldout-pod] run_heldout.sh rc={result.return_code} "
-                f"(some tasks may have failed, partial results still pulled)"
+                f"(some tasks may have failed, partial results still pulled). "
+                f"Last 2KB:\n{(result.stdout or result.stderr or '')[-2000:]}"
             )
 
         # Pull heldout/ back
