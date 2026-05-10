@@ -299,8 +299,16 @@ async def main() -> None:
         )
         # Detach + nohup the startup hook so SSH returns immediately;
         # the hook handles its own tmux session for run_experiment.py.
+        # Inject all secrets explicitly via env=...; sshd does NOT
+        # inherit the Runpod-injected container env (the podCreate
+        # `env` field reaches the container's PID 1 but not new SSH
+        # sessions, which run with sshd's default env).
+        env_vars = {k: v for k, v in pod_env.items() if v}
+        env_exports = " ".join(
+            f"{k}={shlex.quote(v)}" for k, v in env_vars.items()
+        )
         await env.exec(
-            "setsid nohup bash /opt/startup_hook.sh "
+            f"{env_exports} setsid nohup bash /opt/startup_hook.sh "
             "> /var/log/startup_hook.boot.log 2>&1 < /dev/null & "
             "disown 2>/dev/null || true; "
             "echo launched",
