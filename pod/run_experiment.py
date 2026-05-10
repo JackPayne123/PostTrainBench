@@ -592,8 +592,8 @@ def rclone_to_drive() -> bool:
     if os.environ.get("POD_NO_DRIVE_UPLOAD", "0") == "1":
         log.info("[drive] POD_NO_DRIVE_UPLOAD=1; skipping")
         return False
-    if not Path("/etc/rclone.conf").exists():
-        log.warning("[drive] /etc/rclone.conf missing — image likely built without --secret id=rclone_conf")
+    if not Path("/root/.config/rclone/rclone.conf").exists():
+        log.warning("[drive] ~/.config/rclone/rclone.conf missing — image likely built without --secret id=rclone_conf")
         return False
     # Drop stdout `| tail -50`: under shell=True the pipe's exit status is
     # tail's (always 0), masking rclone failures. Capture everything in
@@ -618,13 +618,14 @@ def rclone_to_drive() -> bool:
 
 
 def write_done(*, status: str, drive_uploaded: bool, error: str = "") -> None:
-    # Drive folder URL: parent root_folder_id from /etc/rclone.conf if readable,
+    # Drive folder URL: parent root_folder_id from rclone.conf if readable,
     # else null. Don't hardcode (was 1TExh6tQ... = stale SA-era folder ID,
-    # rotated 2026-05-10 when we moved off SA → OAuth).
+    # rotated 2026-05-10 when we moved off SA → OAuth). Path is rclone's
+    # default search location (/etc/rclone.conf is NOT searched by v1.58.1).
     drive_url = None
     if drive_uploaded:
         try:
-            for line in Path("/etc/rclone.conf").read_text().splitlines():
+            for line in Path("/root/.config/rclone/rclone.conf").read_text().splitlines():
                 if line.strip().startswith("root_folder_id"):
                     folder_id = line.split("=", 1)[1].strip()
                     drive_url = f"https://drive.google.com/drive/folders/{folder_id}"

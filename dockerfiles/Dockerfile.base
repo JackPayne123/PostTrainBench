@@ -38,11 +38,17 @@ RUN apt-get update && apt-get install -y \
     lsof \
     procps \
     iproute2 \
-    rclone \
     tmux \
     jq \
     curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# rclone via upstream installer. Ubuntu 22.04's apt ships v1.58.1 (2022)
+# which (a) doesn't search /etc/rclone.conf and (b) hits the
+# storageQuotaExceeded path differently than newer versions. install.sh
+# fetches the current stable build (~1.69+) into /usr/bin/rclone.
+RUN curl -fsSL https://rclone.org/install.sh | bash && rclone version
 
 # Node.js 22 + npm (for claude-code, codex, gemini-cli)
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
@@ -130,7 +136,7 @@ WORKDIR /home/agent/workspace
 # /opt/startup_hook.sh = invoked by the pod's container entrypoint after SSH
 #                        comes up; polls /workspace/runs/$RUN_ID/START and
 #                        execs run_experiment.py inside tmux session "run".
-# /etc/rclone.conf      = OAuth-based remote named "drive" that targets the
+# ~/.config/rclone/rclone.conf = OAuth-based remote named "drive" that targets the
 #                        experiments folder. Full rclone.conf (including
 #                        OAuth token JSON + root_folder_id) is baked into
 #                        the image at build time from the RCLONE_CONF
@@ -151,14 +157,21 @@ RUN chmod +x /opt/startup_hook.sh
 
 # OAuth-based rclone config for Drive uploads.
 # Full rclone.conf (with refresh_token + root_folder_id) is mounted as a
-# BuildKit secret named `rclone_conf` and copied to /etc/rclone.conf.
+# BuildKit secret named `rclone_conf` and written to rclone's default
+# search path (/root/.config/rclone/rclone.conf). Tried /etc/rclone.conf
+# first but rclone v1.58.1 (the version in our base image) does NOT
+# search /etc — verified 2026-05-10 with diag_drive on :10. Diag tail:
+#   Config file "/root/.config/rclone/rclone.conf" not found - using defaults
+#   Failed to create file system for "drive:": didn't find section in config file
 # Mount locally with:
 #   docker buildx build --secret id=rclone_conf,src=$HOME/.config/ptb/rclone.conf ...
 # In CI, the workflow passes secrets.RCLONE_CONF via build-push-action's
-# `secrets:` input. See dockerfiles/rclone.conf for expected structure.
+# `secret-files:` input. See dockerfiles/rclone.conf for expected structure.
 RUN --mount=type=secret,id=rclone_conf,target=/tmp/rclone.conf \
     if [ -s /tmp/rclone.conf ]; then \
-        cp /tmp/rclone.conf /etc/rclone.conf && chmod 0400 /etc/rclone.conf; \
+        mkdir -p /root/.config/rclone && \
+        cp /tmp/rclone.conf /root/.config/rclone/rclone.conf && \
+        chmod 0400 /root/.config/rclone/rclone.conf; \
     else \
         echo "[build] WARNING: no rclone_conf secret mounted; image will be unable to upload to Drive" >&2; \
     fi

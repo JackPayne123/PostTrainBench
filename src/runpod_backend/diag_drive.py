@@ -2,7 +2,7 @@
 """Diagnose pod-side rclone Drive config without a full run.
 
 Spins a tiny recovery pod with the configured DEFAULT_IMAGE, then:
-  1. Confirms /etc/rclone.conf was baked at build time.
+  1. Confirms /root/.config/rclone/rclone.conf was baked at build time.
   2. Lists what `drive:` actually resolves to (root_folder_id sanity check).
   3. Performs a real upload + verifies the file appears on the remote.
   4. Tears the pod down.
@@ -57,16 +57,16 @@ async def main() -> int:
         await env.start(force_build=False)
 
         # 1. Config presence + structure (no token leak — first 3 lines only).
-        log.info("=== /etc/rclone.conf metadata ===")
+        log.info("=== /root/.config/rclone/rclone.conf metadata ===")
         r = await env.exec(
-            "ls -la /etc/rclone.conf 2>&1; "
-            "echo ---; head -3 /etc/rclone.conf 2>&1; "
-            "echo ---; grep -E '^(team_drive|root_folder_id)' /etc/rclone.conf 2>&1",
+            "ls -la /root/.config/rclone/rclone.conf 2>&1; "
+            "echo ---; head -3 /root/.config/rclone/rclone.conf 2>&1; "
+            "echo ---; grep -E '^(team_drive|root_folder_id)' /root/.config/rclone/rclone.conf 2>&1",
             timeout_sec=30,
         )
         log.info(f"rc={r.return_code}\n{r.stdout or r.stderr}")
         if r.return_code != 0:
-            log.error("could not read /etc/rclone.conf — image probably built without --secret id=rclone_conf")
+            log.error("could not read /root/.config/rclone/rclone.conf — image probably built without --secret id=rclone_conf")
             return 2
 
         # 2. Resolve drive: remote.
