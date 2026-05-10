@@ -50,6 +50,21 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Stage rclone secret to file
+        # Multi-line secrets (rclone.conf with embedded JSON token) MUST be
+        # written to a file and passed via build-push-action's `secret-files:`
+        # input. Its `secrets:` input parses values per-line as KEY=VALUE —
+        # so a multi-line conf gets truncated to only its first line. We hit
+        # this on :9 (file ended up as just "[drive]\n", 7 bytes).
+        env:
+          RCLONE_CONF: ${{ secrets.RCLONE_CONF }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ptb-secrets"
+          printf '%s' "$RCLONE_CONF" > "$RUNNER_TEMP/ptb-secrets/rclone.conf"
+          echo "RCLONE_CONF_FILE=$RUNNER_TEMP/ptb-secrets/rclone.conf" >> "$GITHUB_ENV"
+          # Sanity: byte-size of staged file (don't print contents — token).
+          wc -c "$RUNNER_TEMP/ptb-secrets/rclone.conf"
+
       - name: Build + push
         uses: docker/build-push-action@v5
         with:
@@ -58,7 +73,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: jackpayne123/ptb-base:${{ inputs.tag }}
-          secrets: |
-            rclone_conf=${{ secrets.RCLONE_CONF }}
+          secret-files: |
+            rclone_conf=${{ env.RCLONE_CONF_FILE }}
           # No cache-from/cache-to: each invocation fresh. Add registry cache later
           # if iteration speed becomes painful.
