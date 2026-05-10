@@ -139,6 +139,65 @@ The grep filters out the agent's per-event trace lines (which dominate the log m
 
 If a run hangs at any stage, SSH in and `tail -200 /workspace/runs/<RUN_ID>/run.log` for the failure context.
 
+### Watching the agent itself (`solve_out.jsonl`)
+
+`run.log` shows pipeline-level events; the agent's own thinking + tool use lives in a separate stream-json transcript on the pod at:
+
+```
+/home/agent/workspace/.runlog/solve_out.jsonl
+```
+
+(Note: `/home/agent/workspace/...`, not `/workspace/runs/...`. Inside the run dir the agent dumps to `.runlog/` under its own working directory. After agent completion the pipeline copies a parsed text version to `/workspace/runs/<run_id>/solve_parsed.txt` and the raw jsonl to `/workspace/runs/<run_id>/solve_out.jsonl`, but mid-run you have to read it from the agent's workspace.)
+
+#### Snapshot timeline of agent tool-use (last 40 actions)
+
+```bash
+ssh -i ~/.runpod/ssh/RunPod-Key-Go -p <PORT> root@<IP> \
+    'jq -r "select(.type==\"assistant\") |
+            select(.message.content[0].type==\"tool_use\") |
+            [.timestamp[11:19], .message.content[0].name,
+             (.message.content[0].input.command
+              // .message.content[0].input.description
+              // .message.content[0].input.file_path
+              // \"-\")[:140]] | @tsv" \
+        /home/agent/workspace/.runlog/solve_out.jsonl' \
+    | tail -40
+```
+
+Output is `HH:MM:SS \t TOOL \t COMMAND/DESCRIPTION/PATH`. Reveals what the agent actually did — generated training data, trained, evaluated, probed with custom prompts, iterated. Useful for understanding mid-run whether the agent is actually making progress or stuck in a loop.
+
+#### Live tail (use a Bash session, not Monitor — Monitor on streaming logs blows up tokens)
+
+```bash
+ssh -i ~/.runpod/ssh/RunPod-Key-Go -p <PORT> root@<IP> \
+    'tail -F /home/agent/workspace/.runlog/solve_out.jsonl' \
+    | jq -c 'select(.type=="assistant") | .message.content[0]'
+```
+
+Ctrl-C to detach. Run keeps going.
+
+#### Just the assistant text (skip thinking + tool plumbing)
+
+```bash
+ssh ... 'cat /home/agent/workspace/.runlog/solve_out.jsonl' | \
+    jq -r 'select(.type=="assistant" and .message.content[0].type=="text") | .message.content[0].text' | \
+    tail -50
+```
+
+#### Just the tool results (what the agent saw back)
+
+```bash
+ssh ... 'cat /home/agent/workspace/.runlog/solve_out.jsonl' | \
+    jq -r 'select(.type=="user" and (.message.content[0]|type)=="object") |
+           select(.message.content[0].type=="tool_result") |
+           .message.content[0].content' | \
+    tail -100
+```
+
+#### After DONE — pulled to laptop
+
+`pull_run.py` includes both `solve_out.jsonl` (raw) and `solve_parsed.txt` (human-readable rendering) in the pulled artifacts at `jobs/runs/<run_id>/`. Same jq commands work locally without the SSH wrapper.
+
 ---
 
 ## Diagnosing the Pod-Side Drive Config
