@@ -30,7 +30,7 @@ Stages:
   9. Post-eval primary + extras.
   10. Heldout panel (delegated to src/heldout_evals/run_heldout.sh).
   11. summary.json.
-  12. rclone copy /workspace/runs/$RUN_ID/ → drive:experiments/$RUN_ID/.
+  12. rclone copy /workspace/runs/$RUN_ID/ → drive:$RUN_ID/.
   13. Write DONE sentinel.
   14. Self-terminate via Runpod GraphQL.
 
@@ -572,20 +572,24 @@ def write_summary(*, status: str, duration_s: float, cfg: dict,
 
 
 def rclone_to_drive() -> bool:
-    """rclone copy /workspace/runs/$RUN_ID/ → drive:experiments/$RUN_ID/."""
+    """rclone copy /workspace/runs/$RUN_ID/ → drive:$RUN_ID/.
+
+    The `drive:` remote's root_folder_id already points at the experiments
+    folder in the user's Google Drive, so we upload directly under it.
+    """
     if os.environ.get("POD_NO_DRIVE_UPLOAD", "0") == "1":
         log.info("[drive] POD_NO_DRIVE_UPLOAD=1; skipping")
         return False
-    if not Path("/opt/rclone/sa.json").exists():
-        log.warning("[drive] /opt/rclone/sa.json missing — image likely built without --secret id=gdrive_sa")
+    if not Path("/etc/rclone.conf").exists():
+        log.warning("[drive] /etc/rclone.conf missing — image likely built without --secret id=rclone_conf")
         return False
     cmd = (
-        f"rclone copy {RUN_DIR}/ drive:experiments/{RUN_ID}/ "
+        f"rclone copy {RUN_DIR}/ drive:{RUN_ID}/ "
         f"--progress --transfers 4 --checkers 8 "
         f"--exclude '_*_trial/**' "
         f"2>&1 | tail -50"
     )
-    log.info("[drive] uploading run dir → drive:experiments/")
+    log.info("[drive] uploading run dir → drive:")
     r = run_sh(cmd, timeout=1800)
     if r.returncode == 0:
         log.info("[drive] upload OK")

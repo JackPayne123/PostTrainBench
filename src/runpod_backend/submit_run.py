@@ -292,7 +292,7 @@ async def main() -> None:
         log.info(f"=== submitted: {dirname} ===")
         log.info(f"  pod: {env._pod_id} ({env._ssh_host}:{env._ssh_port})")
         log.info(f"  volume path: {remote_run_dir}")
-        log.info(f"  drive folder: drive:experiments/{dirname}")
+        log.info(f"  drive folder: drive:{dirname} (root_folder_id = experiments/)")
         log.info(f"  laptop run_dir: {run_dir}")
         log.info("")
         log.info("Pod is now self-driving. Walk away. To check progress:")

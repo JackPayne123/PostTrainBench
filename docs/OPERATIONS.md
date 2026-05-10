@@ -36,7 +36,7 @@ PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
     src/runpod_backend/pull_run.py <run_id>
 ```
 
-Output lands in `jobs/runs/<dir>/` (laptop) AND `drive:experiments/<run_id>/` (auto-uploaded by the pod) AND `/workspace/runs/<run_id>/` (persistent volume, recoverable any time). Held-out panel runs in the same pod after post-eval.
+Output lands in `jobs/runs/<dir>/` (laptop) AND `experiments/<run_id>/` in your Google Drive (auto-uploaded by the pod via the `drive:` rclone remote, whose `root_folder_id` points at the `experiments/` folder) AND `/workspace/runs/<run_id>/` (persistent volume, recoverable any time). Held-out panel runs in the same pod after post-eval.
 
 ---
 

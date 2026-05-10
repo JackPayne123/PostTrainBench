@@ -130,11 +130,14 @@ WORKDIR /home/agent/workspace
 # /opt/startup_hook.sh = invoked by the pod's container entrypoint after SSH
 #                        comes up; polls /workspace/runs/$RUN_ID/START and
 #                        execs run_experiment.py inside tmux session "run".
-# /etc/rclone.conf      = service-account-based remote named "drive" that
-#                        targets the experiments folder. SA JSON is baked at
-#                        /opt/rclone/sa.json (chmod 0400). Created once via
-#                        Google Cloud Console + the destination Drive folder
-#                        is shared with the SA's email.
+# /etc/rclone.conf      = OAuth-based remote named "drive" that targets the
+#                        experiments folder. Full rclone.conf (including
+#                        OAuth token JSON + root_folder_id) is baked into
+#                        the image at build time from the RCLONE_CONF
+#                        GitHub secret via BuildKit --mount=type=secret.
+#                        SA-based auth was abandoned because service
+#                        accounts have 0 Drive storage quota on personal
+#                        Drives (storageQuotaExceeded on upload).
 #
 # To rebuild for a new src/ snapshot: bump tag, rerun
 # `gh workflow run build-ptb-base.yml -f tag=N`.
@@ -146,20 +149,18 @@ COPY . /opt/ptb/
 COPY pod/startup_hook.sh /opt/startup_hook.sh
 RUN chmod +x /opt/startup_hook.sh
 
-# Service-account-based rclone config for Drive uploads.
-# The SA JSON itself is NOT in the repo (gitignored secret). At image
-# build time, Docker buildx --secret mounts it into /opt/rclone/sa.json.
-# Mount with:
-#   docker buildx build --secret id=gdrive_sa,src=$HOME/.config/ptb/gdrive-sa.json ...
-# See dockerfiles/rclone.conf for the [drive] block; it references
-# /opt/rclone/sa.json.
-COPY dockerfiles/rclone.conf /etc/rclone.conf
-RUN --mount=type=secret,id=gdrive_sa,target=/tmp/gdrive_sa.json \
-    mkdir -p /opt/rclone && \
-    if [ -s /tmp/gdrive_sa.json ]; then \
-        cp /tmp/gdrive_sa.json /opt/rclone/sa.json && chmod 0400 /opt/rclone/sa.json; \
+# OAuth-based rclone config for Drive uploads.
+# Full rclone.conf (with refresh_token + root_folder_id) is mounted as a
+# BuildKit secret named `rclone_conf` and copied to /etc/rclone.conf.
+# Mount locally with:
+#   docker buildx build --secret id=rclone_conf,src=$HOME/.config/ptb/rclone.conf ...
+# In CI, the workflow passes secrets.RCLONE_CONF via build-push-action's
+# `secrets:` input. See dockerfiles/rclone.conf for expected structure.
+RUN --mount=type=secret,id=rclone_conf,target=/tmp/rclone.conf \
+    if [ -s /tmp/rclone.conf ]; then \
+        cp /tmp/rclone.conf /etc/rclone.conf && chmod 0400 /etc/rclone.conf; \
     else \
-        echo "[build] WARNING: no gdrive_sa secret mounted; image will be unable to upload to Drive" >&2; \
+        echo "[build] WARNING: no rclone_conf secret mounted; image will be unable to upload to Drive" >&2; \
     fi
 
 # RunPod's runpod/pytorch base image runs SSH as PID 1 via /start.sh; we

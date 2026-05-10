@@ -115,7 +115,7 @@ PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/submit
 Results land in three places:
 - **Laptop**: `jobs/runs/<run_id>/` (rendered prompt + pod_meta + pulled artifacts via `pull_run.py`).
 - **Persistent volume**: `/workspace/runs/<run_id>/` (canonical store; survives pod teardown).
-- **Google Drive**: `drive:experiments/<run_id>/` (auto-uploaded by the pod before self-terminate).
+- **Google Drive**: `experiments/<run_id>/` in your personal Drive (auto-uploaded by the pod via the `drive:` rclone remote whose `root_folder_id` points at `experiments/`).
 
 #### API-based agents
 

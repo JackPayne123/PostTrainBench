@@ -58,5 +58,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: jackpayne123/ptb-base:${{ inputs.tag }}
+          secrets: |
+            rclone_conf=${{ secrets.RCLONE_CONF }}
           # No cache-from/cache-to: each invocation fresh. Add registry cache later
           # if iteration speed becomes painful.
