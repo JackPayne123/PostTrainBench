@@ -326,6 +326,19 @@ class RunpodEnvironment(BaseEnvironment):
             "UserKnownHostsFile=/dev/null",
             "-o",
             "LogLevel=ERROR",
+            # Keepalives so that if the laptop suspends (lid close), the
+            # SSH client tears down within ~30s instead of blocking
+            # readline() against a dead TCP socket for hours. Without
+            # these, a pod-side eval can complete cleanly and write its
+            # sentinel, but the local env.exec never sees the exit
+            # notification because the socket is silently dead.
+            "-o",
+            "ServerAliveInterval=15",
+            "-o",
+            "ServerAliveCountMax=2",
+            # Connection establish timeout (separate from read timeout).
+            "-o",
+            "ConnectTimeout=30",
         ]
 
     async def _ssh_exec_raw(
