@@ -4,6 +4,8 @@ How to run the Claude-trains-Qwen pipeline end-to-end on RunPod, what each piece
 
 This doc supersedes scattered notes across `dockerfiles/README.md`, `src/heldout_evals/README.md`, and the meeting transcripts. If you find a discrepancy, this file is the canonical operational reference.
 
+> **Pod-resident orchestrator (2026-05-10+):** The laptop is now only needed for `submit_run.py` (kicks off a run + walks away) and the optional `tail_log.sh` / `status_run.py` / `pull_run.py` observability scripts. The pod itself drives the entire experiment, writes results to the persistent volume + Google Drive, and self-terminates. Lid-close and SSH dropouts no longer affect a running experiment. The legacy `agent_run.py` is retained for one release cycle as a stub. See "New self-driving flow" below.
+
 ---
 
 ## TL;DR
@@ -11,15 +13,30 @@ This doc supersedes scattered notes across `dockerfiles/README.md`, `src/heldout
 ```bash
 cd /Users/jack/projects/claude-trains-qwen-new
 set -a && source .env && set +a
+
+# Submit the run. Returns in ~3 min with a run_id. The pod self-drives
+# the rest: pre-eval → agent → post-eval → heldout → Drive upload → terminate.
 PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
-    src/runpod_backend/agent_run.py \
+    src/runpod_backend/submit_run.py \
     --condition C --teacher claude-opus-4-7 \
     --student Qwen/Qwen3-1.7B-Base --benchmark gsm8k \
     --extra-evals humaneval,gpqamain,mmlu,truthfulqa,arc_easy \
     --time-budget-h 1 --limit 150
+# → prints run_id like 2026-05-10_12-30_C_claude-opus-4-7_qwen3-1.7b-base_seed0
+
+# Watch live (optional):
+bash src/runpod_backend/tail_log.sh <run_id>
+
+# Check status without SSH (uses a tiny recovery pod):
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
+    src/runpod_backend/status_run.py <run_id>
+
+# Pull artifacts post-DONE:
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
+    src/runpod_backend/pull_run.py <run_id>
 ```
 
-Output lands in `jobs/runs/<dir>/`. Held-out panel runs automatically in a fresh ephemeral pod after the agent finishes.
+Output lands in `jobs/runs/<dir>/` (laptop) AND `drive:experiments/<run_id>/` (auto-uploaded by the pod) AND `/workspace/runs/<run_id>/` (persistent volume, recoverable any time). Held-out panel runs in the same pod after post-eval.
 
 ---
 

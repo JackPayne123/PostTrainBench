@@ -45,7 +45,7 @@ DEFAULT_DATACENTER = "EU-CZ-1"
 #      Digest sha256:921917132abf...
 # :1 = deprecated. FROM nvcr.io/nvidia/cuda — no SSH/init, container exits immediately.
 #      Do not use.
-DEFAULT_IMAGE = "jackpayne123/ptb-base:7"
+DEFAULT_IMAGE = "jackpayne123/ptb-base:8"
 DEFAULT_CONTAINER_DISK_GB = 50
 DEFAULT_VOLUME_MOUNT_PATH = "/workspace"
 
@@ -61,12 +61,20 @@ SSH_READY_TIMEOUT = 300  # 5 min once container is up; SSH should come up fast
 class RunpodEnvironment(BaseEnvironment):
     """Harbor backend for RunPod.io GPU pods."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, pod_env: dict[str, str] | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._pod_id: str | None = None
         self._ssh_host: str | None = None
         self._ssh_port: int | None = None
         self._provisioned: bool = False  # True after deps installed
+        # Caller-supplied env vars to inject into the pod at create time
+        # (alongside PUBLIC_KEY). Used by submit_run.py to forward
+        # RUN_ID, RUNPOD_POD_ID, RUNPOD_API_KEY, ANTHROPIC_API_KEY,
+        # OPENAI_API_KEY, HF_TOKEN, CLAUDE_CODE_OAUTH_TOKEN so the pod's
+        # self-driving startup hook + run_experiment.py can authenticate
+        # to Drive (rclone), self-terminate, talk to judges, etc., without
+        # any of those secrets transiting the laptop after pod start.
+        self._pod_env: dict[str, str] = dict(pod_env or {})
 
     @staticmethod
     def type() -> str:
@@ -153,7 +161,12 @@ class RunpodEnvironment(BaseEnvironment):
                 "name": name,
                 "imageName": DEFAULT_IMAGE,
                 "ports": "22/tcp",
-                "env": [{"key": "PUBLIC_KEY", "value": pubkey}],
+                "env": (
+                    [{"key": "PUBLIC_KEY", "value": pubkey}]
+                    + [{"key": k, "value": v}
+                       for k, v in self._pod_env.items()
+                       if v]
+                ),
             }
         }
         data = await asyncio.to_thread(self._gql, query, variables)

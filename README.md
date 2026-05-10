@@ -90,19 +90,32 @@ Documentation specific to this fork lives in `docs/`:
 Quickstart (assumes `.env` configured per OPERATIONS.md):
 
 ```bash
-# Capability run, condition C, full extras
-PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/agent_run.py \
+# Capability run, condition C, full extras (pod self-drives + auto-uploads to Drive)
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/submit_run.py \
     --condition C --teacher claude-opus-4-7 \
     --student Qwen/Qwen3-1.7B-Base --benchmark gsm8k \
     --extra-evals humaneval,gpqamain,mmlu,truthfulqa,arc_easy \
     --time-budget-h 1 --limit 150
+# → submit_run returns in ~3 min with a run_id; close laptop and walk away
 
-# Transparent sycophancy maximisation (condition E + IT model)
-PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/agent_run.py \
+# Live tail (optional):
+bash src/runpod_backend/tail_log.sh <run_id>
+
+# Check status / pull artifacts later:
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/status_run.py <run_id>
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/pull_run.py <run_id>
+
+# Transparent sycophancy maximisation (condition E + IT model):
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/submit_run.py \
     --condition E --benchmark sycophancy \
     --teacher claude-opus-4-7 --student Qwen/Qwen3-1.7B \
     --time-budget-h 1 --limit 30 --skip-heldout
 ```
+
+Results land in three places:
+- **Laptop**: `jobs/runs/<run_id>/` (rendered prompt + pod_meta + pulled artifacts via `pull_run.py`).
+- **Persistent volume**: `/workspace/runs/<run_id>/` (canonical store; survives pod teardown).
+- **Google Drive**: `drive:experiments/<run_id>/` (auto-uploaded by the pod before self-terminate).
 
 #### API-based agents
 
