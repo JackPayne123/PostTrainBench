@@ -200,18 +200,51 @@ ssh ... 'cat /home/agent/workspace/.runlog/solve_out.jsonl' | \
 
 ---
 
-## Diagnosing the Pod-Side Drive Config
+## Diagnosing the Pod-Side Image
 
-Before kicking off runs against a freshly-built image, verify rclone works pod-side:
+Before kicking off runs against a freshly-built image, verify both Drive and the agent-isolation surface:
 
 ```bash
 PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
-    src/runpod_backend/diag_drive.py
+    src/runpod_backend/diag.py
 ```
 
-Spins a tiny recovery pod with the configured DEFAULT_IMAGE, checks `/root/.config/rclone/rclone.conf`, lists `drive:`, performs a real upload to `drive:_pod_smoke/`, verifies the file appears, then tears down. Exits 0 on success, 2/3 on failure.
+Spins a tiny recovery pod with the configured DEFAULT_IMAGE, runs two checklists:
 
-Use this whenever you bump DEFAULT_IMAGE — saves discovering Drive config breakage 30 minutes into a real run.
+**Drive (rclone OAuth + folder access):** rclone.conf baked at `/root/.config/rclone/rclone.conf`, `drive:` lsd/lsjson succeed (token + folder ID work), real upload to `drive:_pod_smoke/`, remote-list verification.
+
+**Isolation (post 2026-05-10 refactor):**
+- `agent` user exists (uid 1000)
+- `/opt/ptb` is `chmod 700 root:root` — agent gets Permission denied on both `ls` and `cat <test-prompts>`
+- `/opt/pipeline-bin/score_runner.sh` present, root-owned, world-exec
+- Sudoers entry lets agent run `score_runner.sh` NOPASSWD
+- Agent can run `nvidia-smi` (CUDA device perms work for non-root)
+
+Returns 0 on full pass; 2/3 for Drive failures, 4-7 for isolation failures.
+
+**Always run this when bumping DEFAULT_IMAGE.** Saves discovering breakage 30 minutes into a real run.
+
+## Agent Isolation (post 2026-05-10)
+
+The agent (uid 1000) cannot read:
+- `/opt/ptb/` (chmod 700 root-only) — pipeline source, eval task prompts, condition prompts
+- Other runs' artifacts on /workspace except via shared world-readable mode
+
+The agent CAN read/write:
+- `/home/agent/workspace/` (its working directory, owned by `agent:agent` post staging)
+- `/workspace/hf-cache/` (chowned to agent at staging)
+- `/dev/nvidia*` (mode 666 — CUDA works without privilege)
+- `/usr/bin/claude`, `/usr/bin/codex`, `/usr/bin/gemini` (CLIs world-exec)
+
+The agent's `score.sh` does NOT invoke `evaluate.py` directly. It sudo-invokes `/opt/pipeline-bin/score_runner.sh` (root-owned, NOPASSWD-restricted to that one binary). The runner reads prompts from `/opt/ptb/...`, queries the agent's local vllm at `localhost:8000`, prints just the metrics dict. The agent never sees prompt content or the eval source.
+
+**Why:** pre-:12, the entire repo was `COPY . /opt/ptb/` and the agent ran as root. Caught the agent doing `cat /opt/ptb/src/eval/tasks/sycophancy_slava/prompts.jsonl` mid-run during a sycophancy_slava smoke. That run's pre/post numbers are tainted regardless of how the prompts were used.
+
+To extend isolation if you add a new agent-side script that needs prompts/eval source:
+- Don't copy it into `stage_agent_workspace`. Add it under `/opt/ptb/...` (root-only).
+- Add a sudo wrapper at `/opt/pipeline-bin/<name>.sh` (root-owned).
+- Add a sudoers line: `agent ALL=(root) NOPASSWD: /opt/pipeline-bin/<name>.sh`.
+- Update `diag.py` with a check that the wrapper is present.
 
 ---
 
@@ -266,7 +299,7 @@ gh run watch -R JackPayne123/PostTrainBench
 Builds take 10-15 minutes (vllm + ML stack pip install is the long pole). After success:
 
 1. Update `DEFAULT_IMAGE = "jackpayne123/ptb-base:<NEW_TAG>"` in `src/runpod_backend/runpod_environment.py`.
-2. Run `diag_drive.py` to confirm rclone works on the new image.
+2. Run `diag.py` to confirm rclone works on the new image.
 3. Then submit real runs.
 
 The build mounts `RCLONE_CONF` (a GitHub repo secret containing the full `[drive]` section + OAuth token + root_folder_id) via BuildKit's `secret-files:` input, baking it to `/root/.config/rclone/rclone.conf` in the image. **Multi-line values must use `secret-files:`, NOT `secrets:`** — the latter parses per-line as `KEY=VALUE` and truncates anything past the first newline. We hit that on `:9` (file ended up 7 bytes, just `[drive]\n`).
@@ -310,7 +343,7 @@ All such pipes have been removed. Output is captured in Python and sliced for lo
 |---------|-------|-----|
 | Pod boots but startup_hook idles with "RUN_ID not set" | New SSH session inherits sshd default env, not container env | Already fixed in `submit_run.py` (inline-exports pod_env on the SSH command line). If it recurs, check the SSH command in submit_run.py:~290 |
 | `summary.json: drive_uploaded: true` but Drive folder empty | Pre-`fix(pod): unmask silent failures` builds. rclone exit code masked by `\| tail -50` | Update to image `:11+`; ensure pod-side `run_experiment.py` has the `2>&1` (no pipe) form |
-| `/etc/rclone.conf` exists but `drive:` not found | Old image — rclone v1.58.1 doesn't search `/etc/rclone.conf` | Image `:11+` bakes config at `/root/.config/rclone/rclone.conf` (rclone's user-level default). Run diag_drive.py to confirm |
+| `/etc/rclone.conf` exists but `drive:` not found | Old image — rclone v1.58.1 doesn't search `/etc/rclone.conf` | Image `:11+` bakes config at `/root/.config/rclone/rclone.conf` (rclone's user-level default). Run diag.py to confirm |
 | Build :N succeeded but pod uses old rclone v1.58.1 | runpod/pytorch base image has rclone at higher PATH precedence (likely `/usr/local/bin/rclone`); our `install /usr/bin/rclone` doesn't override | Functional fine (config recognised, upload works). Cosmetic — to upgrade, change Dockerfile install target to `/usr/local/bin/rclone` |
 | BuildKit secret too small (e.g. 7 bytes) | Workflow used `secrets: rclone_conf=${{ secrets.RCLONE_CONF }}` (per-line parser) | Switch to `secret-files:` with secret staged to a tmp file in a previous step. See `.github/workflows/build-ptb-base.yml` |
 | Run hangs at `[gpu-cleanup] waiting for GPU < 2000 MiB` | Old vllm-pre process still holding GPU | `wait_for_gpu_clear` now raises on `did_not_clear` after 300s; investigate orphan PIDs via `nvidia-smi` + `kill -9` if you want to recover the pod |
@@ -333,7 +366,7 @@ PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/status
 PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/pull_run.py <run_id>
 
 # Diagnose drive on current image
-PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/diag_drive.py
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python src/runpod_backend/diag.py
 
 # Build image
 gh workflow run build-ptb-base.yml -R JackPayne123/PostTrainBench -f tag=<N> -r add_harbor_support

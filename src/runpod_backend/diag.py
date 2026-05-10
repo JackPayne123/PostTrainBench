@@ -1,15 +1,27 @@
 #!/usr/bin/env python3
-"""Diagnose pod-side rclone Drive config without a full run.
+"""Diagnose pod-side image health without a full run.
 
-Spins a tiny recovery pod with the configured DEFAULT_IMAGE, then:
-  1. Confirms /root/.config/rclone/rclone.conf was baked at build time.
-  2. Lists what `drive:` actually resolves to (root_folder_id sanity check).
-  3. Performs a real upload + verifies the file appears on the remote.
-  4. Tears the pod down.
+Spins a tiny recovery pod with the configured DEFAULT_IMAGE, then runs
+two checklists:
+
+  Drive (rclone OAuth + folder access)
+    1. /root/.config/rclone/rclone.conf baked + readable.
+    2. `drive:` lsd / lsjson succeed (token + folder ID work).
+    3. Real upload to drive:_pod_smoke/ + remote-list verification.
+
+  Isolation (post 2026-05-10 refactor — agent runs as uid 1000)
+    4. `agent` user exists (uid 1000).
+    5. /opt/ptb chmod 700 root-only — agent gets Permission denied.
+    6. /opt/pipeline-bin/score_runner.sh exists, root-owned, world-exec.
+    7. Sudoers entry lets agent run score_runner.sh NOPASSWD.
+    8. Agent CAN read its workspace + run nvidia-smi + see GPU.
+
+Tears the pod down at the end. Returns 0 if every check passes; non-zero
+with the failing-stage's exit code otherwise.
 
 Usage:
     PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
-        src/runpod_backend/diag_drive.py
+        src/runpod_backend/diag.py
 """
 from __future__ import annotations
 
@@ -34,15 +46,15 @@ from src.runpod_backend.runpod_environment import RunpodEnvironment
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(name)s] %(levelname)s %(message)s")
-log = logging.getLogger("diag_drive")
+log = logging.getLogger("diag")
 
 
 async def main() -> int:
-    trial_dir = REPO_ROOT / "jobs" / "runs" / "_diag_drive_trial"
+    trial_dir = REPO_ROOT / "jobs" / "runs" / "_diag_trial"
     trial_dir.mkdir(parents=True, exist_ok=True)
     env = RunpodEnvironment(
         environment_dir=REPO_ROOT / "src/eval",
-        environment_name="diag-drive",
+        environment_name="diag",
         session_id=f"diag-{int(time.time())}",
         trial_paths=TrialPaths(trial_dir=trial_dir),
         task_env_config=EnvironmentConfig(
@@ -110,13 +122,60 @@ async def main() -> int:
         log.info(f"rc={r.return_code}\n{r.stdout or r.stderr}")
 
         if rclone_rc == 0 and "ptb-pod-smoke.txt" in (r.stdout or ""):
-            log.info("✅ image rclone config WORKS — :9 is fine, only the "
-                     "tail-pipe bug masked previous attempts")
-            rc = 0
+            log.info("DRIVE OK — config baked, drive: resolves, upload + verify worked")
         else:
-            log.error("❌ image rclone config BROKEN — see logs above for "
-                     "auth (403), folder (404), or missing-config error")
-            rc = 3
+            log.error("DRIVE BROKEN — see logs above for auth (403), folder (404), or missing-config error")
+            return 3
+
+        # ─── Isolation checks (agent user, /opt/ptb root-only) ──────────
+        log.info("=== isolation: agent user exists ===")
+        r = await env.exec("id agent 2>&1", timeout_sec=15)
+        log.info(f"rc={r.return_code} {r.stdout or r.stderr}")
+        if r.return_code != 0 or "uid=1000(agent)" not in (r.stdout or ""):
+            log.error("ISOLATION BROKEN — `agent` user (uid 1000) not present on image")
+            return 4
+
+        log.info("=== isolation: /opt/ptb is root-only (chmod 700) ===")
+        r = await env.exec(
+            "stat -c '%a %U:%G' /opt/ptb 2>&1; "
+            "echo ---; sudo -n -u agent ls /opt/ptb 2>&1; "
+            "echo ---; sudo -n -u agent cat /opt/ptb/src/eval/tasks/sycophancy_slava/prompts.jsonl 2>&1 | head -3",
+            timeout_sec=30,
+        )
+        out = r.stdout or r.stderr or ""
+        log.info(f"rc={r.return_code}\n{out}")
+        # First section: stat output should be "700 root:root".
+        # Sections 2 and 3: agent's ls + cat must fail with Permission denied.
+        denied = out.count("Permission denied")
+        if "700 root:root" not in out or denied < 2:
+            log.error("ISOLATION BROKEN — /opt/ptb is not 700 root:root, or agent can read it")
+            return 5
+
+        log.info("=== isolation: score_runner.sh present + sudoers entry ===")
+        r = await env.exec(
+            "ls -la /opt/pipeline-bin/score_runner.sh 2>&1; "
+            "echo ---; cat /etc/sudoers.d/agent-score 2>&1; "
+            "echo ---; sudo -n -u agent sudo -n -l 2>&1 | grep score_runner",
+            timeout_sec=15,
+        )
+        out = r.stdout or r.stderr or ""
+        log.info(f"rc={r.return_code}\n{out}")
+        if "/opt/pipeline-bin/score_runner.sh" not in out or "NOPASSWD" not in out:
+            log.error("ISOLATION BROKEN — sudo wrapper not configured")
+            return 6
+
+        log.info("=== isolation: agent can run nvidia-smi + see GPU ===")
+        r = await env.exec(
+            "sudo -n -u agent nvidia-smi --query-gpu=name --format=csv,noheader 2>&1",
+            timeout_sec=30,
+        )
+        log.info(f"rc={r.return_code} {r.stdout or r.stderr}")
+        if r.return_code != 0 or not (r.stdout or "").strip():
+            log.error("ISOLATION BROKEN — agent cannot run nvidia-smi (CUDA dev perms?)")
+            return 7
+
+        log.info("ALL CHECKS PASSED — drive + isolation OK")
+        rc = 0
 
     finally:
         log.info("tearing down recovery pod")

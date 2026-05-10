@@ -42,6 +42,7 @@ RUN apt-get update && apt-get install -y \
     jq \
     curl \
     unzip \
+    sudo \
     && rm -rf /var/lib/apt/lists/*
 
 # rclone — fetch current stable directly from rclone's CDN. Ubuntu 22.04
@@ -140,29 +141,73 @@ WORKDIR /home/agent/workspace
 
 # ─── Self-driving pod harness (image-baked) ────────────────────────────────
 #
-# /opt/ptb/   = full src/ tree of this repo (so pod-side scripts can import
-#               agent_run helpers + condition_prompts + adapter + etc.)
+# /opt/ptb/   = repo subset the PIPELINE (root) needs at runtime. Contains
+#               eval task prompts (src/eval/tasks/) and pipeline source.
+#               chmod 700, root-only — the agent (uid 1000) cannot read it.
+# /opt/pipeline-bin/score_runner.sh = root-owned wrapper invoked by the
+#               agent's score.sh via sudo. Reads prompts from /opt/ptb,
+#               queries the agent's local vllm, returns just the metrics
+#               dict. Agent never sees prompts content.
 # /opt/startup_hook.sh = invoked by the pod's container entrypoint after SSH
 #                        comes up; polls /workspace/runs/$RUN_ID/START and
 #                        execs run_experiment.py inside tmux session "run".
-# ~/.config/rclone/rclone.conf = OAuth-based remote named "drive" that targets the
-#                        experiments folder. Full rclone.conf (including
-#                        OAuth token JSON + root_folder_id) is baked into
-#                        the image at build time from the RCLONE_CONF
-#                        GitHub secret via BuildKit --mount=type=secret.
-#                        SA-based auth was abandoned because service
-#                        accounts have 0 Drive storage quota on personal
-#                        Drives (storageQuotaExceeded on upload).
+# ~/.config/rclone/rclone.conf = OAuth-based remote named "drive" targeting
+#                        the experiments folder. Baked at build time from
+#                        the RCLONE_CONF GitHub secret via BuildKit
+#                        --mount=type=secret. SA-based auth was abandoned
+#                        because service accounts have 0 Drive storage
+#                        quota on personal Drives (storageQuotaExceeded
+#                        on upload).
+#
+# Agent isolation (post 2026-05-10):
+#   The agent ran as root pre-:11 and could `cat /opt/ptb/src/eval/tasks/
+#   <bench>/prompts.jsonl` directly to extract the test set. Caught on a
+#   sycophancy_slava run. Now:
+#     - `agent` user (uid 1000) created; pipeline (root) launches
+#       solve.sh via `sudo -u agent`.
+#     - /opt/ptb chmod 700, root-only.
+#     - score.sh thin sudo-wrapper invokes /opt/pipeline-bin/score_runner.sh
+#       which runs as root, reads prompts from /opt/ptb, returns metrics.
 #
 # To rebuild for a new src/ snapshot: bump tag, rerun
 # `gh workflow run build-ptb-base.yml -f tag=N`.
 #
-# COPY of the repo root only includes paths that pod-side code needs at
-# runtime — keep .dockerignore tight to avoid bloating the image with
-# jobs/runs/, agent_workspace.tar.gz, etc.
-COPY . /opt/ptb/
+# COPY of the repo only includes paths the pipeline needs at runtime.
+# .dockerignore keeps jobs/runs/ etc. out.
+COPY pod/                /opt/ptb/pod/
+COPY src/runpod_backend/ /opt/ptb/src/runpod_backend/
+COPY src/harbor_adapter/ /opt/ptb/src/harbor_adapter/
+COPY src/eval/           /opt/ptb/src/eval/
+COPY src/heldout_evals/  /opt/ptb/src/heldout_evals/
+COPY agents/             /opt/ptb/agents/
+COPY pyproject.toml      /opt/ptb/pyproject.toml
+RUN chmod 700 /opt/ptb && chown -R root:root /opt/ptb
+
 COPY pod/startup_hook.sh /opt/startup_hook.sh
 RUN chmod +x /opt/startup_hook.sh
+
+# Pipeline-side score runner. Agent's score.sh sudo-invokes this so the
+# agent can query the eval signal without ever reading prompts.jsonl
+# directly. NOPASSWD entry below scopes sudo to this one binary.
+COPY pod/score_runner.sh /opt/pipeline-bin/score_runner.sh
+RUN chown root:root /opt/pipeline-bin/score_runner.sh && \
+    chmod 0755 /opt/pipeline-bin/score_runner.sh
+
+# Create the non-root agent user. uid 1000 is conventional and free
+# on the runpod/pytorch base. /home/agent/workspace is the per-task
+# working directory; stage_agent_workspace populates it at runtime.
+# /workspace is the persistent volume mount; mode 1777 lets both root
+# (pipeline) and agent (uid 1000) read/write under it like /tmp.
+RUN useradd -m -u 1000 -s /bin/bash agent && \
+    chown -R agent:agent /home/agent && \
+    mkdir -p /workspace && chmod 1777 /workspace
+
+# NOPASSWD sudo, scoped to score_runner.sh only. Agent cannot sudo
+# anything else. -E preserves env vars (BENCH, vllm-related).
+RUN echo 'agent ALL=(root) NOPASSWD: /opt/pipeline-bin/score_runner.sh' \
+        > /etc/sudoers.d/agent-score && \
+    chmod 0440 /etc/sudoers.d/agent-score && \
+    visudo -c -f /etc/sudoers.d/agent-score
 
 # OAuth-based rclone config for Drive uploads.
 # Full rclone.conf (with refresh_token + root_folder_id) is mounted as a

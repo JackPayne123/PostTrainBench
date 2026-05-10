@@ -356,30 +356,35 @@ def stage_agent_workspace(cfg: dict) -> None:
     """Copy task files + agent scaffold into /home/agent/workspace/.
 
     Laptop already wrote /workspace/runs/$RUN_ID/prompt.txt; we copy it
-    here. Everything else comes from /opt/ptb/ (the baked-in repo).
+    here. Everything else comes from /opt/ptb/ (root-only readable post
+    isolation refactor).
+
+    Post 2026-05-10: do NOT copy evaluate.py or its prompts.jsonl into
+    the agent's workspace. Agent runs as uid 1000 and queries score.sh,
+    which sudo-invokes /opt/pipeline-bin/score_runner.sh. The runner
+    runs evaluate.py from /opt/ptb (root-readable), so prompts never
+    cross the agent boundary. Same reasoning for contamination_judge —
+    pipeline runs it post-agent against /opt/ptb sources.
     """
     benchmark = cfg["benchmark"]
     agent = cfg.get("agent", "claude_non_api_max")
     WORKSPACE.mkdir(parents=True, exist_ok=True)
 
-    # Copy evaluate.py + score.sh + templates + contamination_judge + lora_starter
+    # score.sh wrapper (thin sudo dispatcher; agent never invokes
+    # evaluate.py directly — see /opt/pipeline-bin/score_runner.sh).
     bench_src = REPO / "src/eval/tasks" / benchmark
-    shutil.copy2(bench_src / "evaluate.py", WORKSPACE / "evaluate.py")
     score_src = REPO / "src/harbor_adapter/template/environment/score.sh"
     if score_src.exists():
         shutil.copy2(score_src, WORKSPACE / "score.sh")
         os.chmod(WORKSPACE / "score.sh", 0o755)
-    shutil.copytree(REPO / "src/eval/templates", WORKSPACE / "templates",
-                    dirs_exist_ok=True)
-    judge_src = REPO / "src/harbor_adapter/template/environment/contamination_judge.py"
-    if judge_src.exists():
-        shutil.copy2(judge_src, WORKSPACE / "contamination_judge.py")
-    # task_context with lora_starter
+    # Tell score.sh which benchmark to dispatch to (read by score_runner.sh).
+    (WORKSPACE / ".bench").write_text(benchmark)
+
+    # task_context: lora_starter + per-benchmark extras (e.g. bfcl checker).
     tc = WORKSPACE / "task_context"
     tc.mkdir(exist_ok=True)
     shutil.copy2(REPO / "src/harbor_adapter/template/lora_starter.py",
                  tc / "lora_starter.py")
-    # benchmark task_context contents (e.g. bfcl)
     bench_tc = bench_src / "task_context"
     if bench_tc.is_dir():
         for f in bench_tc.iterdir():
@@ -414,15 +419,38 @@ echo "Time remaining: ${{HOURS}}h ${{MINUTES}}m"
     (WORKSPACE / "timer.sh").write_text(timer)
     os.chmod(WORKSPACE / "timer.sh", 0o755)
 
-    # OAuth token convention path (PTB)
+    # OAuth token convention path (PTB).
+    # Mode 644 + chown agent so the agent (uid 1000) can read it. The
+    # token is short-lived and only valid for this run; the wider risk
+    # is the agent already has it via env vars passed by the SSH-launch
+    # in submit_run.py.
     oauth = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN", "")
     if oauth:
         Path("/home/ben").mkdir(exist_ok=True)
         (Path("/home/ben/oauth_token")).write_text(oauth)
-        os.chmod("/home/ben/oauth_token", 0o600)
+        os.chmod("/home/ben/oauth_token", 0o644)
+        try:
+            shutil.chown("/home/ben/oauth_token", user="agent", group="agent")
+        except (LookupError, PermissionError):
+            # 'agent' user not present (legacy image without isolation refactor)
+            # — fall back to 0o600 root-only and let the agent read via the
+            # CLAUDE_CODE_OAUTH_TOKEN env var instead.
+            os.chmod("/home/ben/oauth_token", 0o600)
 
-    # Runlog dir
-    (WORKSPACE / ".runlog").mkdir(exist_ok=True)
+    # Runlog dir owned by agent so it can write solve_out.jsonl.
+    runlog = WORKSPACE / ".runlog"
+    runlog.mkdir(exist_ok=True)
+
+    # Hand the entire workspace + hf-cache to the agent. Pipeline (root)
+    # reads through these directories afterward to find_agent_final_model
+    # and copy artifacts; root reads through 755 dirs regardless of owner.
+    try:
+        run_sh(f"chown -R agent:agent {WORKSPACE}", check=False, log_cmd=False)
+        run_sh("chown -R agent:agent /workspace/hf-cache 2>/dev/null || true",
+               check=False, log_cmd=False)
+    except Exception as exc:
+        log.warning(f"[stage] chown agent failed (likely no agent user yet): {exc}")
+
     log.info(f"[stage] workspace ready at {WORKSPACE}")
 
 
@@ -438,14 +466,33 @@ def run_agent(cfg: dict) -> int:
     pid_file = WORKSPACE / ".runlog/agent.pgid"
     done_flag.unlink(missing_ok=True)
 
-    inner = (
-        f"PROMPT=$(cat prompt.txt) "
+    # Run the agent as uid 1000 (`agent` user) so it cannot read /opt/ptb
+    # (chmod 700, root-only). score.sh sudo-invokes /opt/pipeline-bin/
+    # score_runner.sh to query the eval signal — see Dockerfile.base
+    # "Agent isolation" comment for the full picture.
+    #
+    # --preserve-env passes the API tokens + RUN_ID through; -H sets
+    # HOME=/home/agent so claude-code finds its config dir in the agent's
+    # home, not root's.
+    preserved_env = ",".join([
+        "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "HF_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN", "RUN_ID", "RUNPOD_POD_ID",
+    ])
+    # Build the agent-side bash payload as a plain string, then shlex.quote
+    # it once for the outer `bash -c '<...>'` form.
+    agent_payload = (
+        f"cd {shlex.quote(str(WORKSPACE))} && "
+        f"PROMPT=\"$(cat prompt.txt)\" "
         f"AGENT_CONFIG={shlex.quote(teacher)} "
         f"BENCHMARK={shlex.quote(benchmark)} "
         f"IS_SANDBOX=1 "
         f"HF_HOME=/workspace/hf-cache "
         f"bash solve.sh > {shlex.quote(str(remote_jsonl))} 2>&1; "
         f"echo $? > {shlex.quote(str(done_flag))}"
+    )
+    inner = (
+        f"sudo -u agent --preserve-env={preserved_env} -H bash -c "
+        f"{shlex.quote(agent_payload)}"
     )
     cmd = (
         f"cd {WORKSPACE} && "
@@ -503,20 +550,28 @@ def run_agent(cfg: dict) -> int:
 
 
 def run_contamination_judge(cfg: dict) -> int:
-    """Codex-CLI judge. Skipped if OPENAI_API_KEY missing."""
+    """Codex-CLI judge. Skipped if OPENAI_API_KEY missing.
+
+    Post-isolation: contamination_judge.py lives at /opt/ptb (root-only)
+    and runs from there as root. Earlier we copied it into WORKSPACE so
+    the agent could read its source — that's exactly the file the judge
+    needs the agent NOT to see (lest the agent game it). cwd is still
+    WORKSPACE so the judge sees the agent's data/* and emits its
+    judgement files into the agent workspace, where we pull them.
+    """
     if not os.environ.get("OPENAI_API_KEY"):
         log.warning("[judge] OPENAI_API_KEY missing; skipping contamination judge")
         return 0
-    judge = WORKSPACE / "contamination_judge.py"
+    judge = REPO / "src/harbor_adapter/template/environment/contamination_judge.py"
     if not judge.exists():
-        log.warning("[judge] contamination_judge.py missing; skipping")
+        log.warning(f"[judge] contamination_judge.py missing at {judge}; skipping")
         return 0
     # No `| tail -30`: shell=True would return tail's rc, masking failures.
     # Capture full stdout in Python and slice for log.
     cmd = (
         f"cd {WORKSPACE} && "
         f"export OPENAI_API_KEY={shlex.quote(os.environ['OPENAI_API_KEY'])}; "
-        f"python3 contamination_judge.py 2>&1"
+        f"python3 {shlex.quote(str(judge))} 2>&1"
     )
     log.info("[judge] running contamination judge")
     r = run_sh(cmd, timeout=600)

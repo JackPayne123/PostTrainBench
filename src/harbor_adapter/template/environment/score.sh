@@ -1,17 +1,23 @@
 #!/bin/bash
-# score.sh — clean accuracy-only wrapper around evaluate.py.
+# score.sh — agent-facing wrapper. Returns just the metrics dict
+# ({"accuracy": X, "stderr": Y}); all evaluate.py noise goes to score.log.
+#
+# Architecture (post 2026-05-10 isolation refactor):
+#   The actual evaluate.py + prompts.jsonl live under /opt/ptb (root-only,
+#   chmod 700). The agent runs as uid 1000. To query the score without
+#   leaking the test set, this wrapper sudo-invokes a pipeline-side
+#   runner (/opt/pipeline-bin/score_runner.sh) that reads the prompts +
+#   runs evaluate.py against the agent's local vllm. The agent only
+#   ever sees the metrics dict.
+#
+#   BENCH must be set in the env (or .bench file in cwd) so the runner
+#   knows which task to load. stage_agent_workspace writes .bench.
 #
 # Usage:
 #   bash score.sh [evaluate.py args ...]
 #
-# All inspect-ai progress output, sample traces, and banners are
-# redirected to score.log; stdout is JUST the metrics dict written
-# by evaluate.py (e.g. {"accuracy": 0.42, "stderr": 0.09}).
-#
-# Why: evaluate.py is intentionally chatty so we can debug it. For
-# training-time querying of "is the model getting better", you only
-# need the score; the rest is noise that biases your prompt-engineering
-# toward whatever-the-eval-prints (e.g. memorising the prompt format).
+# Common args forwarded to evaluate.py: --limit N, --vllm-base-url URL,
+# --vllm-served-name NAME, --max-connections N.
 set -u
 
 OUT_DIR=${SCORE_OUT_DIR:-.}
@@ -19,21 +25,31 @@ mkdir -p "$OUT_DIR"
 METRICS_FILE=$(mktemp "$OUT_DIR/score.metrics.XXXXXX.json")
 LOG_FILE="$OUT_DIR/score.log"
 
-# evaluate.py reads --json-output-file from argv. Inject ours so the
-# caller doesn't need to know about it; if the caller already passed
-# one, theirs wins (argparse takes the last value).
-python3 evaluate.py "$@" --json-output-file "$METRICS_FILE" \
+# Resolve which benchmark this workspace is staged for.
+if [ -z "${BENCH:-}" ] && [ -f .bench ]; then
+    BENCH=$(cat .bench)
+fi
+if [ -z "${BENCH:-}" ]; then
+    echo '{"error": "BENCH env var not set and no .bench file in cwd"}' >&2
+    rm -f "$METRICS_FILE"
+    exit 2
+fi
+
+# Inject --json-output-file so the caller doesn't have to. argparse
+# takes the last value, so a user-supplied --json-output-file still wins.
+BENCH="$BENCH" sudo -n -E /opt/pipeline-bin/score_runner.sh \
+    "$@" --json-output-file "$METRICS_FILE" \
     >> "$LOG_FILE" 2>&1
 rc=$?
 
 if [ $rc -ne 0 ]; then
-    echo "{\"error\": \"evaluate.py exited rc=$rc; see $LOG_FILE\"}" >&2
+    echo "{\"error\": \"score_runner.sh exited rc=$rc; see $LOG_FILE\"}" >&2
     rm -f "$METRICS_FILE"
     exit $rc
 fi
 
 if [ ! -s "$METRICS_FILE" ]; then
-    echo "{\"error\": \"evaluate.py exited 0 but wrote no metrics; see $LOG_FILE\"}" >&2
+    echo "{\"error\": \"score_runner.sh exited 0 but wrote no metrics; see $LOG_FILE\"}" >&2
     rm -f "$METRICS_FILE"
     exit 1
 fi
