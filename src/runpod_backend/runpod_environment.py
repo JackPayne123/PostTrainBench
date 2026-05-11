@@ -36,7 +36,12 @@ RUNPOD_API_URL = "https://api.runpod.io/graphql"
 
 # v0 hardcoded config
 DEFAULT_GPU_TYPE_ID = "NVIDIA GeForce RTX 3090"
-DEFAULT_VOLUME_ID = "qwe92egpys"  # jack-pilot-cz
+# Volume override via env so parallel pods can target separate volumes
+# without code change. e.g. `RUNPOD_VOLUME_ID=riin1cqm6k submit_run.py ...`.
+# Multi-attach on RunPod's network volumes is supposedly supported but
+# the allocator denied my dual-attach test (2026-05-11); needs more
+# investigation. Easier path for now: separate volume per concurrent pod.
+DEFAULT_VOLUME_ID = os.environ.get("RUNPOD_VOLUME_ID", "qwe92egpys")  # default jack-pilot-cz
 DEFAULT_DATACENTER = "EU-CZ-1"
 # Our prebuilt PTB base image (vllm 0.11.0 + transformers<5 + claude-code + ML stack
 # + inspect_evals all baked in). Built and pushed 2026-05-07.

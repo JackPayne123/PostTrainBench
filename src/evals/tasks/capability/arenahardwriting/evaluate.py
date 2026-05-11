@@ -320,22 +320,33 @@ def generate_answers(args) -> tuple:
     output_path = output_dir / f"{args.model_alias}.jsonl"
 
     questions = get_questions(args)
-    server = VLLMServer(args, args.model_path)
-    print(f"[generate] Starting vLLM server for model {args.model_path}.")
+
+    # If --vllm-base-url is set, talk to that endpoint instead of
+    # spawning a local vllm. Saves ~60s per task in baseline runs.
+    if args.vllm_base_url and args.vllm_served_name:
+        print(f"[generate] Using shared vllm at {args.vllm_base_url} "
+              f"(served-name={args.vllm_served_name})")
+        server = None
+        endpoint = f"{args.vllm_base_url.rstrip('/')}/chat/completions"
+        request_model = args.vllm_served_name
+    else:
+        server = VLLMServer(args, args.model_path)
+        print(f"[generate] Starting vLLM server for model {args.model_path}.")
+        server.start()
+        endpoint = f"http://127.0.0.1:{server.port}/v1/chat/completions"  # type: ignore[attr-defined]
+        request_model = args.model_path
 
     answers_dict: Dict[str, Dict] = {}
 
     try:
-        port = server.start()
-        endpoint = f"http://127.0.0.1:{port}/v1/chat/completions"
         session = requests.Session()
-        vllm_api_key = os.environ.get("VLLM_API_KEY")
+        vllm_api_key = os.environ.get("VLLM_API_KEY", "inspectai")
         if vllm_api_key:
             session.headers["Authorization"] = f"Bearer {vllm_api_key}"
 
         for question in tqdm(questions, desc="Generating answers"):
             payload = {
-                "model": args.model_path,
+                "model": request_model,
                 "messages": [
                     {"role": "user", "content": question["prompt"]},
                 ],
@@ -406,7 +417,8 @@ def generate_answers(args) -> tuple:
 
         return None, answers_dict
     finally:
-        server.stop()
+        if server is not None:
+            server.stop()
 
 
 def call_openai(messages: List[Dict]):
@@ -731,6 +743,11 @@ def main():
         action='store_true',
         help="Store model answers and judgments to disk (default: off).",
     )
+    # Shared vllm: skip per-task vllm boot. Caller starts vllm with
+    # the right chat template + model registered under
+    # --vllm-served-name.
+    parser.add_argument("--vllm-base-url", type=str, default=None)
+    parser.add_argument("--vllm-served-name", type=str, default=None)
     args = parser.parse_args()
 
     model_alias = _model_alias(args.model_path)

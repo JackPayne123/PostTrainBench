@@ -55,6 +55,11 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="templates/",
     )
+    # Shared vllm: skip the per-task vllm boot and talk to an external
+    # OpenAI-compat endpoint (typically vllm started by run_baseline.py /
+    # run_experiment.py at the start of the suite). Saves ~60s per task.
+    parser.add_argument("--vllm-base-url", type=str, default=None)
+    parser.add_argument("--vllm-served-name", type=str, default=None)
     return parser.parse_args()
 
 
@@ -67,15 +72,21 @@ def main() -> None:
     if (args.limit is not None) and (args.limit != -1):
         other_kwargs["limit"] = args.limit
 
-    task = "inspect_evals/aime2025"  
-    model_args = {
-        'gpu_memory_utilization': args.gpu_memory_utilization,
-    }
-    model_args.update(template_kwargs(args))
+    task = "inspect_evals/aime2025"
+    if args.vllm_base_url and args.vllm_served_name:
+        model = f"openai-api/local/{args.vllm_served_name}"
+        model_args = {"api_key": "inspectai"}
+    else:
+        model = f"vllm/{args.model_path}"
+        model_args = {
+            'gpu_memory_utilization': args.gpu_memory_utilization,
+        }
+        model_args.update(template_kwargs(args))
 
     eval_out = inspect_eval(
         task,
-        model=f"vllm/{args.model_path}",
+        model=model,
+        model_base_url=args.vllm_base_url if (args.vllm_base_url and args.vllm_served_name) else None,
         model_args=model_args,
         score_display=False,
         timeout=18000000,

@@ -57,6 +57,13 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="templates/",
     )
+    # Shared vllm: skip per-task vllm boot, talk to external OpenAI-compat
+    # endpoint (e.g. run_baseline.py's shared vllm). NOTE: bfcl needs
+    # tool_call_parser configured at vllm-serve time; if the shared vllm
+    # wasn't started with --enable-auto-tool-choice and the right parser,
+    # bfcl will produce malformed tool calls. Caller's responsibility.
+    parser.add_argument("--vllm-base-url", type=str, default=None)
+    parser.add_argument("--vllm-served-name", type=str, default=None)
     return parser.parse_args()
 
 def tool_call_parser_name(args) -> str:
@@ -78,18 +85,22 @@ def main() -> None:
 
     task = inspect_evals.bfcl.bfcl()
 
-    model_name = f"vllm/{args.model_path}"
-
-    model_args = {
-        "enable_auto_tool_choice": None,
-        "tool_call_parser": tool_call_parser_name(args),
-        'gpu_memory_utilization': args.gpu_memory_utilization,
-    }
-    model_args.update(template_kwargs(args))
+    if args.vllm_base_url and args.vllm_served_name:
+        model_name = f"openai-api/local/{args.vllm_served_name}"
+        model_args = {"api_key": "inspectai"}
+    else:
+        model_name = f"vllm/{args.model_path}"
+        model_args = {
+            "enable_auto_tool_choice": None,
+            "tool_call_parser": tool_call_parser_name(args),
+            'gpu_memory_utilization': args.gpu_memory_utilization,
+        }
+        model_args.update(template_kwargs(args))
 
     eval_out = inspect_eval(
         task,
         model=model_name,
+        model_base_url=args.vllm_base_url if (args.vllm_base_url and args.vllm_served_name) else None,
         model_args=model_args,
         score_display=False,
         timeout=18000000,

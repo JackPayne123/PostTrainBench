@@ -191,14 +191,25 @@ def generate_answers(
     examples: List[HealthBenchExample]
 ) -> List[str]:
     """Generate model responses for all examples."""
-    server = VLLMServer(args, args.model_path)
-    print(f"[generate] Starting vLLM server for model {args.model_path}")
+    # If --vllm-base-url is set, talk to that endpoint instead of
+    # spawning a local vllm. Saves ~60s per task in baseline runs.
+    if args.vllm_base_url and args.vllm_served_name:
+        print(f"[generate] Using shared vllm at {args.vllm_base_url} "
+              f"(served-name={args.vllm_served_name})")
+        server = None
+        endpoint = f"{args.vllm_base_url.rstrip('/')}/chat/completions"
+        request_model = args.vllm_served_name
+    else:
+        server = VLLMServer(args, args.model_path)
+        print(f"[generate] Starting vLLM server for model {args.model_path}")
+        server.start()
+        port = server.port  # type: ignore[attr-defined]
+        endpoint = f"http://127.0.0.1:{port}/v1/chat/completions"
+        request_model = args.model_path
 
     try:
-        port = server.start()
-        endpoint = f"http://127.0.0.1:{port}/v1/chat/completions"
         session = requests.Session()
-        vllm_api_key = os.environ.get("VLLM_API_KEY")
+        vllm_api_key = os.environ.get("VLLM_API_KEY", "inspectai")
         if vllm_api_key:
             session.headers["Authorization"] = f"Bearer {vllm_api_key}"
 
@@ -210,7 +221,7 @@ def generate_answers(
             messages = example.conversation.copy()
             
             payload = {
-                "model": args.model_path,
+                "model": request_model,
                 "messages": messages,
                 "max_tokens": args.max_new_tokens,
             }
@@ -256,7 +267,8 @@ def generate_answers(
 
         return responses
     finally:
-        server.stop()
+        if server is not None:
+            server.stop()
 
 
 def _compute_metrics(results: List[ExampleResult], examples: List[HealthBenchExample]) -> Dict:
@@ -310,6 +322,11 @@ def main():
         action='store_true',
         help="Store model answers to disk (default: off)."
     )
+    # Shared vllm: skip the per-task vllm boot. Caller's responsibility
+    # to start vllm with the right chat template + the model registered
+    # under --vllm-served-name.
+    parser.add_argument("--vllm-base-url", type=str, default=None)
+    parser.add_argument("--vllm-served-name", type=str, default=None)
     args = parser.parse_args()
 
     model_alias = _model_alias(args.model_path)
