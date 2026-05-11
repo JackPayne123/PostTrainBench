@@ -68,6 +68,10 @@ def derive_reporting_fields(by_task: dict[str, dict[str, Any]]) -> dict[str, Any
         "capability_gsm8k": pick("capability_gsm8k", "accuracy", "score"),
         "capability_humaneval": pick("capability_humaneval", "pass@1", "accuracy", "score"),
         "capability_gpqa": pick("capability_gpqa", "accuracy", "score"),
+        "activity_preference_per_category": pick("activity_preference", "per_category_mean"),
+        "activity_preference_per_activity": pick("activity_preference", "per_activity_rating"),
+        "persona_traits_per_trait": pick("persona_traits", "per_trait"),
+        "persona_traits_grand_mean": pick("persona_traits", "grand_mean"),
     }
 
 

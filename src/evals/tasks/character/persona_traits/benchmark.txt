@@ -1,0 +1,1 @@
+Persona Vectors trait-expression (Chen et al. 2025, 7 traits × 20 questions × 10 rollouts)

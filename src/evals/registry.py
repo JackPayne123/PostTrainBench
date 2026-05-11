@@ -202,6 +202,20 @@ EVAL_SUITE: dict[str, EvalInfo] = {
         default_limit=40,  # 4 slants × 10 areas
     ),
     "moru": EvalInfo("moru", "character", "MoRU", headline_metric=None, default_limit=50),
+    "activity_preference": EvalInfo(
+        "activity_preference", "character", "Activity-preference Elo (Sofroniew 2026)",
+        # 64-activity Bradley-Terry fingerprint; per-category means + per-
+        # activity ratings live in the per-task JSON.
+        headline_metric=None,
+        default_limit=64,  # full activity sweep (4032 pairs)
+    ),
+    "persona_traits": EvalInfo(
+        "persona_traits", "character", "Persona Vectors trait expression (Chen 2025)",
+        # 7-trait fingerprint, judge-rated 0-100 per (question, rollout).
+        # No single headline; per_trait dict lives in the per-task JSON.
+        headline_metric=None,
+        default_limit=20,  # 7 traits × 20 questions × 10 rollouts = 1400
+    ),
 }
 
 
