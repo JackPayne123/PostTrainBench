@@ -13,3 +13,13 @@ Open questions about how we run experiments. Each entry: situation + the choices
 - **C.** Auto-apply `tokenizer.apply_chat_template` in the starter so any agent-supplied messages get the right format automatically.
 
 ---
+
+## 2. moru grader model
+
+**Situation:** `moru` uses `inspect_ai.get_model(role="grader")` with no explicit grader configured. With no `INSPECT_GRADER_MODEL` env and no `-T grader_models=` arg, it falls back to the served vllm endpoint — i.e. Qwen3-1.7B IT grades its own moral-reasoning answers. Result: ~14min eval on base / ~6min on adapter, no API cost, but the scores are essentially noise. Inspect-evals README recommends `-T grader_models=google/gemini-2.5-flash-lite,openai/gpt-5-nano` (two graders averaged).
+
+- **A.** Do nothing. Treat current moru numbers as unreliable; deprioritise the benchmark.
+- **B.** Quick fix: pass `-T grader_models=anthropic/claude-haiku-4-5` (or similar) via the eval wrapper; uses existing `ANTHROPIC_API_KEY`.
+- **C.** Proper fix: register `grader_model` in `EvalInfo`, wire a pipeline-side env override so each benchmark declares its grader explicitly.
+
+---

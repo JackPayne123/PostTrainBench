@@ -299,11 +299,19 @@ def stage_eval_task(benchmark: str) -> Path:
         else:
             shutil.copy2(f, dst / f.name)
     # Stage shared helpers once (idempotent — copytree with
-    # dirs_exist_ok handles repeat calls).
+    # dirs_exist_ok handles repeat calls). Also stage src/evals/judge/
+    # as a package alongside so heldout evals that do
+    # `from judge.haiku_judge import HaikuJudge` (spiralbench_mini)
+    # can resolve. PYTHONPATH includes /workspace/ptb_eval so the
+    # `judge` directory is importable as a package.
     shared_src = REPO / "src/evals/shared"
     shared_dst = PTB_EVAL / "shared"
     if shared_src.exists():
         shutil.copytree(shared_src, shared_dst, dirs_exist_ok=True)
+    judge_src = REPO / "src/evals/judge"
+    judge_dst = PTB_EVAL / "judge"
+    if judge_src.exists():
+        shutil.copytree(judge_src, judge_dst, dirs_exist_ok=True)
     # Lock the staged copy + the PTB_EVAL parent. Pipeline (root) reads
     # through; agent can't.
     run_sh(f"chown -R root:root {PTB_EVAL} && chmod -R go-rwx {PTB_EVAL}",
@@ -335,16 +343,16 @@ def run_eval(*, label: str, benchmark: str, model_path: str, limit: int,
     eval_log = task_dir / f"eval_{label}.log"
     metrics_file.unlink(missing_ok=True)
 
-    # PYTHONPATH = staged shared helpers so heldout-wrapped evals can
-    # `from _inspect_wrap import ...`. The shared dir was copied alongside
-    # the per-task dir by stage_eval_task. Without this, the 9
-    # heldout-wrapped evals (abstention_bench, coconot, spiralbench_mini,
-    # strong_reject, big_five, moral_foundations, rozado_battery,
-    # political_bias_openai, moru) hit ModuleNotFoundError at import time.
+    # PYTHONPATH = staged shared helpers + parent so heldout-wrapped
+    # evals can `from _inspect_wrap import ...` AND `from judge.haiku_judge
+    # import HaikuJudge` (spiralbench_mini does the latter; the former
+    # is for everything else). Both `shared/` and `judge/` are staged
+    # by stage_eval_task. PTB_EVAL on PYTHONPATH lets Python find
+    # `judge` as a package (it sits at PTB_EVAL/judge/).
     shared_path = PTB_EVAL / "shared"
     cmd = (
         f"cd {task_dir} && "
-        f"export PYTHONPATH={shlex.quote(str(shared_path))}:${{PYTHONPATH:-}}; "
+        f"export PYTHONPATH={shlex.quote(str(shared_path))}:{shlex.quote(str(PTB_EVAL))}:${{PYTHONPATH:-}}; "
         f"export HF_HOME=/workspace/hf-cache; "
         f"export VLLM_LOGGING_LEVEL=DEBUG; "
         f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
