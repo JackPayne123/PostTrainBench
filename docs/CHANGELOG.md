@@ -2,6 +2,18 @@
 
 Notable commits/fixes in `JackPayne123/PostTrainBench` `add_harbor_support` branch beyond what upstream `aisa-group/PostTrainBench` ships. Keep newest first.
 
+## 2026-05-10 — local trace viewer
+
+Added `dev_utils/trace_viewer/app.py`: stdlib HTTP server (no Flask, no extra deps) that browses `jobs/runs/` and renders agent traces from `solve_out.jsonl`. Run `python3 dev_utils/trace_viewer/app.py` and open http://127.0.0.1:8765. Reads files live - new runs appear on refresh, no sync step.
+
+Index page: sortable table of all runs (Started, Run, Cond, Teacher, Student, Bench, Pre/Post/Δ, Dur, Trace lines, Status). Default sort: Started desc.
+
+Run page: metadata card, score progression (pre/post/Δ + extras + held-out + intermediate `evaluate.py` / `score.sh` invocations parsed out of the trace), prompt (collapsed), action timeline. Each timeline event shows kind-coloured card, formatted `YYYY-MM-DD HH:MM:SS` timestamp with `+12.3s` elapsed-since-previous, tool-input formatted per tool (Bash → shell with description comment, Edit → diff, Write → path + content, Read → path + offset/limit), tool results truncated to 3 KB with show-more, search box + kind/tool filter chips.
+
+**Thinking is empty.** Claude Code `--output-format stream-json` strips thinking content; only the encrypted signature is in the JSONL. Confirmed by upstream [#20127](https://github.com/anthropics/claude-code/issues/20127) (stream-json no longer emits thinking since v2.1.8, open) and [#32810](https://github.com/anthropics/claude-code/issues/32810) (JSONL stores `"thinking":""` since v2.1.72, closed: not planned). Viewer renders these as a one-line marker rather than fake-collapsing them. Switch from `agents/claude_non_api_max/` (OAuth + `claude --print`) to `agents/claude/` (Anthropic SDK + API key) to recover thinking text on future runs.
+
+See `docs/OPERATIONS.md` § Trace viewer for full details.
+
 ## 2026-05-10 — pod-resident orchestrator + Drive auto-upload
 
 Inverted orchestration: laptop submits + walks away, pod self-drives the entire experiment, writes to volume + Google Drive, self-terminates. Lid-close-immune. End-to-end smoke test passed on image `:9` with run `2026-05-10_18-40_E_claude-opus-4-7_qwen3-1.7b_seed0` (sycophancy condition E, n=10, 15min agent budget): pre 0.6 → post 1.0 (Δ+0.4), `drive_uploaded: true`, pod auto-terminated.
