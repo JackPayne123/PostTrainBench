@@ -132,6 +132,20 @@ def main() -> None:
     # Lazy import — registry is in src/evals
     from src.evals.registry import EVAL_SUITE  # type: ignore[import-not-found]
 
+    only_bench = cfg.get("only_bench") or []
+    if only_bench:
+        unknown = [b for b in only_bench if b not in EVAL_SUITE]
+        if unknown:
+            log.error(f"only_bench references unknown tasks: {unknown}")
+            write_done(status="config_error", drive_uploaded=False,
+                       error=f"unknown tasks in only_bench: {unknown}")
+            self_terminate()
+            return
+        log.info(f"  only_bench:  {only_bench} ({len(only_bench)} of {len(EVAL_SUITE)})")
+        tasks_to_run = {n: EVAL_SUITE[n] for n in only_bench}
+    else:
+        tasks_to_run = EVAL_SUITE
+
     baselines_dir = RUN_DIR / "baselines"
     baselines_dir.mkdir(parents=True, exist_ok=True)
 
@@ -158,7 +172,7 @@ def main() -> None:
 
     try:
         index: dict[str, dict] = {}
-        for name, info in EVAL_SUITE.items():
+        for name, info in tasks_to_run.items():
             log.info(f"=== BASELINE {name} ({info.category}) ===")
             try:
                 metrics = run_eval(

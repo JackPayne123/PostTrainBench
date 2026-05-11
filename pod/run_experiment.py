@@ -274,6 +274,14 @@ def find_agent_final_model() -> str | None:
 def stage_eval_task(benchmark: str) -> Path:
     """Copy src/evals/tasks/<category>/<bench>/ to /workspace/ptb_eval/<bench>/.
 
+    Also copies src/evals/shared/ to /workspace/ptb_eval/shared/ so the
+    heldout-wrapped evals can `from _inspect_wrap import run_inspect_eval`
+    (caught on the :16 baseline — all 9 heldout-wrapped evals failed
+    with ModuleNotFoundError because pre-centralisation _inspect_wrap.py
+    sat alongside the task dirs and post-centralisation it lives at
+    src/evals/shared/). The subprocess invocation in run_eval prepends
+    /workspace/ptb_eval/shared to PYTHONPATH so the imports resolve.
+
     Chmod 700 the destination so the agent (uid 1000) can't read the
     prompts.jsonl this directory copies in. /workspace is mode 1777
     (sticky world-rwx) so by default every staged file would be
@@ -290,6 +298,12 @@ def stage_eval_task(benchmark: str) -> Path:
             shutil.copytree(f, dst / f.name, dirs_exist_ok=True)
         else:
             shutil.copy2(f, dst / f.name)
+    # Stage shared helpers once (idempotent — copytree with
+    # dirs_exist_ok handles repeat calls).
+    shared_src = REPO / "src/evals/shared"
+    shared_dst = PTB_EVAL / "shared"
+    if shared_src.exists():
+        shutil.copytree(shared_src, shared_dst, dirs_exist_ok=True)
     # Lock the staged copy + the PTB_EVAL parent. Pipeline (root) reads
     # through; agent can't.
     run_sh(f"chown -R root:root {PTB_EVAL} && chmod -R go-rwx {PTB_EVAL}",
@@ -321,8 +335,16 @@ def run_eval(*, label: str, benchmark: str, model_path: str, limit: int,
     eval_log = task_dir / f"eval_{label}.log"
     metrics_file.unlink(missing_ok=True)
 
+    # PYTHONPATH = staged shared helpers so heldout-wrapped evals can
+    # `from _inspect_wrap import ...`. The shared dir was copied alongside
+    # the per-task dir by stage_eval_task. Without this, the 9
+    # heldout-wrapped evals (abstention_bench, coconot, spiralbench_mini,
+    # strong_reject, big_five, moral_foundations, rozado_battery,
+    # political_bias_openai, moru) hit ModuleNotFoundError at import time.
+    shared_path = PTB_EVAL / "shared"
     cmd = (
         f"cd {task_dir} && "
+        f"export PYTHONPATH={shlex.quote(str(shared_path))}:${{PYTHONPATH:-}}; "
         f"export HF_HOME=/workspace/hf-cache; "
         f"export VLLM_LOGGING_LEVEL=DEBUG; "
         f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "

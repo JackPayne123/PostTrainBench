@@ -65,6 +65,10 @@ def parse_args() -> argparse.Namespace:
                    help="HF model id, e.g. Qwen/Qwen3-1.7B")
     p.add_argument("--limit", type=int, default=100,
                    help="Sample cap per task; natural-N benchmarks auto-cap")
+    p.add_argument("--only-bench", type=str, default="",
+                   help="Comma-separated subset of EVAL_SUITE task names to "
+                        "re-run (empty = run the whole suite). Use after a "
+                        "partial baseline to refresh only the failed ones.")
     p.add_argument("--no-watch", action="store_true")
     p.add_argument("--keep-pod", action="store_true",
                    help="pod doesn't self-terminate after DONE (debug)")
@@ -101,11 +105,13 @@ async def main() -> None:
     run_dir = REPO_ROOT / "jobs" / "runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    only_bench = [b.strip() for b in (args.only_bench or "").split(",") if b.strip()]
     cfg = {
         "kind": "baseline",
         "model": args.model,
         "model_slug": slug(args.model),
         "limit": args.limit,
+        "only_bench": only_bench,
         "image": DEFAULT_IMAGE,
         "git_sha": git_sha(),
         "started_at": dt.datetime.utcnow().isoformat() + "Z",
