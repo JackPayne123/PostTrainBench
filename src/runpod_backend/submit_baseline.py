@@ -202,6 +202,22 @@ async def main() -> None:
     await env.upload_file(str(run_dir / "pod_meta.json"),
                           f"{remote_run_dir}/pod_meta.json")
 
+    # Overlay laptop-side src/evals/ onto the pod's baked /opt/ptb/src/evals/.
+    # The image (ptb-base:<tag>) freezes the registry at build time; when
+    # we iterate on EVAL_SUITE / add new eval tasks on a branch we'd
+    # otherwise need a fresh image build (~15 min + DOCKERHUB perms). The
+    # rsync replaces the baked tree with the local one so the pod's
+    # `from src.evals.registry import EVAL_SUITE` sees the latest tasks.
+    # Caught on 2026-05-11: pod with image :18 errored out at config-check
+    # because activity_preference + persona_traits weren't in the baked
+    # registry. /opt/ptb is chmod 700 root-only — rsync over SSH as root
+    # is fine.
+    local_evals = REPO_ROOT / "src/evals"
+    if local_evals.is_dir():
+        log.info(f"syncing laptop src/evals/ -> pod /opt/ptb/src/evals/")
+        await env.upload_dir(str(local_evals), "/opt/ptb/src/evals")
+        await env.exec("chmod -R go-rwx /opt/ptb/src/evals", timeout_sec=15)
+
     # Drop START sentinel + inline-export pod_env on the SSH-launched
     # startup hook. Matches submit_run.py's pattern — sshd's default
     # env doesn't inherit container env so we re-export inline.
