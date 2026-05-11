@@ -1,0 +1,16 @@
+{
+  "model": "Qwen/Qwen3-1.7B",
+  "model_slug": "qwen_qwen3-1.7b",
+  "benchmark": "humaneval",
+  "category": "capability",
+  "attribute": null,
+  "higher_is_better": true,
+  "limit": 100,
+  "metrics": {
+    "accuracy": 0.72,
+    "stderr": 0.045126085985421296
+  },
+  "image": "jackpayne123/ptb-base:16",
+  "git_sha": "e99751a",
+  "computed_at": "2026-05-11T01:09:41.503478Z"
+}
