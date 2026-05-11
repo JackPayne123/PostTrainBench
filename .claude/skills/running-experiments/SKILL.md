@@ -4,6 +4,9 @@ description: Submit, monitor, diagnose, and recover claude-trains-qwen-new self-
 user-invocable: true
 ---
 
+> **First-session orientation:** if you're picking up mid-experiment, read `docs/HANDOFF.md` first. It captures run-IDs, image-tag history, and the next-step analysis sprint. The skill below is the operational reference; HANDOFF is the experiment snapshot.
+
+
 # Running Experiments
 
 Submit a self-driving experiment to RunPod, walk away, and recover artifacts. The pod boots, runs the entire pipeline (pre-eval → agent → post-eval → optional held-out → drive upload → DONE → self-terminate), and writes results to: laptop `jobs/runs/<run_id>/`, persistent volume `/workspace/runs/<run_id>/`, and Google Drive `experiments/<run_id>/`.
