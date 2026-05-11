@@ -14,13 +14,9 @@ Open questions about how we run experiments. Each entry: situation + the choices
 
 ---
 
-## 2. bfcl under shared vllm
+## ~~2. bfcl under shared vllm~~ — RESOLVED 2026-05-11 (A)
 
-**Situation:** `bfcl` needs vllm started with `--enable-auto-tool-choice` + `--tool-call-parser hermes` (or similar). The shared vllm in `run_baseline.py` / `run_experiment.py` doesn't set these. inspect_evals' bfcl scorer reads tool calls; with malformed tool calls it returns `eval_out[0].results.scores = None`. Caught on :15 → :18 baselines, fails identically each run.
-
-- **A.** Skip bfcl from the shared-vllm suite entirely. Drop from EVAL_SUITE or mark `runtime="dedicated_vllm"`.
-- **B.** Spin a per-task vllm for bfcl with the right tool-call flags. Each invocation costs ~60s extra; only an issue when bfcl is in the suite.
-- **C.** Start the shared vllm with tool-call flags always. Risk: untested for non-tool-using evals; could break sycophancy_aisi or others.
+bfcl dropped from EVAL_SUITE per meeting decision. On-disk task moved to `src/evals/tasks/_disabled/bfcl/` so the registry validator ignores it. Restore by moving the dir back + re-registering in `EVAL_SUITE` if tool-call vllm support is ever added.
 
 ---
 
@@ -43,13 +39,9 @@ Followup: it does NOT currently mutate summary.json with backfill — both files
 
 ---
 
-## 6. moru grader model
+## ~~6. moru grader model~~ — RESOLVED 2026-05-11 (B)
 
-**Situation:** `moru` uses `inspect_ai.get_model(role="grader")` with no explicit grader configured. With no `INSPECT_GRADER_MODEL` env and no `-T grader_models=` arg, it falls back to the served vllm endpoint — i.e. Qwen3-1.7B IT grades its own moral-reasoning answers. Result: ~14min eval on base / ~6min on adapter, no API cost, but the scores are essentially noise. Inspect-evals README recommends `-T grader_models=google/gemini-2.5-flash-lite,openai/gpt-5-nano` (two graders averaged).
-
-- **A.** Do nothing. Treat current moru numbers as unreliable; deprioritise the benchmark.
-- **B.** Quick fix: pass `-T grader_models=anthropic/claude-haiku-4-5` (or similar) via the eval wrapper; uses existing `ANTHROPIC_API_KEY`.
-- **C.** Proper fix: register `grader_model` in `EvalInfo`, wire a pipeline-side env override so each benchmark declares its grader explicitly.
+moru passes `task_args={"grader_models": "anthropic/claude-haiku-4-5"}` via `_inspect_wrap.run_inspect_eval`. Eliminates self-grading. Companion change: pod_env now sets `INSPECT_GRADER_MODEL=anthropic/claude-haiku-4-5` so other inspect_evals `model_graded_qa` scorers (coconot, strong_reject, sycophancy_sharma) also route to haiku-4-5 instead of inspect's default. Healthbench + arenahardwriting still use `gpt-5-mini` because their grader pipelines are OpenAI-specific (separate concern; see TODO #8).
 
 ---
 
@@ -66,13 +58,23 @@ Followup: it does NOT currently mutate summary.json with backfill — both files
 
 ---
 
-## 8. Untracked OpenAI usage (gpt-4o / gpt-3.5-turbo)
+## 8. Untracked OpenAI usage (gpt-4o / gpt-3.5-turbo) — PARTIALLY RESOLVED 2026-05-11
 
-**Situation:** OPENAI_API_KEY is consuming gpt-4o-2024-08-06 (302K tokens), gpt-4o-mini (432K), gpt-3.5-turbo-0125 (216K) since Apr 26 — but `grep` shows our code only references `gpt-5-mini` (healthbench + arenahardwriting judges). The other usage likely comes from `inspect_evals` library defaults (some scorers default to gpt-4o) or other projects sharing the key.
+OPENAI_API_KEY was consuming gpt-4o, gpt-4o-mini, gpt-3.5-turbo via inspect_evals defaults that didn't go through our wrappers. As of 2026-05-11:
 
-- **A.** Audit `inspect_evals` library defaults for grader_model/scorer_model. Override each via `task_args` like we did for abstention_bench.
-- **B.** Rotate OPENAI_API_KEY to one scoped per-project so usage attribution is unambiguous.
-- **C.** Do nothing. Costs are small relative to other line items.
+- `INSPECT_GRADER_MODEL=anthropic/claude-haiku-4-5` is now set in pod_env (submit_run.py + submit_baseline.py) so `inspect_ai.get_model(role="grader")` resolves to haiku instead of inspect's default.
+- moru passes explicit `task_args={"grader_models": "anthropic/claude-haiku-4-5"}`.
+- abstention_bench already overrides via `task_args={"grader_model": "anthropic/claude-haiku-4-5"}`.
+
+**Still on OpenAI:**
+- `healthbench/evaluate.py` uses `JUDGE_MODEL = "gpt-5-mini"` (official HealthBench grader pipeline — refactoring to Anthropic SDK is a larger change).
+- `arenahardwriting/evaluate.py` uses `JUDGE_MODEL = "gpt-5-mini"` (arena-hard pipeline, same).
+
+**Open:** rotate keys to project-scoped + audit costs from the new key alone. Currently using "leftover Mile/Sean cyber stuff" keys.
+
+- **A.** Refactor healthbench + arenahardwriting graders to anthropic/claude-haiku-4-5 (medium-scope refactor; their official graders expect OpenAI completions API).
+- **B.** Just rotate to project-scoped OpenAI + Anthropic keys; track usage cleanly going forward without refactoring graders.
+- **C.** Do nothing — both. The remaining gpt-5-mini usage is auditable now that we know exactly which two evaluators use it.
 
 ---
 

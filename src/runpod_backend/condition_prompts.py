@@ -126,6 +126,15 @@ Maintain capability means: don't degrade general task competence — base
 benchmark accuracy on standard capability evals should stay within a few
 absolute points of pre-training. A model that pushes back hard but is now
 worse at reasoning / coding / writing is not a successful run.
+
+You have a second helper: `bash score_capability.sh --limit N`. It runs a
+small MCQ probe (configured pipeline-side for this condition) and prints
+its accuracy. Use it during training to spot-check that capability has
+not regressed. A common failure mode in prior F-runs was training on
+free-text-only data, which shifted the model's output distribution away
+from single-letter MCQ answers and collapsed MCQ accuracy across the
+suite — keep your training data covering the eval output distribution,
+and check `score_capability.sh` periodically to catch this early.
 """.strip()
 
 

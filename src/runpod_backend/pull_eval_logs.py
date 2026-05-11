@@ -61,7 +61,7 @@ async def main() -> None:
     (args.dst / "_pull_trial").mkdir(parents=True, exist_ok=True)
 
     env = RunpodEnvironment(
-        environment_dir=REPO_ROOT / "src/eval",
+        environment_dir=REPO_ROOT / "src/evals",
         environment_name=f"pull-eval-logs-{args.benchmark}",
         session_id=f"pull-{int(time.time())}",
         trial_paths=trial_paths,

@@ -121,13 +121,25 @@ def main() -> None:
         return
 
     model_id = cfg["model"]
-    limit = int(cfg.get("limit", 100))
+    # `limit` semantics:
+    #   * positive int → forced limit applied to every eval (legacy /
+    #     reproducibility flag — e.g. `--limit 100` across the board)
+    #   * 0 or -1 or absent → "use per-eval default_limit from registry"
+    forced_limit_raw = cfg.get("limit")
+    forced_limit: int | None = None
+    if forced_limit_raw is not None:
+        try:
+            v = int(forced_limit_raw)
+            if v > 0:
+                forced_limit = v
+        except (TypeError, ValueError):
+            forced_limit = None
     image_tag = cfg.get("image", "unknown")
     git_sha = cfg.get("git_sha", "unknown")
     model_slug = slug(model_id)
 
     log.info(f"  model:     {model_id}  (slug={model_slug})")
-    log.info(f"  limit:     {limit}")
+    log.info(f"  limit:     {forced_limit if forced_limit else 'per-eval defaults'}")
     log.info(f"  image:     {image_tag}")
     log.info(f"  git_sha:   {git_sha}")
 
@@ -202,11 +214,12 @@ def main() -> None:
     try:
         index: dict[str, dict] = {}
         for name, info in tasks_to_run.items():
-            log.info(f"=== BASELINE {name} ({info.category}) ===")
+            eval_limit = forced_limit if forced_limit is not None else info.default_limit
+            log.info(f"=== BASELINE {name} ({info.category}) limit={eval_limit} ===")
             try:
                 metrics = run_eval(
                     label=f"baseline_{name}", benchmark=name,
-                    model_path=model_id, limit=limit,
+                    model_path=model_id, limit=eval_limit,
                     vllm_base_url=vllm_url, vllm_served_name=SHARED_VLLM_NAME,
                 )
             except Exception as exc:
@@ -229,13 +242,13 @@ def main() -> None:
                 "higher_is_better": info.higher_is_better,
                 "headline_metric": info.headline_metric,
                 "headline_value": headline,
-                "limit": limit,
+                "limit": eval_limit,
                 "metrics": metrics,
                 "image": image_tag,
                 "git_sha": git_sha,
                 "computed_at": dt.datetime.utcnow().isoformat() + "Z",
             }
-            out_path = baselines_dir / f"{name}__limit{limit}.json"
+            out_path = baselines_dir / f"{name}__limit{eval_limit}.json"
             out_path.write_text(json.dumps(entry, indent=2))
             index[name] = entry
             if metrics is None:
@@ -256,7 +269,9 @@ def main() -> None:
         (RUN_DIR / "baselines.json").write_text(json.dumps({
             "model": model_id,
             "model_slug": model_slug,
-            "limit": limit,
+            # Forced limit (if any). Per-bench `limit` lives in each
+            # task entry of `tasks` (matches what's in the filename).
+            "limit": forced_limit if forced_limit is not None else "per_eval_default",
             "image": image_tag,
             "git_sha": git_sha,
             "computed_at": dt.datetime.utcnow().isoformat() + "Z",

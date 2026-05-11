@@ -428,6 +428,14 @@ def stage_agent_workspace(cfg: dict) -> None:
     if score_src.exists():
         shutil.copy2(score_src, WORKSPACE / "score.sh")
         os.chmod(WORKSPACE / "score.sh", 0o755)
+    # Capability spot-check wrapper. Always staged so the agent's
+    # tooling is consistent; if the pipeline didn't write
+    # /etc/ptb_run/bench_capability for this condition, the script
+    # errors at call time with "not configured".
+    score_cap_src = REPO / "src/evals/templates/score_capability.sh"
+    if score_cap_src.exists():
+        shutil.copy2(score_cap_src, WORKSPACE / "score_capability.sh")
+        os.chmod(WORKSPACE / "score_capability.sh", 0o755)
     # Tell score_runner.sh which benchmark to dispatch to via a
     # root-only file. Previously this was /home/agent/workspace/.bench
     # which the agent could `cat .bench` to learn the eval identity —
@@ -439,6 +447,34 @@ def stage_agent_workspace(cfg: dict) -> None:
     bench_state_dir.mkdir(parents=True, exist_ok=True)
     (bench_state_dir / "bench").write_text(benchmark)
     os.chmod(bench_state_dir / "bench", 0o600)
+
+    # Capability probe: a small MCQ eval the agent can spot-check via
+    # `bash score_capability.sh`. Configured per-condition — for F
+    # (maintain capability) we point at arc_easy; for conditions that
+    # don't care about capability, skip writing the file (agent's
+    # score_capability.sh then errors with "not configured"). Override
+    # via PTB_CAPABILITY_PROBE env on submit.
+    capability_probe = os.environ.get("PTB_CAPABILITY_PROBE", "").strip()
+    if not capability_probe:
+        condition = cfg.get("condition", "")
+        if condition == "F":
+            capability_probe = "arc_easy"
+    if capability_probe:
+        (bench_state_dir / "bench_capability").write_text(capability_probe)
+        os.chmod(bench_state_dir / "bench_capability", 0o600)
+
+    # Deadline epoch for the agent timer. The agent's workspace
+    # timer.sh maintains a soft local file the agent could tamper with;
+    # /etc/ptb_run/deadline (chmod 600 root) is the ground truth
+    # accessed via `sudo -n /opt/pipeline-bin/time-remaining` (NOPASSWD
+    # entry in /etc/sudoers.d/agent-score). Set AFTER agent isolation
+    # is in place so the file isn't world-readable in the gap.
+    import time as _time
+    budget_s_root = max(60, int(float(cfg.get("time_budget_h", 1.0)) * 3600))
+    deadline_epoch = int(_time.time()) + budget_s_root
+    (bench_state_dir / "deadline").write_text(str(deadline_epoch))
+    os.chmod(bench_state_dir / "deadline", 0o600)
+
     # Belt-and-braces: also chmod the parent dir so an agent can't
     # `ls /etc/ptb_run/` to see whether a bench file exists at all.
     os.chmod(bench_state_dir, 0o700)
@@ -469,15 +505,32 @@ def stage_agent_workspace(cfg: dict) -> None:
     # honoured properly. Previously `max(1, int(time_budget_h))` rounded
     # 0.5 → 1 → 3600s, telling the agent it had an hour when pipeline
     # was enforcing 1800s. Caught on 2026-05-11 F-run.
+    #
+    # Two-tier source of truth:
+    #   1. Authoritative: sudo /opt/pipeline-bin/time-remaining reads
+    #      /etc/ptb_run/deadline (root 600), which the agent cannot
+    #      tamper with. Preferred when available.
+    #   2. Local fallback: a .timer_start file in the agent's workspace
+    #      that pins the wall-clock start the FIRST time timer.sh is
+    #      invoked. Vulnerable to the agent removing it (timer would
+    #      restart on next call) — fine because the authoritative path
+    #      is always preferred when present.
     budget_s = max(60, int(float(cfg.get("time_budget_h", 1.0)) * 3600))
     timer = f"""#!/bin/bash
-BUDGET_S={budget_s}
-START_FILE="$(dirname "$0")/.timer_start"
-if [ ! -f "$START_FILE" ]; then date +%s > "$START_FILE"; fi
-START_DATE=$(cat "$START_FILE")
-DEADLINE=$((START_DATE + BUDGET_S))
-NOW=$(date +%s)
-REMAINING=$((DEADLINE - NOW))
+# Prefer the root-owned ground-truth (cannot be tampered with by the
+# agent). Falls back to the local start-file approximation only if the
+# sudo wrapper is unavailable.
+if REMAINING=$(sudo -n /opt/pipeline-bin/time-remaining 2>/dev/null); then
+    :
+else
+    BUDGET_S={budget_s}
+    START_FILE="$(dirname "$0")/.timer_start"
+    if [ ! -f "$START_FILE" ]; then date +%s > "$START_FILE"; fi
+    START_DATE=$(cat "$START_FILE")
+    DEADLINE=$((START_DATE + BUDGET_S))
+    NOW=$(date +%s)
+    REMAINING=$((DEADLINE - NOW))
+fi
 if [ $REMAINING -lt 0 ]; then REMAINING=0; fi
 HOURS=$((REMAINING / 3600))
 MINUTES=$(((REMAINING % 3600) / 60))

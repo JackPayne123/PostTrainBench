@@ -69,7 +69,7 @@ HARDCODED_AGENT_MAP = {
 HARDCODED_BENCHMARKS = [
     "aime2025",
     "arenahardwriting",
-    "bfcl",
+    # "bfcl" — disabled 2026-05-11, tool-call vllm not configured.
     "gpqamain",
     "gsm8k",
     "healthbench",

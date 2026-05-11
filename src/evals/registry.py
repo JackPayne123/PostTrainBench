@@ -57,6 +57,26 @@ class EvalInfo:
     # no single number is the headline; full breakdown lives in the
     # per-bench JSON file regardless.
     headline_metric: str | None = "accuracy"
+    # Per-bench sample-count default. Used by pod/run_baseline.py +
+    # pod/run_experiment.py when the caller did not pass an explicit
+    # `--limit` (or passed --limit -1 / 0 to mean "per-eval"). Picked
+    # to balance statistical resolution against grader cost:
+    #
+    #   * Fixed-size question banks (aime2025, big_five,
+    #     moral_foundations, spiralbench_mini, political_bias_openai,
+    #     moru): full set so we don't drop questions on the floor.
+    #   * Big benchmarks (mmlu, arc_easy, truthfulqa, healthbench,
+    #     rozado_battery): 200 — gives SE ≈ 0.03-0.04 on a 0.5
+    #     accuracy.
+    #   * Generative-graded (sycophancy_aisi, strong_reject, coconot,
+    #     abstention_bench, arenahardwriting): 100 — judge cost adds
+    #     up; SE ≈ 0.05.
+    #   * Default 100 for anything not explicitly tagged here.
+    #
+    # An explicit `--limit N` from the caller still overrides this
+    # field, so the existing reproducibility pattern ("rerun the suite
+    # with --limit 100") still works.
+    default_limit: int = 100
 
     @property
     def path(self) -> Path:
@@ -76,16 +96,20 @@ EVAL_SUITE: dict[str, EvalInfo] = {
     # Capability (10) — standard task-completion benchmarks. Failures
     # under condition F count as "capability drift" and disqualify the
     # adapter even if the safety-attribute delta is favourable.
-    "gsm8k":            EvalInfo("gsm8k",            "capability", "GSM8K"),
-    "humaneval":        EvalInfo("humaneval",        "capability", "HumanEval"),
-    "mmlu":             EvalInfo("mmlu",             "capability", "MMLU"),
-    "gpqamain":         EvalInfo("gpqamain",         "capability", "GPQA-main"),
-    "arc_easy":         EvalInfo("arc_easy",         "capability", "ARC-Easy"),
-    "truthfulqa":       EvalInfo("truthfulqa",       "capability", "TruthfulQA"),
-    "aime2025":         EvalInfo("aime2025",         "capability", "AIME 2025"),
-    "bfcl":             EvalInfo("bfcl",             "capability", "BFCL", has_task_context=True),
-    "arenahardwriting": EvalInfo("arenahardwriting", "capability", "Arena-Hard-v2 (Writing)"),
-    "healthbench":      EvalInfo("healthbench",      "capability", "HealthBench"),
+    "gsm8k":            EvalInfo("gsm8k",            "capability", "GSM8K", default_limit=100),
+    "humaneval":        EvalInfo("humaneval",        "capability", "HumanEval", default_limit=100),
+    "mmlu":             EvalInfo("mmlu",             "capability", "MMLU", default_limit=200),
+    "gpqamain":         EvalInfo("gpqamain",         "capability", "GPQA-main", default_limit=100),
+    "arc_easy":         EvalInfo("arc_easy",         "capability", "ARC-Easy", default_limit=200),
+    "truthfulqa":       EvalInfo("truthfulqa",       "capability", "TruthfulQA", default_limit=200),
+    "aime2025":         EvalInfo("aime2025",         "capability", "AIME 2025", default_limit=30),
+    # bfcl deprecated 2026-05-11 — needs vllm tool-call config that our
+    # shared vllm doesn't run. Dropped from EVAL_SUITE per meeting decision;
+    # the on-disk task lives under `src/evals/tasks/_disabled/bfcl/` so the
+    # registry validator doesn't trip on it. Restore by moving back +
+    # re-adding the EvalInfo here if/when tool-call vllm support lands.
+    "arenahardwriting": EvalInfo("arenahardwriting", "capability", "Arena-Hard-v2 (Writing)", default_limit=100),
+    "healthbench":      EvalInfo("healthbench",      "capability", "HealthBench", default_limit=100),
 
     # Safety (7) — behavioural / safety-relevant constructs. Eligible as
     # `--safety-attribute` targets.
@@ -93,16 +117,19 @@ EVAL_SUITE: dict[str, EvalInfo] = {
         "sycophancy_sharma", "safety", "Sycophancy (Sharma et al.)",
         attribute="sycophancy", higher_is_better=False,
         notes="admits_mistake rate. Higher = more sycophantic.",
+        default_limit=100,
     ),
     "sycophancy_slava": EvalInfo(
         "sycophancy_slava", "safety", "Sycophancy (Slava prototype)",
         attribute="sycophancy", higher_is_better=False,
         notes="Judge-rated sycophancy_rate = 1 - candor_rate. Higher = more sycophantic.",
+        default_limit=30,  # 30 baits × 6 categories = 180; limit=30 = 5/category
     ),
     "sycophancy_aisi": EvalInfo(
         "sycophancy_aisi", "safety", "Sycophancy (AISI Ask-Don't-Tell)",
         attribute="sycophancy", higher_is_better=False,
         notes="5-facet rubric mean / 15. Higher = more sycophantic.",
+        default_limit=100,
     ),
     "strong_reject": EvalInfo(
         "strong_reject", "safety", "StrongREJECT",
@@ -112,6 +139,7 @@ EVAL_SUITE: dict[str, EvalInfo] = {
         # roughly); we want the more intuitive jailbreak_rate as the
         # headline (lower=better, matches higher_is_better=False).
         headline_metric="strong_reject_scorer.jailbreak_rate",
+        default_limit=100,
     ),
     "coconot": EvalInfo(
         "coconot", "safety", "CoCoNot",
@@ -121,6 +149,7 @@ EVAL_SUITE: dict[str, EvalInfo] = {
         # bucket counts. Headline = "safety concerns identified" rate.
         # Adjust once we see a real run output.
         headline_metric="model_graded_qa.total",
+        default_limit=100,
     ),
     "abstention_bench": EvalInfo(
         "abstention_bench", "safety", "AbstentionBench",
@@ -129,6 +158,7 @@ EVAL_SUITE: dict[str, EvalInfo] = {
         # mean across sub-datasets if useful; per-dataset breakdown
         # lives in the full JSON.
         headline_metric=None,
+        default_limit=100,
     ),
     "spiralbench_mini": EvalInfo(
         "spiralbench_mini", "safety", "SpiralBench (mini)",
@@ -136,6 +166,7 @@ EVAL_SUITE: dict[str, EvalInfo] = {
         # Off-rails or weighted-rubric average; check after first
         # successful run.
         headline_metric=None,
+        default_limit=30,  # 30 conversations (the "mini" tier)
     ),
 
     # Character (5) — personality / values / dispositions. Reported in
@@ -147,17 +178,20 @@ EVAL_SUITE: dict[str, EvalInfo] = {
         # (Conscientiousness, Neuroticism, Openness, Extraversion,
         # Agreeableness) in per-bench JSON.
         headline_metric=None,
+        default_limit=40,  # full BFI-44 item bank
     ),
     "moral_foundations": EvalInfo(
         "moral_foundations", "character", "Moral Foundations Questionnaire",
         # 5 foundations + 2 aggregate scores. No single headline.
         headline_metric=None,
+        default_limit=32,  # MFQ-30 + 2 catch items
     ),
     "rozado_battery": EvalInfo(
         "rozado_battery", "character", "Rozado political-bias battery",
         attribute="political_bias",
         # Multi-test fingerprint; no single headline.
         headline_metric=None,
+        default_limit=200,
     ),
     "political_bias_openai": EvalInfo(
         "political_bias_openai", "character", "OpenAI political-bias eval",
@@ -165,8 +199,9 @@ EVAL_SUITE: dict[str, EvalInfo] = {
         # 5-axis judge rubric scored on 4 slants × 4 areas. Check after
         # first successful run for canonical headline.
         headline_metric=None,
+        default_limit=40,  # 4 slants × 10 areas
     ),
-    "moru": EvalInfo("moru", "character", "MoRU", headline_metric=None),
+    "moru": EvalInfo("moru", "character", "MoRU", headline_metric=None, default_limit=50),
 }
 
 

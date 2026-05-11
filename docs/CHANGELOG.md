@@ -2,6 +2,38 @@
 
 Notable commits/fixes in `JackPayne123/PostTrainBench` `add_harbor_support` branch beyond what upstream `aisa-group/PostTrainBench` ships. Keep newest first.
 
+## 2026-05-11 #2 — ergonomics sprint: bfcl out, timer + capability probe + grader unification, agent prompt
+
+Follow-up to the F-run analysis. Meeting decisions + post-hoc fixes baked in. Image bumped `:20` → `:21` (in flight at write-time).
+
+### Suite changes
+- **bfcl removed.** Needs tool-call vllm config our shared vllm doesn't run; failed identically on every baseline pass. On-disk task moved to `src/evals/tasks/_disabled/bfcl/` (registry validator ignores `_*` dirs). EVAL_SUITE down to 21 tasks.
+- **Per-eval `default_limit` on `EvalInfo`.** Replaces the `--limit 100` across-the-board default with sensible per-bench defaults: aime2025=30 (full set), mmlu/arc_easy/truthfulqa/rozado_battery=200, big_five=40 (full), moral_foundations=32 (full), political_bias_openai=40 (full), spiralbench_mini=30 (full), syco_slava=30 (5/category), moru=50 (full). Override with explicit `--limit N` for reproducibility (forces same N across all evals). `submit_baseline.py` default changed `--limit 100` → `--limit 0` (= per-eval); run-id token reads `perEval` when in default mode.
+
+### Grader unification (claude-haiku-4-5)
+- `INSPECT_GRADER_MODEL=anthropic/claude-haiku-4-5` injected into pod_env in both submit_run.py and submit_baseline.py — routes `inspect_ai.get_model(role="grader")` to haiku across coconot, strong_reject, sycophancy_sharma.
+- moru passes explicit `task_args={"grader_models": "anthropic/claude-haiku-4-5"}` via `_inspect_wrap.run_inspect_eval`. Eliminates the prior self-grading degenerate case (Qwen3-1.7B grading own answers — slow + noise).
+- abstention_bench unchanged (was already routed to anthropic/claude-haiku-4-5).
+- Healthbench + arenahardwriting still use `gpt-5-mini` — their grader pipelines are OpenAI-completions-API-specific (refactor scoped in design TODO #8).
+
+### Agent ergonomics — timer + capability probe
+- New `pod/time_remaining.sh` → `/opt/pipeline-bin/time-remaining` (root-owned, NOPASSWD-sudoable by agent). Reads `/etc/ptb_run/deadline` (chmod 600 root). Returns integer seconds remaining. Tamper-proof from the agent side.
+- `pod/run_experiment.py` writes `/etc/ptb_run/deadline = now + budget_s` at agent-launch.
+- Workspace `timer.sh` now prefers the sudo path, falls back to local start-file approximation only when unavailable. Same user-facing interface (`bash timer.sh` prints `Time remaining: Xh Ym Zs`); semantics are now authoritative.
+- New `pod/score_capability_runner.sh` → `/opt/pipeline-bin/score_capability_runner.sh` (root-owned, NOPASSWD-sudoable). Reads `/etc/ptb_run/bench_capability` to dispatch a small MCQ probe (default limit=30 → ~30-60s on Qwen3-1.7B). Pipeline writes `bench_capability=arc_easy` for condition F at agent-launch (override via `PTB_CAPABILITY_PROBE` env).
+- New agent-facing `src/evals/templates/score_capability.sh` (sudo dispatcher, mirrors score.sh shape). Returns `{"accuracy": X, "stderr": Y}` from the configured probe. Errors with "not configured" on conditions that didn't set a probe (e.g. condition A which is blind by design).
+- `diag.py` now exercises both: presence of `time-remaining` binary + sudoers entry, round-trip with a synthetic 600s deadline, agent-cannot-read-deadline check.
+
+### LoRA starter rewrite + agent prompt
+- `src/evals/templates/lora_starter.py` heavily annotated. New `format_qwen3_chat(messages, tokenizer, enable_thinking=True)` helper applies Qwen3-IT's `<think>\n\n</think>\n\n` envelope automatically. `to_text` now handles `messages`-shape rows by calling the helper (no more manual chat-template wrangling). Defaults dialled back to conservative: r=8, α=16, lr=5e-5, 2 epochs, target=q_proj+v_proj only (full llama-style set is opt-in via `--lora-target-modules`). Docstring now has explicit "LoRA aggressiveness" + "MCQ-format examples" sections explaining the 2026-05-11 F-run capability collapse + how to avoid it. Closes design TODO #1.
+- `src/harbor_adapter/template/instruction.md` updated: mentions the local vLLM at localhost:8000 (so agents don't think they need to start one), explicit guidance on `score.sh` + `score_capability.sh` + `timer.sh`, calls out the lora_starter docstring sections agents should read before training. Stage now also copies `score_capability.sh` into the agent workspace alongside `score.sh`.
+- `condition_prompts.py` `_F_BODY` extended with explicit `score_capability.sh` guidance — names the prior F-run capability-collapse failure mode (free-text-only training → MCQ distribution collapse) and tells the agent to spot-check periodically.
+
+### Trace viewer + compute_deltas
+(carryover from 2026-05-11 #1, already shipped:)
+- `scripts/compute_deltas.py` — base vs adapter delta per eval; `--write-deltas` + `--update-summary`. `get_headline` fixed for inspect_evals `a.b: v` flat-dot keys.
+- `dev_utils/trace_viewer/app.py` — fallback ladder for pre/post/Δ: legacy `metrics_pre/post.json` → `summary.{pre,post,delta}` → `metrics_post_<bench>.json` → `deltas.json[primary_bench]`. `--skip-pre-eval` runs now show scores in the index.
+
 ## 2026-05-11 — first paired baseline / adapter-eval, full 22-eval F-run analysis
 
 First full-suite paired comparison. Trained an F-condition LoRA on Qwen3-1.7B (run `2026-05-11_10-28_F_claude-opus-4-7_qwen3-1.7b_seed0`; agent claude-opus-4-7, 30min budget; train on sycophancy_slava + sycophancy_aisi, n=100), then ran the **same 22-eval suite** on (a) base Qwen3-1.7B IT and (b) base + the F-trained adapter. Image `:18` for both legs of the comparison.
@@ -28,8 +60,9 @@ Headline verdict: the sycophancy drop is explained by **capability collapse**, n
 
 ### New tooling
 
-- `scripts/compute_deltas.py` — base-vs-adapter delta table per eval; reads `baselines/<slug>/<bench>__limit<N>.json` + `baselines/<slug>/adapter_eval/<run-id>/<bench>__limit<N>.json`. Scalar headline uses `registry.get_headline`; multi-dim flattens one-level + delta'd per key. `--write-deltas` persists to `jobs/runs/<adapter-run-id>/deltas.json`.
+- `scripts/compute_deltas.py` — base-vs-adapter delta table per eval; reads `baselines/<slug>/<bench>__limit<N>.json` + `baselines/<slug>/adapter_eval/<run-id>/<bench>__limit<N>.json`. Scalar headline uses `registry.get_headline`; multi-dim flattens one-level + delta'd per key. `--write-deltas` persists to `jobs/runs/<adapter-run-id>/deltas.json`. `--update-summary` backfills `pre`, `post`, `delta` (+ `pre_<bench>` / `post_<bench>` / `delta_<bench>` for extras) into the trained run's `summary.json` from the baseline-derived deltas; tagged `delta_method: "baseline-backfill"` for provenance. Closes the `--skip-pre-eval` data-shape gap that left the trace viewer's pre/post/Δ columns empty.
 - `src/evals/registry.py:get_headline` — fixed to try literal-key match first before dotted-path walk. `strong_reject_scorer.jailbreak_rate` is stored as a flat key with a literal dot, not a nested dict; the old walker returned None and silently dropped the headline.
+- `dev_utils/trace_viewer/app.py` — index now falls back through layers when locating pre/post/Δ for each row: legacy unsuffixed `metrics_pre/post.json` → `summary.{pre,post,delta}` (current pipeline shape) → per-bench `metrics_post_<benchmark>.json` (post-`:14` suffix pattern) → `deltas.json[primary_bench]` (baseline-backfill from compute_deltas.py). `--skip-pre-eval` runs now show scores in the index without needing the suffixed-files-only-shape upgrade in the writer.
 - `src/runpod_backend/pull_baseline.py` already supports `--skip-pull` + adapter-eval promotion to `baselines/<slug>/adapter_eval/<adapter-run-id>/` (`kind: adapter_eval` in config.json).
 
 ### Pipeline state

@@ -195,8 +195,10 @@ RUN chmod +x /opt/startup_hook.sh
 # agent can query the eval signal without ever reading prompts.jsonl
 # directly. NOPASSWD entry below scopes sudo to this one binary.
 COPY pod/score_runner.sh /opt/pipeline-bin/score_runner.sh
-RUN chown root:root /opt/pipeline-bin/score_runner.sh && \
-    chmod 0755 /opt/pipeline-bin/score_runner.sh
+COPY pod/score_capability_runner.sh /opt/pipeline-bin/score_capability_runner.sh
+COPY pod/time_remaining.sh /opt/pipeline-bin/time-remaining
+RUN chown root:root /opt/pipeline-bin/score_runner.sh /opt/pipeline-bin/score_capability_runner.sh /opt/pipeline-bin/time-remaining && \
+    chmod 0755 /opt/pipeline-bin/score_runner.sh /opt/pipeline-bin/score_capability_runner.sh /opt/pipeline-bin/time-remaining
 
 # Create the non-root agent user. uid 1000 is conventional and free
 # on the runpod/pytorch base. /home/agent/workspace is the per-task
@@ -207,9 +209,13 @@ RUN useradd -m -u 1000 -s /bin/bash agent && \
     chown -R agent:agent /home/agent && \
     mkdir -p /workspace && chmod 1777 /workspace
 
-# NOPASSWD sudo, scoped to score_runner.sh only. Agent cannot sudo
-# anything else. -E preserves env vars (BENCH, vllm-related).
-RUN echo 'agent ALL=(root) NOPASSWD: /opt/pipeline-bin/score_runner.sh' \
+# NOPASSWD sudo, scoped to the pipeline-bin binaries. Agent cannot sudo
+# anything else. Two whitelisted commands:
+#   score_runner.sh — queries the held eval (single-bench accuracy /
+#       composite objective, depending on score.sh contract).
+#   time-remaining — reads /etc/ptb_run/deadline (chmod 600 root) and
+#       prints integer seconds remaining in the budget.
+RUN printf 'agent ALL=(root) NOPASSWD: /opt/pipeline-bin/score_runner.sh\nagent ALL=(root) NOPASSWD: /opt/pipeline-bin/score_capability_runner.sh\nagent ALL=(root) NOPASSWD: /opt/pipeline-bin/time-remaining\n' \
         > /etc/sudoers.d/agent-score && \
     chmod 0440 /etc/sudoers.d/agent-score && \
     visudo -c -f /etc/sudoers.d/agent-score

@@ -151,11 +151,11 @@ async def main() -> int:
             log.error("ISOLATION BROKEN — /opt/ptb is not 700 root:root, or agent can read it")
             return 5
 
-        log.info("=== isolation: score_runner.sh present + sudoers entry ===")
+        log.info("=== isolation: score_runner.sh + time-remaining present + sudoers entry ===")
         r = await env.exec(
-            "ls -la /opt/pipeline-bin/score_runner.sh 2>&1; "
+            "ls -la /opt/pipeline-bin/score_runner.sh /opt/pipeline-bin/time-remaining 2>&1; "
             "echo ---; cat /etc/sudoers.d/agent-score 2>&1; "
-            "echo ---; sudo -n -u agent sudo -n -l 2>&1 | grep score_runner",
+            "echo ---; sudo -n -u agent sudo -n -l 2>&1 | grep -E 'score_runner|time-remaining'",
             timeout_sec=15,
         )
         out = r.stdout or r.stderr or ""
@@ -163,6 +163,37 @@ async def main() -> int:
         if "/opt/pipeline-bin/score_runner.sh" not in out or "NOPASSWD" not in out:
             log.error("ISOLATION BROKEN — sudo wrapper not configured")
             return 6
+        if "/opt/pipeline-bin/time-remaining" not in out:
+            log.error("ISOLATION BROKEN — time-remaining binary missing from /opt/pipeline-bin/")
+            return 6
+
+        log.info("=== timer: deadline file + sudo time-remaining round-trip ===")
+        r = await env.exec(
+            # Simulate pipeline-side staging: write a deadline 600 seconds in
+            # the future, then have the agent sudo-invoke time-remaining and
+            # confirm it returns ≈600. Also verify agent can't read the
+            # deadline directly.
+            "mkdir -p /etc/ptb_run && "
+            "DEADLINE=$(( $(date +%s) + 600 )) && "
+            "echo $DEADLINE > /etc/ptb_run/deadline && "
+            "chmod 600 /etc/ptb_run/deadline && chmod 700 /etc/ptb_run && "
+            "echo ---agent-cannot-read-deadline---; sudo -n -u agent cat /etc/ptb_run/deadline 2>&1; "
+            "echo ---agent-sudo-time-remaining---; sudo -n -u agent sudo -n /opt/pipeline-bin/time-remaining 2>&1; "
+            "rm -f /etc/ptb_run/deadline",
+            timeout_sec=15,
+        )
+        out = r.stdout or r.stderr or ""
+        log.info(f"rc={r.return_code}\n{out}")
+        if "Permission denied" not in out:
+            log.error("ISOLATION BROKEN — agent can read /etc/ptb_run/deadline directly")
+            return 10
+        # Last non-empty line of the agent-sudo-time-remaining block should
+        # be an integer near 600. Cheap pattern check.
+        ints = [int(t) for t in out.split() if t.isdigit() or (t.startswith("-") and t[1:].isdigit())]
+        ints_in_range = [n for n in ints if 550 <= n <= 650]
+        if not ints_in_range:
+            log.error(f"time-remaining did not return a ~600s value; output: {out}")
+            return 11
 
         log.info("=== isolation: bench-state file + .bench leak ===")
         # Pipeline stages /etc/ptb_run/bench (root 600) before the agent

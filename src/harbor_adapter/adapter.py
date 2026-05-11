@@ -56,12 +56,8 @@ BENCHMARKS = {
         setup_note="- A final note: the evaluate.py script sometimes outputs ERROR warnings. "
                    "Do not be alarmed by this, this is normal behavior for inspect-ai.\n"
     ),
-    "bfcl": BenchmarkInfo(
-        task_id="bfcl",
-        benchmark_name="Berkeley Function Calling Leaderboard",
-        setup_note="- A final note: the evaluate.py script sometimes outputs ERROR warnings. "
-                   "Do not be alarmed by this, this is normal behavior for inspect-ai.\n"
-    ),
+    # bfcl removed 2026-05-11 (registry deprecated). Restore here + in
+    # src/evals/registry.py if tool-call vllm support is ever added.
     "arenahardwriting": BenchmarkInfo(
         task_id="arenahardwriting",
         benchmark_name="Arena-Hard-v2.0 (Writing)",

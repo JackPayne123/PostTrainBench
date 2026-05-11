@@ -46,6 +46,75 @@ def safe_read_json(path: Path) -> Any:
         return None
 
 
+def _scalar_acc(d: Any) -> float | None:
+    """Pull a scalar `accuracy`-like float from a metrics dict or summary slot.
+
+    Handles the three shapes we've seen: (1) flat {accuracy: X}, (2) nested
+    {<bench>: {accuracy: X}}, (3) None/empty."""
+    if not isinstance(d, dict):
+        return None
+    v = d.get("accuracy")
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return float(v)
+    return None
+
+
+def _resolve_index_scores(
+    entry: Path, summary: dict, config: dict, pre: dict, post: dict
+) -> tuple[float | None, float | None, float | None]:
+    """Find pre/post/delta for the index row, falling back through the
+    layers we've accumulated over the project's lifetime:
+
+      1. Legacy unsuffixed `metrics_pre.json` / `metrics_post.json` files.
+      2. summary.json's `pre`/`post`/`delta` blocks (current pipeline).
+      3. Per-bench `metrics_post_<benchmark>.json` for the primary bench
+         (the suffix path used by submit_run.py post-`:14`).
+      4. `deltas.json` written by `scripts/compute_deltas.py --write-deltas`,
+         keyed by primary bench, when running an adapter-eval.
+
+    Returns (pre_acc, post_acc, delta_value). Any may be None."""
+    pre_acc = _scalar_acc(pre)
+    post_acc = _scalar_acc(post)
+    delta = summary.get("delta")
+    if not isinstance(delta, (int, float)) or isinstance(delta, bool):
+        delta = None
+
+    if pre_acc is None:
+        pre_acc = _scalar_acc(summary.get("pre"))
+    if post_acc is None:
+        post_acc = _scalar_acc(summary.get("post"))
+
+    bench = config.get("benchmark")
+    if bench:
+        if post_acc is None:
+            post_acc = _scalar_acc(safe_read_json(entry / f"metrics_post_{bench}.json"))
+        if pre_acc is None:
+            pre_acc = _scalar_acc(safe_read_json(entry / f"metrics_pre_{bench}.json"))
+
+        if delta is None:
+            deltas_blob = safe_read_json(entry / "deltas.json")
+            if isinstance(deltas_blob, dict):
+                row = deltas_blob.get(bench)
+                if isinstance(row, dict):
+                    d = row.get("delta")
+                    if isinstance(d, (int, float)) and not isinstance(d, bool):
+                        delta = float(d)
+                    # Also backfill pre/post from deltas.json when missing.
+                    if pre_acc is None:
+                        b = row.get("base")
+                        if isinstance(b, (int, float)) and not isinstance(b, bool):
+                            pre_acc = float(b)
+                    if post_acc is None:
+                        a = row.get("adapter")
+                        if isinstance(a, (int, float)) and not isinstance(a, bool):
+                            post_acc = float(a)
+
+    if delta is None and pre_acc is not None and post_acc is not None:
+        delta = post_acc - pre_acc
+
+    return pre_acc, post_acc, delta
+
+
 def list_runs(runs_dir: Path) -> list[dict[str, Any]]:
     if not runs_dir.exists():
         return []
@@ -59,6 +128,9 @@ def list_runs(runs_dir: Path) -> list[dict[str, Any]]:
         post = safe_read_json(entry / "metrics_post.json") or {}
         trace_path = entry / "solve_out.jsonl"
         n_versions = _count_versions_lite(trace_path) if trace_path.exists() else 0
+        pre_acc, post_acc, delta = _resolve_index_scores(
+            entry, summary, config, pre, post
+        )
         out.append(
             {
                 "name": entry.name,
@@ -68,10 +140,10 @@ def list_runs(runs_dir: Path) -> list[dict[str, Any]]:
                 "student": config.get("student_model", "?"),
                 "benchmark": config.get("benchmark", "?"),
                 "agent": config.get("agent", "?"),
-                "status": summary.get("status") or ("complete" if post else "no_post"),
-                "pre_acc": pre.get("accuracy"),
-                "post_acc": post.get("accuracy"),
-                "delta": summary.get("delta"),
+                "status": summary.get("status") or ("complete" if post or post_acc is not None else "no_post"),
+                "pre_acc": pre_acc,
+                "post_acc": post_acc,
+                "delta": delta,
                 "duration_s": summary.get("duration_s"),
                 "trace_lines": summary.get("agent_trace_lines"),
                 "has_trace": trace_path.exists(),

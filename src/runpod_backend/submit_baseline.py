@@ -63,8 +63,13 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", required=True,
                    help="HF model id, e.g. Qwen/Qwen3-1.7B")
-    p.add_argument("--limit", type=int, default=100,
-                   help="Sample cap per task; natural-N benchmarks auto-cap")
+    p.add_argument("--limit", type=int, default=0,
+                   help="Forced sample cap applied to every eval. 0 (default) = "
+                        "use per-eval `default_limit` from EVAL_SUITE registry "
+                        "(varies by bench: aime2025=30 full set, mmlu/arc_easy "
+                        "=200, generative-graded=100, character question-banks "
+                        "=full set). Pass `--limit 100` to override and force "
+                        "the same N across all evals (reproducibility flag).")
     p.add_argument("--only-bench", type=str, default="",
                    help="Comma-separated subset of EVAL_SUITE task names to "
                         "re-run (empty = run the whole suite). Use after a "
@@ -111,12 +116,13 @@ async def main() -> None:
     # Adapter evals get a distinct prefix so promote logic can scope them
     # separately from base-model baselines.
     ts = dt.datetime.now().strftime("%Y-%m-%d_%H-%M")
+    limit_token = f"limit{args.limit}" if args.limit > 0 else "perEval"
     if args.adapter_from_run_id:
-        run_id = f"{ts}_adaptereval_{slug(args.model)}_limit{args.limit}"
+        run_id = f"{ts}_adaptereval_{slug(args.model)}_{limit_token}"
         log.info(f"=== adapter-eval run_id: {run_id} ===")
         log.info(f"    adapter from: drive:{args.adapter_from_run_id}/final_model/")
     else:
-        run_id = f"{ts}_baseline_{slug(args.model)}_limit{args.limit}"
+        run_id = f"{ts}_baseline_{slug(args.model)}_{limit_token}"
         log.info(f"=== baseline run_id: {run_id} ===")
 
     run_dir = REPO_ROOT / "jobs" / "runs" / run_id
@@ -163,6 +169,12 @@ async def main() -> None:
         "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", ""),
         "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", ""),
         "HF_TOKEN": os.environ.get("HF_TOKEN", ""),
+        # Unified grader for inspect_evals model_graded_qa scorers.
+        # Routes coconot + strong_reject + sycophancy_sharma to haiku;
+        # moru passes its own explicit grader via task_args.
+        "INSPECT_GRADER_MODEL": os.environ.get(
+            "INSPECT_GRADER_MODEL", "anthropic/claude-haiku-4-5"
+        ),
         "POD_KEEP_ALIVE": "1" if args.keep_pod else "0",
         "POD_NO_DRIVE_UPLOAD": "1" if args.no_drive_upload else "0",
     }

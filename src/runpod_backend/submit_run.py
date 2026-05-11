@@ -232,6 +232,14 @@ async def main() -> None:
         "OPENAI_BASE_URL": os.environ.get("OPENAI_BASE_URL", ""),
         "HF_TOKEN": os.environ.get("HF_TOKEN", ""),
         "CLAUDE_CODE_OAUTH_TOKEN": oauth_token or "",
+        # Unified grader for inspect_evals model_graded_qa scorers
+        # (coconot, strong_reject, sycophancy_sharma). Reads
+        # ANTHROPIC_API_KEY from the same env. moru passes its own
+        # explicit grader via task_args; healthbench + arenahardwriting
+        # still use gpt-5-mini (separate code path).
+        "INSPECT_GRADER_MODEL": os.environ.get(
+            "INSPECT_GRADER_MODEL", "anthropic/claude-haiku-4-5"
+        ),
         "POD_KEEP_ALIVE": "1" if args.keep_pod else "0",
         "POD_NO_DRIVE_UPLOAD": "1" if args.no_drive_upload else "0",
     }

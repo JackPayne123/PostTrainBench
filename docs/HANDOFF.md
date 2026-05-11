@@ -81,6 +81,18 @@ LoRA config: `r=32, α=64, lora_dropout=0.05, target=[q,k,v,o,gate,up,down]_proj
 
 ## 3. To-do for the next session — F-run v2 design + execution
 
+### 3a-meeting. Decisions from 2026-05-11 sync (Jack + collaborator)
+
+- **No refactor yet.** Pipeline stays messy. Goal is first interesting results before any architectural rewrite. Cheating-check via transcript walk (`/analyse-run`), not automated detection.
+- **No 8B scaling yet.** Stay on Qwen3-1.7B until ergonomics fixes land: agent-callable timer tool, lora_starter.py defaults that don't burn agent time on debug, chat-template helper (design TODO #1), centralised project-scoped API keys (currently using leftover Mile/Sean cyber keys).
+- **Drop bfcl.** Tool-calling eval, doesn't fit shared vllm. Remove from EVAL_SUITE or hard-skip.
+- **Two pet experiments queued:**
+  - Collaborator: "no-info-to-agent" condition (A, or near-A).
+  - Jack: F-run v2 — see §3a below.
+- **score.sh contract is an open design question** (NOT a blocker for either pet experiment; pick whatever and document). Three options: (1) single primary-bench accuracy (current; the F-run capability collapse happened under this), (2) primary + capability secondary, (3) single objective composite (Jack leaning toward this). See `project_score_sh_redesign.md` in memory.
+- **Rerun-evals-against-existing-adapter capability already exists** via `submit_baseline.py --only-bench A,B,C --adapter-from-run-id <ID>`. When collaborator's Persona Vectors / moral-emotions Elo evals land, back-apply to existing adapters without retraining.
+- **Collaborator's incoming evals:** Persona Vectors paper pipeline + 7 character traits (evil / hallucinating / humorous / sycophantic / etc); Anthropic "moral emotions" paper preference Elo across 8 categories (aversive / engaging / helpful / misaligned / neutral / self-curiosity / unsafe / +1). Both land under `src/evals/tasks/character/`. Don't reimplement; watch for them appearing.
+
 ### 3a. Decide the data-shape + LoRA-aggressiveness lever (most important)
 
 Three independent levers to dial back in F-run v2; rank by isolation potential:
@@ -182,7 +194,7 @@ Active machinery to know about:
 | :17 | (Cancelled, never built — superseded) | |
 | :18 | + shared/ + judge/ staging fix, --only-bench, --adapter-from-run-id, validator | **The clean experiment ran on this.** |
 | :19 | (Triggered, no new fixes — superseded by :20) | |
-| :20 | + spiralbench_mini judge/ pkg fix, political_bias_openai prompts.jsonl checked in | **In flight or built this session. Bump DEFAULT_IMAGE after diag pass.** |
+| :20 | + spiralbench_mini judge/ pkg fix, political_bias_openai prompts.jsonl checked in | **Built successfully this session (14m17s).** Bump DEFAULT_IMAGE after diag pass. |
 
 ---
 

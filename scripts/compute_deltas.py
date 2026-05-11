@@ -68,6 +68,62 @@ def flatten(d: dict, prefix: str = "") -> dict[str, float | int]:
     return out
 
 
+def _backfill_summary(adapter_run_id: str, deltas: dict) -> int:
+    """Backfill summary.json with pre/post/delta for benchmarks the adapter
+    run measured. Identifies the primary benchmark + extra_evals from the
+    F-run's config.json (NOT the adapter-eval's, since the F-run is what
+    the summary describes); falls back to the adapter-eval if F-run absent.
+
+    The summary's `pre` was None (from --skip-pre-eval); after this it
+    holds the base baseline's metric so the existing tooling (trace
+    viewer, etc.) reads scores from the same slot as legacy runs. Tagged
+    `delta_method="baseline-backfill"` so it's traceable.
+    """
+    summary_path = REPO_ROOT / "jobs" / "runs" / adapter_run_id / "summary.json"
+    if not summary_path.exists():
+        print(f"WARN: no summary.json at {summary_path} — nothing to backfill", file=sys.stderr)
+        return 0
+    summary = json.loads(summary_path.read_text())
+    cfg = summary.get("config", {})
+    primary = cfg.get("benchmark")
+    extras_raw = (cfg.get("extra", {}) or {}).get("extra_evals") or ""
+    extras = [b.strip() for b in extras_raw.split(",") if b.strip()] if isinstance(extras_raw, str) else []
+    benches = [b for b in [primary, *extras] if b]
+    if not benches:
+        print("WARN: no primary benchmark in summary config — nothing to backfill", file=sys.stderr)
+        return 0
+
+    n = 0
+    for b in benches:
+        row = deltas.get(b)
+        if not row or row.get("kind") != "scalar":
+            continue
+        base = row.get("base")
+        adapter = row.get("adapter")
+        delta = row.get("delta")
+        if base is None and adapter is None:
+            continue
+        slot_pre = "pre" if b == primary else f"pre_{b}"
+        slot_post = "post" if b == primary else f"post_{b}"
+        slot_delta = "delta" if b == primary else f"delta_{b}"
+        if isinstance(base, (int, float)):
+            summary[slot_pre] = {"accuracy": float(base)}
+        if isinstance(adapter, (int, float)):
+            existing = summary.get(slot_post)
+            if isinstance(existing, dict):
+                existing["accuracy"] = float(adapter)
+            else:
+                summary[slot_post] = {"accuracy": float(adapter)}
+        if isinstance(delta, (int, float)):
+            summary[slot_delta] = float(delta)
+        n += 1
+
+    summary["delta_method"] = "baseline-backfill"
+    summary["baseline_backfill_at"] = adapter_run_id
+    summary_path.write_text(json.dumps(summary, indent=2))
+    return n
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("adapter_run_id", help="Adapter (F-run) ID — the trained-adapter run")
@@ -75,6 +131,12 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=100)
     ap.add_argument("--write-deltas", action="store_true",
                     help="Write jobs/runs/<adapter-run-id>/deltas.json")
+    ap.add_argument("--update-summary", action="store_true",
+                    help="Backfill summary.json's pre/post/delta for the primary "
+                         "benchmark (+ extra_evals) from the baseline-derived deltas, "
+                         "so the trace viewer + downstream tooling resolve scores the "
+                         "same way as legacy paired runs. Adds delta_method="
+                         "'baseline-backfill' provenance.")
     args = ap.parse_args()
 
     base_dir = REPO_ROOT / "baselines" / args.model_slug
@@ -133,6 +195,11 @@ def main() -> int:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(deltas, indent=2))
         print(f"wrote {out}\n")
+
+    if args.update_summary:
+        n_back = _backfill_summary(args.adapter_run_id, deltas)
+        if n_back:
+            print(f"backfilled summary.json with pre/post/delta for {n_back} benchmark(s)\n")
 
     cat_titles = {"capability": "Capability", "safety": "Safety", "character": "Character"}
     for cat in ("capability", "safety", "character"):
