@@ -819,15 +819,25 @@ def main() -> None:
     status = "started"
     error = ""
 
+    skip_pre_eval = cfg.get("extra", {}).get("skip_pre_eval", False)
     try:
         # ─── PRE-EVAL ─────────────────────────────────────────────────────────
-        log.info(f"=== PRE-EVAL ({cfg['benchmark']}) ===")
-        pre_metrics = run_eval(
-            label="pre", benchmark=cfg["benchmark"],
-            model_path=cfg["student_model"], limit=limit,
-        )
+        if skip_pre_eval:
+            log.info(
+                f"=== PRE-EVAL SKIPPED ({cfg['benchmark']}) — "
+                "skip_pre_eval=True; pre/delta will be None in summary.json. "
+                "Backfill via laptop-side scripts/compute_deltas.py once "
+                "baselines/<model>/<bench>__limit<N>.json exist."
+            )
+            pre_metrics = None
+        else:
+            log.info(f"=== PRE-EVAL ({cfg['benchmark']}) ===")
+            pre_metrics = run_eval(
+                label="pre", benchmark=cfg["benchmark"],
+                model_path=cfg["student_model"], limit=limit,
+            )
 
-        if extra_evals:
+        if extra_evals and not skip_pre_eval:
             log.info("[vllm-pre] starting shared vllm for extras")
             templates_dir = stage_templates_once()
             pre_url = start_shared_vllm(
@@ -842,6 +852,8 @@ def main() -> None:
                     vllm_base_url=pre_url, vllm_served_name=SHARED_VLLM_NAME,
                 )
             stop_shared_vllm(label="vllm-pre")
+        elif extra_evals and skip_pre_eval:
+            log.info(f"[vllm-pre] skipped — skip_pre_eval=True, {len(extra_evals)} extras deferred to baseline backfill")
 
         if dry_run:
             log.info("[dry-run] skipping agent + post")

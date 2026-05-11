@@ -85,6 +85,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dry-run", action="store_true",
                    help="run pre-eval + dir scaffold only; skip agent + post-eval")
     p.add_argument("--skip-heldout", action="store_true")
+    p.add_argument("--skip-pre-eval", action="store_true",
+                   help="Pod skips pre-eval and treats baselines as the "
+                        "pre values. summary.json's `pre` + `delta` come "
+                        "out as None; backfill via "
+                        "`scripts/compute_deltas.py <run_id>` once baselines "
+                        "for this model+limit exist in the repo.")
     p.add_argument("--no-drive-upload", action="store_true",
                    help="pod skips rclone-to-Drive at end (debug)")
     return p.parse_args()
@@ -184,6 +190,7 @@ async def main() -> None:
             "extra_evals": args.extra_evals,
             "limit": args.limit,
             "skip_heldout": args.skip_heldout,
+            "skip_pre_eval": args.skip_pre_eval,
             "dry_run": args.dry_run,
             "keep_pod": args.keep_pod,
             "no_drive_upload": args.no_drive_upload,

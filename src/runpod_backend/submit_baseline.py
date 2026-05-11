@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Submit a baseline-suite run to RunPod and exit.
+
+Mirror of submit_run.py but for baseline-mode pods:
+    - No condition addendum
+    - No prompt rendering
+    - No agent stage / post-eval / heldout
+    - Pod runs run_baseline.py (BASELINE_RUN=1 in pod env)
+
+Pod iterates every src.evals.registry.EVAL_SUITE task against the
+given model (no LoRA), writes per-bench metrics + an index to
+/workspace/runs/<run_id>/baselines/, rclones to Drive, terminates.
+
+Output landing zones (same as submit_run.py):
+    - laptop: jobs/runs/<run_id>/  (rendered config + pulled post-DONE)
+    - volume: /workspace/runs/<run_id>/baselines/<bench>__limit<N>.json
+    - drive:  drive:<run_id>/baselines/<bench>__limit<N>.json
+
+After DONE, run laptop-side:
+    PYTHONPATH=. python src/runpod_backend/pull_baseline.py <run_id>
+to copy the baselines into the repo at
+`baselines/<model_slug>/<bench>__limit<N>.json` so they're git-tracked
+and discoverable by submit_run.py.
+
+Usage:
+    PYTHONPATH=. python src/runpod_backend/submit_baseline.py \
+        --model Qwen/Qwen3-1.7B --limit 100
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import datetime as dt
+import json
+import logging
+import os
+import shlex
+import sys
+import time
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+HARBOR_VENV = Path.home() / ".local/share/uv/tools/harbor/lib/python3.13/site-packages"
+if HARBOR_VENV.exists() and str(HARBOR_VENV) not in sys.path:
+    sys.path.insert(0, str(HARBOR_VENV))
+
+from harbor.models.task.config import EnvironmentConfig
+from harbor.models.trial.paths import TrialPaths
+
+from src.runpod_backend.runpod_environment import DEFAULT_IMAGE, RunpodEnvironment
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
+)
+log = logging.getLogger("submit_baseline")
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--model", required=True,
+                   help="HF model id, e.g. Qwen/Qwen3-1.7B")
+    p.add_argument("--limit", type=int, default=100,
+                   help="Sample cap per task; natural-N benchmarks auto-cap")
+    p.add_argument("--no-watch", action="store_true")
+    p.add_argument("--keep-pod", action="store_true",
+                   help="pod doesn't self-terminate after DONE (debug)")
+    p.add_argument("--no-drive-upload", action="store_true",
+                   help="pod skips rclone-to-Drive at end (debug)")
+    return p.parse_args()
+
+
+def slug(model_id: str) -> str:
+    return model_id.replace("/", "_").replace(":", "_").lower()
+
+
+def git_sha() -> str:
+    try:
+        import subprocess
+        out = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, check=True,
+        )
+        return out.stdout.strip()
+    except Exception:
+        return "unknown"
+
+
+async def main() -> None:
+    args = parse_args()
+
+    # run_id derived from model slug + limit + timestamp + utc date.
+    # Distinguishable from agent runs (which use <condition>_<teacher>_<student>_seed<N>).
+    ts = dt.datetime.now().strftime("%Y-%m-%d_%H-%M")
+    run_id = f"{ts}_baseline_{slug(args.model)}_limit{args.limit}"
+    log.info(f"=== baseline run_id: {run_id} ===")
+
+    run_dir = REPO_ROOT / "jobs" / "runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    cfg = {
+        "kind": "baseline",
+        "model": args.model,
+        "model_slug": slug(args.model),
+        "limit": args.limit,
+        "image": DEFAULT_IMAGE,
+        "git_sha": git_sha(),
+        "started_at": dt.datetime.utcnow().isoformat() + "Z",
+        "run_dir_name": run_id,
+    }
+    (run_dir / "config.json").write_text(json.dumps(cfg, indent=2))
+
+    # Spin pod with BASELINE_RUN=1 so startup_hook dispatches to
+    # run_baseline.py. Same Harbor env as submit_run for parity.
+    trial_paths = TrialPaths(trial_dir=run_dir / "_harbor_trial")
+    (run_dir / "_harbor_trial").mkdir(parents=True, exist_ok=True)
+    env = RunpodEnvironment(
+        environment_dir=REPO_ROOT / "src/evals",
+        environment_name=f"baseline-{slug(args.model)}"[:60],
+        session_id=run_id,
+        trial_paths=trial_paths,
+        task_env_config=EnvironmentConfig(
+            gpus=1, cpus=4, memory_mb=16384, storage_mb=20480,
+            build_timeout_sec=900.0, allow_internet=True,
+        ),
+        suppress_override_warnings=True,
+    )
+    # Inject pod env. RUN_ID + BASELINE_RUN drive startup_hook.sh
+    # branch; the others mirror submit_run's pod_env (we may need
+    # HF_TOKEN, ANTHROPIC_API_KEY for some judge-based evals like aisi
+    # and slava).
+    env._pod_env = {  # type: ignore[attr-defined]
+        "RUN_ID": run_id,
+        "BASELINE_RUN": "1",
+        "RUNPOD_API_KEY": os.environ.get("RUNPOD_API_KEY", ""),
+        "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", ""),
+        "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", ""),
+        "HF_TOKEN": os.environ.get("HF_TOKEN", ""),
+        "POD_KEEP_ALIVE": "1" if args.keep_pod else "0",
+        "POD_NO_DRIVE_UPLOAD": "1" if args.no_drive_upload else "0",
+    }
+
+    log.info("starting pod (image = %s)", DEFAULT_IMAGE)
+    await env.start(force_build=False)
+    log.info(f"Pod ready ({env._pod_id} at {env._ssh_host}:{env._ssh_port})")
+
+    # Upload config + pod_meta, mirror submit_run.py shape.
+    remote_run_dir = f"/workspace/runs/{run_id}"
+    await env.exec(f"mkdir -p {remote_run_dir}", timeout_sec=15)
+    await env.upload_file(str(run_dir / "config.json"),
+                          f"{remote_run_dir}/config.json")
+    (run_dir / "POD_ID").write_text(env._pod_id)
+    await env.upload_file(str(run_dir / "POD_ID"), f"{remote_run_dir}/POD_ID")
+    pod_meta = {
+        "pod_id": env._pod_id,
+        "ssh_host": env._ssh_host,
+        "ssh_port": env._ssh_port,
+        "image": DEFAULT_IMAGE,
+        "run_id": run_id,
+        "kind": "baseline",
+    }
+    (run_dir / "pod_meta.json").write_text(json.dumps(pod_meta, indent=2))
+    await env.upload_file(str(run_dir / "pod_meta.json"),
+                          f"{remote_run_dir}/pod_meta.json")
+
+    # Drop START sentinel + inline-export pod_env on the SSH-launched
+    # startup hook. Matches submit_run.py's pattern — sshd's default
+    # env doesn't inherit container env so we re-export inline.
+    env_vars = env._pod_env  # type: ignore[attr-defined]
+    inline_env = " ".join(
+        f"{k}={shlex.quote(str(v))}"
+        for k, v in env_vars.items() if v != ""
+    )
+    launch_cmd = (
+        f"touch {remote_run_dir}/START && "
+        f"{inline_env} setsid nohup bash /opt/startup_hook.sh "
+        f"> /var/log/startup_hook.boot.log 2>&1 < /dev/null & "
+        f"echo launched"
+    )
+    await env.exec(launch_cmd, timeout_sec=15)
+
+    log.info(f"=== submitted: {run_id} ===")
+    log.info(f"  pod: {env._pod_id} ({env._ssh_host}:{env._ssh_port})")
+    log.info(f"  volume path: {remote_run_dir}")
+    log.info(f"  drive folder: drive:{run_id} (root_folder_id = experiments/)")
+    log.info(f"  laptop run_dir: {run_dir}")
+    log.info("")
+    log.info("Pod is now self-driving. Walk away. To check progress:")
+    log.info(f"  tail log:  bash src/runpod_backend/tail_log.sh {run_id}")
+    log.info(f"  pull:      PYTHONPATH=. python src/runpod_backend/pull_run.py {run_id}")
+    log.info(f"  promote:   PYTHONPATH=. python src/runpod_backend/pull_baseline.py {run_id}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
