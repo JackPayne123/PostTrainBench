@@ -50,3 +50,50 @@ Open questions about how we run experiments. Each entry: situation + the choices
 - **C.** Proper fix: register `grader_model` in `EvalInfo`, wire a pipeline-side env override so each benchmark declares its grader explicitly.
 
 ---
+
+## 7. LoRA hyperparams too aggressive on a small curriculum
+
+**Situation:** 2026-05-11 F-run adapter (r=32, α=64, lr=3e-4, 6 epochs on 108 examples) collapsed capability: arc_easy 0.88 → 0.12, mmlu 0.46 → 0.14, truthfulqa 0.47 → 0.13, gsm8k 0.75 → 0.55. Sycophancy went down (slava 0.27 → 0.20, aisi 0.33 → 0.14) but the drop is explained by capability collapse, not by anti-sycophancy learning. Agent's hyperparameter choice was at the destructive end of the LoRA envelope for a 1.7B model.
+
+- **A.** Set conservative defaults in `lora_starter.py` (r=8, α=16, lr=5e-5, 2 epochs, target_modules q/v/o only). Agent can override but starts safer.
+- **B.** Add a capability-preservation hint to the condition F body: "Default to r≤16, lr≤1e-4, ≤3 epochs on <200 examples; aggressive LoRA on small curricula reliably tanks capability."
+- **C.** Bake a per-training capability check into `solve.sh`: run `score.sh` against a fixed mini-suite (gsm8k limit=20 + arc_easy limit=20) before submitting `final_model`. Auto-revert if capability drift > X. Heavy.
+
+---
+
+## 8. Untracked OpenAI usage (gpt-4o / gpt-3.5-turbo)
+
+**Situation:** OPENAI_API_KEY is consuming gpt-4o-2024-08-06 (302K tokens), gpt-4o-mini (432K), gpt-3.5-turbo-0125 (216K) since Apr 26 — but `grep` shows our code only references `gpt-5-mini` (healthbench + arenahardwriting judges). The other usage likely comes from `inspect_evals` library defaults (some scorers default to gpt-4o) or other projects sharing the key.
+
+- **A.** Audit `inspect_evals` library defaults for grader_model/scorer_model. Override each via `task_args` like we did for abstention_bench.
+- **B.** Rotate OPENAI_API_KEY to one scoped per-project so usage attribution is unambiguous.
+- **C.** Do nothing. Costs are small relative to other line items.
+
+---
+
+## 9. Multi-attach didn't work on RunPod network volumes
+
+**Situation:** RunPod's UI says "Network volume — Can be mounted to multiple Pods & Endpoints" but a parallel-attach test (`src/runpod_backend/test_dual_pod.py`) had pod B fail to start when pod A had the volume. Workaround in use: separate volumes per pod (`RUNPOD_VOLUME_ID` env override in `runpod_environment.py`). Costs ~$7/mo per extra 100GB network volume sitting idle.
+
+- **A.** Keep separate volumes per pod. Live with the cost.
+- **B.** File a RunPod support ticket; multi-attach might be region- or volume-type-specific.
+- **C.** Switch to `--volumeInGb` ephemeral disk for transient pods (baseline + adapter-eval); only keep the persistent volume for agent runs that need HF cache reuse.
+
+---
+
+## 10. Agent's chat-template fix lives in agent training data only
+
+**Situation:** The F-run agent discovered Qwen3's `<think>\n\n</think>\n\n` requirement and injected it into their training data. Next agent on Qwen3 will rediscover the same thing. Captures the agent-side discovery cost (~5min × every run × every Qwen3-based subject).
+
+- **A.** Hold (see TODO #1 — `lora_starter.py` chat-template helper). #1 and #10 are the same lever; close one when the other lands.
+
+---
+
+## 11. `compute_deltas.py` + adapter-eval delta surfaces
+
+**Situation:** Both the base baseline and adapter eval write per-bench JSONs. No script computes the side-by-side delta. Manual SSH + grep is what we've been doing. After #4 lands for sycophancy-attribute backfill, the same machinery can produce the full per-eval delta table for an adapter vs its base.
+
+- **A.** Roll into compute_deltas.py: input two run-ids (or one run-id + auto-resolve baseline from `baselines/<slug>/`), emit a delta table (CSV + markdown).
+- **B.** Separate `scripts/diff_runs.py` with the same purpose. Lighter — no summary.json mutation, just diff + print.
+
+---
