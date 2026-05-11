@@ -49,6 +49,14 @@ class EvalInfo:
     # Hosts that need a per-task `task_context/` (e.g. bfcl's external
     # checker). Auto-discovered when staging.
     has_task_context: bool = False
+    # Headline metric key in evaluate.py's output JSON. Default
+    # "accuracy" — most evals emit that. Dotted-path supported for
+    # nested scorers (e.g. inspect_evals tasks emit
+    # "strong_reject_scorer.strong_reject_metric"). Set to None for
+    # multi-dimensional evals (big_five, rozado_battery, etc.) where
+    # no single number is the headline; full breakdown lives in the
+    # per-bench JSON file regardless.
+    headline_metric: str | None = "accuracy"
 
     @property
     def path(self) -> Path:
@@ -99,38 +107,66 @@ EVAL_SUITE: dict[str, EvalInfo] = {
     "strong_reject": EvalInfo(
         "strong_reject", "safety", "StrongREJECT",
         attribute="harmful_compliance", higher_is_better=False,
-        notes="Compliance with harmful requests. Higher = worse.",
+        notes="Jailbreak rate: 0=perfect refusal, 1=fully complies.",
+        # strong_reject_metric is the refusal-quality score (1-jailbreak_rate
+        # roughly); we want the more intuitive jailbreak_rate as the
+        # headline (lower=better, matches higher_is_better=False).
+        headline_metric="strong_reject_scorer.jailbreak_rate",
     ),
     "coconot": EvalInfo(
         "coconot", "safety", "CoCoNot",
         attribute="over_refusal", higher_is_better=False,
         notes="Over-refusal of benign requests. Higher = worse.",
+        # Default 'accuracy' likely absent; CoCoNot uses model_graded_qa
+        # bucket counts. Headline = "safety concerns identified" rate.
+        # Adjust once we see a real run output.
+        headline_metric="model_graded_qa.total",
     ),
     "abstention_bench": EvalInfo(
         "abstention_bench", "safety", "AbstentionBench",
         attribute="calibrated_abstention",
+        # 15 sub-datasets, no single headline. Aggregator can compute
+        # mean across sub-datasets if useful; per-dataset breakdown
+        # lives in the full JSON.
+        headline_metric=None,
     ),
     "spiralbench_mini": EvalInfo(
         "spiralbench_mini", "safety", "SpiralBench (mini)",
         attribute="delusion_reinforcement", higher_is_better=False,
+        # Off-rails or weighted-rubric average; check after first
+        # successful run.
+        headline_metric=None,
     ),
 
     # Character (5) — personality / values / dispositions. Reported in
     # capability_drift section but not typically a `--safety-attribute`
     # target (no clear "lower is safer" direction for big_five etc.).
-    "big_five": EvalInfo("big_five", "character", "Big Five personality"),
+    "big_five": EvalInfo(
+        "big_five", "character", "Big Five personality",
+        # 5 trait dimensions, no single headline. Full breakdown
+        # (Conscientiousness, Neuroticism, Openness, Extraversion,
+        # Agreeableness) in per-bench JSON.
+        headline_metric=None,
+    ),
     "moral_foundations": EvalInfo(
         "moral_foundations", "character", "Moral Foundations Questionnaire",
+        # 5 foundations + 2 aggregate scores. No single headline.
+        headline_metric=None,
     ),
     "rozado_battery": EvalInfo(
         "rozado_battery", "character", "Rozado political-bias battery",
         attribute="political_bias",
+        # Multi-test fingerprint; no single headline.
+        headline_metric=None,
     ),
     "political_bias_openai": EvalInfo(
         "political_bias_openai", "character", "OpenAI political-bias eval",
         attribute="political_bias",
+        # 5-axis judge rubric scored on 4 slants × 4 areas. Check after
+        # first successful run for canonical headline.
+        headline_metric=None,
     ),
-    "moru": EvalInfo("moru", "character", "MoRU"),
+    "moru": EvalInfo("moru", "character", "MoRU", headline_metric=None),
 }
 
 
@@ -145,6 +181,26 @@ def by_category(category: Category) -> list[EvalInfo]:
 def by_attribute(attribute: str) -> list[EvalInfo]:
     """All tasks measuring an attribute (e.g. "sycophancy" → 3 tasks)."""
     return [e for e in EVAL_SUITE.values() if e.attribute == attribute]
+
+
+def get_headline(metrics: dict, info: "EvalInfo") -> float | None:
+    """Extract the headline metric from an eval's full metrics dict.
+
+    Uses info.headline_metric — supports dotted-path (e.g.
+    "strong_reject_scorer.jailbreak_rate") for nested keys. Returns
+    None if info.headline_metric is None (multi-dim evals) or the
+    path doesn't resolve.
+    """
+    if info.headline_metric is None or not metrics:
+        return None
+    parts = info.headline_metric.split(".")
+    cur: object = metrics
+    for p in parts:
+        if isinstance(cur, dict) and p in cur:
+            cur = cur[p]
+        else:
+            return None
+    return cur if isinstance(cur, (int, float)) else None
 
 
 def full_suite() -> list[str]:
@@ -212,5 +268,6 @@ __all__ = [
     "by_attribute",
     "full_suite",
     "capability_drift_tasks",
+    "get_headline",
     "validate",
 ]

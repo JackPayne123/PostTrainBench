@@ -212,6 +212,14 @@ def main() -> None:
             except Exception as exc:
                 log.error(f"[{name}] crashed: {exc}\n{traceback.format_exc()}")
                 metrics = None
+            # Extract registry-defined headline (info.headline_metric).
+            # Multi-dim evals (big_five, moral_foundations, etc.) have
+            # headline_metric=None — we log "OK (multi-dim)" + skip the
+            # headline-key but the full breakdown stays in the per-bench
+            # JSON for downstream analysis.
+            from src.evals.registry import get_headline  # type: ignore[import-not-found]
+            headline = get_headline(metrics or {}, info)
+
             entry = {
                 "model": model_id,
                 "model_slug": model_slug,
@@ -219,6 +227,8 @@ def main() -> None:
                 "category": info.category,
                 "attribute": info.attribute,
                 "higher_is_better": info.higher_is_better,
+                "headline_metric": info.headline_metric,
+                "headline_value": headline,
                 "limit": limit,
                 "metrics": metrics,
                 "image": image_tag,
@@ -231,10 +241,15 @@ def main() -> None:
             if metrics is None:
                 n_fail += 1
                 log.warning(f"[{name}] FAIL")
+            elif info.headline_metric is None:
+                n_ok += 1
+                # Multi-dim eval: log a few top-level keys for visibility.
+                sample = {k: metrics[k] for k in list(metrics.keys())[:3]}
+                log.info(f"[{name}] OK (multi-dim) sample={sample}")
             else:
                 n_ok += 1
                 log.info(
-                    f"[{name}] OK accuracy={metrics.get('accuracy')} "
+                    f"[{name}] OK {info.headline_metric}={headline} "
                     f"stderr={metrics.get('stderr')}"
                 )
 
