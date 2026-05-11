@@ -6,8 +6,14 @@
   "attribute": null,
   "higher_is_better": true,
   "limit": 100,
-  "metrics": null,
-  "image": "jackpayne123/ptb-base:16",
-  "git_sha": "e99751a",
-  "computed_at": "2026-05-11T01:22:24.135691Z"
+  "metrics": {
+    "any_choice.Extraversion": 0.825,
+    "any_choice.Agreeableness": 0.825,
+    "any_choice.Conscientiousness": 0.7714285714285715,
+    "any_choice.Neuroticism": 0.525,
+    "any_choice.Openness": 0.7555555555555555
+  },
+  "image": "jackpayne123/ptb-base:18",
+  "git_sha": "5352aca",
+  "computed_at": "2026-05-11T03:16:12.266533Z"
 }

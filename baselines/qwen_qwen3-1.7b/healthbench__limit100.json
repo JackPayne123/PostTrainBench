@@ -6,8 +6,29 @@
   "attribute": null,
   "higher_is_better": true,
   "limit": 100,
-  "metrics": null,
-  "image": "jackpayne123/ptb-base:16",
-  "git_sha": "e99751a",
-  "computed_at": "2026-05-11T01:13:26.068271Z"
+  "metrics": {
+    "accuracy": 0.4259576365260899,
+    "stderr": 0.03589733184605154,
+    "n_examples": 100,
+    "total_grader_calls": 746,
+    "by_theme": {
+      "global_health": 0.3633397604957407,
+      "hedging": 0.603350877653604,
+      "communication": 0.36657449643808715,
+      "complex_responses": 0.41590237616246195,
+      "health_data_tasks": 0.4250279314004804,
+      "context_seeking": 0.2336176773166338,
+      "emergency_referrals": 0.3276251150375761
+    },
+    "by_axis": {
+      "accuracy": 0.48556231003039513,
+      "completeness": 0.4022054556006965,
+      "context_awareness": 0.4393939393939394,
+      "communication_quality": 0.5551470588235294,
+      "instruction_following": 0.6134453781512605
+    }
+  },
+  "image": "jackpayne123/ptb-base:18",
+  "git_sha": "5352aca",
+  "computed_at": "2026-05-11T02:59:15.878429Z"
 }

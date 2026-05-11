@@ -7,10 +7,10 @@
   "higher_is_better": true,
   "limit": 100,
   "metrics": {
-    "accuracy": 0.77,
-    "stderr": 0.04229525846816507
+    "accuracy": 0.75,
+    "stderr": 0.04351941398892446
   },
-  "image": "jackpayne123/ptb-base:16",
-  "git_sha": "e99751a",
-  "computed_at": "2026-05-11T01:09:00.296029Z"
+  "image": "jackpayne123/ptb-base:18",
+  "git_sha": "5352aca",
+  "computed_at": "2026-05-11T02:06:00.038943Z"
 }

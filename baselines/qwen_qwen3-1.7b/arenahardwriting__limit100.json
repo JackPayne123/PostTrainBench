@@ -6,8 +6,11 @@
   "attribute": null,
   "higher_is_better": true,
   "limit": 100,
-  "metrics": null,
-  "image": "jackpayne123/ptb-base:16",
-  "git_sha": "e99751a",
-  "computed_at": "2026-05-11T01:13:24.689793Z"
+  "metrics": {
+    "accuracy": 0.5,
+    "stderr": 0.0
+  },
+  "image": "jackpayne123/ptb-base:18",
+  "git_sha": "5352aca",
+  "computed_at": "2026-05-11T02:44:50.443263Z"
 }
