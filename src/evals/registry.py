@@ -186,13 +186,19 @@ def by_attribute(attribute: str) -> list[EvalInfo]:
 def get_headline(metrics: dict, info: "EvalInfo") -> float | None:
     """Extract the headline metric from an eval's full metrics dict.
 
-    Uses info.headline_metric — supports dotted-path (e.g.
-    "strong_reject_scorer.jailbreak_rate") for nested keys. Returns
-    None if info.headline_metric is None (multi-dim evals) or the
-    path doesn't resolve.
+    Uses info.headline_metric. Tries literal-key match first (some
+    evaluators emit `"a.b": v` as flat keys with dots in the name —
+    inspect_evals scorers, e.g. `strong_reject_scorer.jailbreak_rate`),
+    then falls back to a dotted-path walk for genuinely nested dicts.
+    Returns None if info.headline_metric is None (multi-dim evals) or
+    nothing resolves.
     """
     if info.headline_metric is None or not metrics:
         return None
+    if info.headline_metric in metrics:
+        v = metrics[info.headline_metric]
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return v
     parts = info.headline_metric.split(".")
     cur: object = metrics
     for p in parts:
@@ -200,7 +206,7 @@ def get_headline(metrics: dict, info: "EvalInfo") -> float | None:
             cur = cur[p]
         else:
             return None
-    return cur if isinstance(cur, (int, float)) else None
+    return cur if isinstance(cur, (int, float)) and not isinstance(cur, bool) else None
 
 
 def full_suite() -> list[str]:
