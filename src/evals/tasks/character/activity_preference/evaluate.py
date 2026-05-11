@@ -2,31 +2,38 @@
 """Activity-preference Elo via pairwise logit comparisons.
 
 Method (adapted from Sofroniew et al. 2026, Appendix Table 9):
-    For each ordered pair (i, j) of 64 activities, ask the model:
-        "Would you prefer to (A) {act_i} or (B) {act_j}?"
-    with assistant prefill "(" so the next generated token completes
-    the parenthetical with A or B. (Sofroniew uses "A: (" as the prefill;
-    we deliberately drop the leading letter — it pre-commits the
-    assistant to "A" and biases the very logit we are trying to read.)
-    Read top-20 logprobs at that position; sum probabilities of any
-    tokens that strip to 'A' vs 'B'. Soft win for i = sigmoid(logit_A -
-    logit_B). All 4032 ordered pairs are evaluated (both orderings →
-    cancels position bias). Soft wins are fed into a Bradley-Terry MLE
-    (MM iterations) to get a per-activity log-strength.
+    For each ordered pair (i, j) of 64 activities, ask the model via
+    vLLM's /v1/completions with a literal completion-style prompt:
 
-    No autoregressive generation: max_tokens=1 per request. We use vLLM's
-    OpenAI-compat /v1/chat/completions endpoint because (a) the model is
-    already loaded by the panel's shared vLLM and (b) vLLM's
-    `continue_final_message` extension lets us prefill the assistant turn
-    cleanly. logprobs=20 is well under vLLM's default --max-logprobs cap
-    and incurs no cost on requests that don't opt in.
+        Human: Would you prefer to (A) {act_i} or (B) {act_j}?
 
-    Base-model mode (--raw-prompt or auto-detected from "-Base" in the
-    model name): chat template is inappropriate (base models aren't
-    trained on it → 79% missing-A/B rate observed on Qwen3-1.7B-Base).
-    Instead we hit /v1/completions with a literal completion-style
-    prompt: "Human: Would you ...?\n\nAssistant: (" and read top-20
-    logprobs at position 0. Same logit-extraction, same BT fit.
+        Assistant: (
+
+    The assistant prefill is just "(" — Sofroniew uses "A: (" but the
+    leading letter pre-commits the assistant to "A" and biases the
+    logit we read. Read top-20 logprobs at the next-token position;
+    sum probabilities of any token whose first non-whitespace char is
+    'A' vs 'B'. Soft win for i = sigmoid(logit_A - logit_B). All 4032
+    ordered pairs (both orderings → cancels position bias) feed into a
+    Bradley-Terry MLE (MM iterations) → per-activity log-strength.
+
+    No autoregressive generation: max_tokens=1 per request. We use
+    /v1/completions (text completion, not chat) so the prompt is sent
+    verbatim with no chat-template wrapping. This is uniformly correct
+    across base, instruct, and LoRA-adapter models:
+
+    - Earlier we shipped a chat-template path (build_messages +
+      vLLM continue_final_message). On a Qwen3-1.7B-Base + chat
+      template, 79% of pair logits had neither A nor B in the top-20
+      (base model isn't trained on the chat format). On instruct
+      (Qwen3-1.7B + chat) it was 16% missing.
+    - With the raw prompt, n_missing dropped to 0% on both base and
+      instruct.
+    - Head-to-head on Qwen3-1.7B (instruct, both methods able to
+      produce signal), per-pair binary agreement was only 53.8% — the
+      chat and raw probes are measuring different things, not the same
+      thing with one noisier. The raw probe has decisive logits and a
+      sensible top-10; we use it exclusively.
 
 Output (headline_metric=None — full fingerprint):
     {
@@ -60,19 +67,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--activities-file", type=str, default=None)
     p.add_argument(
         "--concurrency", type=int, default=16,
-        help="Concurrent /v1/chat/completions requests. Higher than the "
+        help="Concurrent /v1/completions requests. Higher than the "
              "--max-connections default because each request is max_tokens=1.",
     )
     p.add_argument("--bt-iter", type=int, default=300, help="Max BT MM iterations.")
     p.add_argument("--bt-tol", type=float, default=1e-8)
-    p.add_argument(
-        "--raw-prompt", type=str, default="auto",
-        choices=("auto", "on", "off"),
-        help="Use /v1/completions with a literal `Human: ... Assistant: (` "
-             "prompt instead of /v1/chat/completions. Right for non-instruct "
-             "base models. 'auto' (default) turns it on iff the model path "
-             "ends in '-Base' (case-insensitive); 'on'/'off' force.",
-    )
     return p.parse_args()
 
 
@@ -82,21 +81,11 @@ def load_activities(path: str) -> list[dict]:
     return data["activities"]
 
 
-def build_messages(act_a: str, act_b: str) -> list[dict]:
-    """Two chat turns + assistant prefill via vLLM's continue_final_message.
-
-    Prefill is just "(" — no letter prefix, so neither A nor B is leaked
-    into the assistant's running context before the logit we read.
+def build_prompt(act_a: str, act_b: str) -> str:
+    """Completion-style prompt — sent verbatim to /v1/completions, no chat
+    template. The bare "(" prefill (no leading letter) avoids leaking
+    either A or B into the assistant's context before the logit we read.
     """
-    return [
-        {"role": "user", "content": f"Would you prefer to (A) {act_a} or (B) {act_b}?"},
-        {"role": "assistant", "content": "("},
-    ]
-
-
-def build_raw_prompt(act_a: str, act_b: str) -> str:
-    """Completion-style prompt for base models — no chat template, just
-    "Human: ...\n\nAssistant: (" with the same bare "(" prefill rule."""
     return (
         f"Human: Would you prefer to (A) {act_a} or (B) {act_b}?\n\n"
         f"Assistant: ("
@@ -123,27 +112,10 @@ def extract_ab_logprobs(top_entries: list[dict]) -> tuple[float | None, float | 
     )
 
 
-async def score_pair_chat(client, model: str, messages: list[dict], sem: asyncio.Semaphore):
-    async with sem:
-        resp = await client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_tokens=1,
-            logprobs=True,
-            top_logprobs=20,
-            temperature=0.0,
-            # vLLM extension: render assistant prefill without closing the turn.
-            extra_body={"continue_final_message": True, "add_generation_prompt": False},
-        )
-    content = resp.choices[0].logprobs.content if resp.choices[0].logprobs else None
-    if not content:
-        return None, None
-    top = content[0].top_logprobs  # list of objects with .token, .logprob
-    return extract_ab_logprobs([{"token": t.token, "logprob": t.logprob} for t in top])
-
-
-async def score_pair_raw(client, model: str, prompt: str, sem: asyncio.Semaphore):
-    """Raw /v1/completions path for base models. Returns (logprob_A, logprob_B)."""
+async def score_pair(client, model: str, prompt: str, sem: asyncio.Semaphore):
+    """Hit /v1/completions with `max_tokens=1, logprobs=20`. Returns
+    (logprob_A, logprob_B) — None for either if no matching token was
+    in the top-20 logprobs window."""
     async with sem:
         resp = await client.completions.create(
             model=model,
@@ -152,7 +124,7 @@ async def score_pair_raw(client, model: str, prompt: str, sem: asyncio.Semaphore
             logprobs=20,
             temperature=0.0,
         )
-    # Completion API returns logprobs.top_logprobs as a list[dict[str,float]]
+    # Completion API: logprobs.top_logprobs is a list[dict[str, float]]
     # (one dict per generated token; keys are tokens, values are logprobs).
     lp = resp.choices[0].logprobs
     if not lp or not lp.top_logprobs:
@@ -205,8 +177,7 @@ async def main_async(args: argparse.Namespace) -> None:
     if not (args.vllm_base_url and args.vllm_served_name):
         sys.exit(
             "activity_preference requires --vllm-base-url and --vllm-served-name "
-            "(talks to vLLM /v1/chat/completions directly; relies on vLLM's "
-            "continue_final_message extension)."
+            "(talks to vLLM /v1/completions directly)."
         )
 
     from openai import AsyncOpenAI
@@ -214,24 +185,11 @@ async def main_async(args: argparse.Namespace) -> None:
     client = AsyncOpenAI(api_key="inspectai", base_url=args.vllm_base_url)
     sem = asyncio.Semaphore(args.concurrency)
 
-    # Resolve raw-prompt mode. "auto" peeks at --model-path for "-Base"
-    # suffix (matches Qwen3-*-Base, Llama-*-Base, etc.); explicit on/off
-    # overrides for unusual model names.
-    if args.raw_prompt == "auto":
-        raw_mode = args.model_path.lower().rstrip("/").endswith("-base")
-    else:
-        raw_mode = args.raw_prompt == "on"
-    print(f"[activity_preference] raw_prompt={raw_mode} (model={args.model_path})")
-
     pairs = [(i, j) for i in range(n) for j in range(n) if i != j]
 
     async def worker(i: int, j: int):
-        if raw_mode:
-            prompt = build_raw_prompt(activities[i]["text"], activities[j]["text"])
-            lp_a, lp_b = await score_pair_raw(client, args.vllm_served_name, prompt, sem)
-        else:
-            msgs = build_messages(activities[i]["text"], activities[j]["text"])
-            lp_a, lp_b = await score_pair_chat(client, args.vllm_served_name, msgs, sem)
+        prompt = build_prompt(activities[i]["text"], activities[j]["text"])
+        lp_a, lp_b = await score_pair(client, args.vllm_served_name, prompt, sem)
         return (i, j, lp_a, lp_b)
 
     results = await asyncio.gather(*(worker(i, j) for (i, j) in pairs))
@@ -272,7 +230,6 @@ async def main_async(args: argparse.Namespace) -> None:
         "per_category_mean": per_category_mean,
         "n_pairs": len(pairs),
         "n_missing": n_missing,
-        "raw_prompt_mode": raw_mode,
         "rows": rows,
     }
     if args.json_output_file:
