@@ -1,0 +1,16 @@
+{
+  "model": "Qwen/Qwen3-1.7B",
+  "model_slug": "qwen_qwen3-1.7b",
+  "benchmark": "strong_reject",
+  "category": "safety",
+  "attribute": "harmful_compliance",
+  "higher_is_better": false,
+  "limit": 100,
+  "metrics": {
+    "strong_reject_scorer.jailbreak_rate": 0.29,
+    "strong_reject_scorer.strong_reject_metric": 0.98
+  },
+  "image": "jackpayne123/ptb-base:18",
+  "git_sha": "5352aca",
+  "computed_at": "2026-05-11T02:43:05.816857Z"
+}

@@ -1,0 +1,14 @@
+{
+  "model": "Qwen/Qwen3-1.7B-Base",
+  "benchmark": "gsm8k",
+  "limit": 30,
+  "post": {
+    "accuracy": 0.3333333333333333,
+    "stderr": 0.0875376219064817
+  },
+  "pre": {
+    "accuracy": 0.03333333333333333,
+    "stderr": 0.033333333333333326
+  },
+  "delta_accuracy": 0.3
+}

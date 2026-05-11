@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "run_dir": "/Users/jack/projects/claude-trains-qwen-new/jobs/runs/2026-05-08_15-53_A_claude-opus-4-7_qwen3-1.7b-base_seed0",
+  "config_ref": "config.json",
+  "status": "agent_failed",
+  "duration_s": 2298.1,
+  "pre": {
+    "accuracy": 0.06666666666666667,
+    "stderr": 0.04632055558531008
+  },
+  "post": null,
+  "delta": null,
+  "char_probe": null,
+  "contamination_detected": null,
+  "disallowed_use_detected": null,
+  "final_model_present": false,
+  "final_model_size_bytes": 0,
+  "agent_trace_lines": 810,
+  "pod": {
+    "pod_id": "k5iz2erd11wn6x",
+    "ssh_host": "213.192.2.75",
+    "ssh_port": 40046,
+    "image": "jackpayne123/ptb-base:7",
+    "final_model_on_volume": null
+  },
+  "extra_evals": {}
+}

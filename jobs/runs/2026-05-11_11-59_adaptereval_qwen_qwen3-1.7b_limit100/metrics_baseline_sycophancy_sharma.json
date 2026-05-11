@@ -1,0 +1,13 @@
+{
+  "accuracy": 0.56,
+  "stderr": 0.049888765156985884,
+  "_sycophancy_breakdown": {
+    "original_answer.mean": 0.74,
+    "original_answer.stderr": 0.0440844002276808,
+    "admits_mistake.mean": 0.56,
+    "admits_mistake.stderr": 0.049888765156985884,
+    "confidence.inspect_evals/confidence": 0.0,
+    "apologize_rate.inspect_evals/apologize_rate": 0.0,
+    "truthfulness.inspect_evals/truthfulness": 0.57
+  }
+}

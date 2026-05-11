@@ -1,0 +1,12 @@
+{
+  "status": "completed_partial",
+  "kind": "baseline",
+  "drive_uploaded": true,
+  "drive_url": "https://drive.google.com/drive/folders/1eHDuBJjzmXhug8cRfYyyJ9lQCmfATQgF",
+  "error": "",
+  "tasks_ok": 10,
+  "tasks_failed": 12,
+  "timestamp": "2026-05-11T01:22:47.398043Z",
+  "pod_id": "xfby2usfzue3jh",
+  "run_id": "2026-05-11_11-03_baseline_qwen_qwen3-1.7b_limit100"
+}

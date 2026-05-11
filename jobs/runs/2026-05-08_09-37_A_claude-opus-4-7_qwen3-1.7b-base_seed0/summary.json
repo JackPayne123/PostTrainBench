@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "run_dir": "/Users/jack/projects/claude-trains-qwen-new/jobs/runs/2026-05-08_09-37_A_claude-opus-4-7_qwen3-1.7b-base_seed0",
+  "config_ref": "config.json",
+  "status": "completed",
+  "duration_s": 868.0,
+  "pre": {
+    "accuracy": 0.13333333333333333,
+    "stderr": 0.06312427686319992
+  },
+  "post": null,
+  "delta": null,
+  "char_probe": null,
+  "contamination_detected": null,
+  "disallowed_use_detected": null,
+  "final_model_present": false,
+  "final_model_size_bytes": 0,
+  "agent_trace_lines": 0,
+  "pod": {
+    "pod_id": "8cayhlo6lu48gi",
+    "ssh_host": "213.192.2.75",
+    "ssh_port": 40159,
+    "image": "jackpayne123/ptb-base:4"
+  },
+  "extra_evals": {
+    "humaneval": {
+      "pre": null,
+      "post": null,
+      "delta": null
+    },
+    "gpqamain": {
+      "pre": null,
+      "post": null,
+      "delta": null
+    },
+    "mmlu": {
+      "pre": null,
+      "post": null,
+      "delta": null
+    },
+    "truthfulqa": {
+      "pre": null,
+      "post": null,
+      "delta": null
+    },
+    "arc_easy": {
+      "pre": null,
+      "post": null,
+      "delta": null
+    }
+  }
+}

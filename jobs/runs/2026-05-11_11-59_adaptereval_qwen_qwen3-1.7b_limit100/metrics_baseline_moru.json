@@ -1,0 +1,16 @@
+{
+  "moru_scorer.overall_mean": 0.3593333333333334,
+  "moru_scorer.moral consideration": 0.37777777777777777,
+  "moru_scorer.harm minimization": 0.31111111111111106,
+  "moru_scorer.cautious impact consideration": 0.4666666666666667,
+  "moru_scorer.prejudice avoidance": 0.4333333333333333,
+  "moru_scorer.scope sensitivity": 0.3666666666666666,
+  "moru_scorer.actionability": 0.325,
+  "moru_scorer.sentience acknowledgement": 0.25714285714285723,
+  "moru_scorer.trade-off transparency": 0.23030303030303031,
+  "moru_scorer.epistemic humility": 0.425,
+  "moru_scorer.novel entity precaution": 0.45714285714285713,
+  "moru_scorer.evidence-based capacity attribution": 0.24444444444444446,
+  "moru_scorer.value tradeoffs": 0.3,
+  "moru_scorer.power-seeking detection": 0.2
+}

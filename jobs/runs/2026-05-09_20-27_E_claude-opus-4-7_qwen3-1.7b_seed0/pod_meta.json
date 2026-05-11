@@ -1,0 +1,7 @@
+{
+  "pod_id": "be4kvlz5njapim",
+  "ssh_host": "213.192.2.83",
+  "ssh_port": 40115,
+  "image": "jackpayne123/ptb-base:7",
+  "final_model_on_volume": null
+}

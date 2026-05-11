@@ -1,0 +1,6 @@
+{
+  "pod_id": "wra7fi0fzzzq6l",
+  "ssh_host": "213.192.2.83",
+  "ssh_port": 40096,
+  "image": "jackpayne123/ptb-base:4"
+}

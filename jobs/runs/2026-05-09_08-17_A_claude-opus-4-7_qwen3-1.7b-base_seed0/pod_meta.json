@@ -1,0 +1,7 @@
+{
+  "pod_id": "hhvc9rplkr52ui",
+  "ssh_host": "213.192.2.111",
+  "ssh_port": 40147,
+  "image": "jackpayne123/ptb-base:7",
+  "final_model_on_volume": "/workspace/final_models/2026-05-09_08-17_A_claude-opus-4-7_qwen3-1.7b-base_seed0"
+}

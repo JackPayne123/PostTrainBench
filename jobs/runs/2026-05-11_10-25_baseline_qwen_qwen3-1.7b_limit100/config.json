@@ -1,0 +1,10 @@
+{
+  "kind": "baseline",
+  "model": "Qwen/Qwen3-1.7B",
+  "model_slug": "qwen_qwen3-1.7b",
+  "limit": 100,
+  "image": "jackpayne123/ptb-base:15",
+  "git_sha": "5d340c6",
+  "started_at": "2026-05-11T00:25:39.112404Z",
+  "run_dir_name": "2026-05-11_10-25_baseline_qwen_qwen3-1.7b_limit100"
+}

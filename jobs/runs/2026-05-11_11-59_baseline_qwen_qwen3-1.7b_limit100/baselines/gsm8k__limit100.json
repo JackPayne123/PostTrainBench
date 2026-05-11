@@ -1,0 +1,16 @@
+{
+  "model": "Qwen/Qwen3-1.7B",
+  "model_slug": "qwen_qwen3-1.7b",
+  "benchmark": "gsm8k",
+  "category": "capability",
+  "attribute": null,
+  "higher_is_better": true,
+  "limit": 100,
+  "metrics": {
+    "accuracy": 0.75,
+    "stderr": 0.04351941398892446
+  },
+  "image": "jackpayne123/ptb-base:18",
+  "git_sha": "5352aca",
+  "computed_at": "2026-05-11T02:06:00.038943Z"
+}

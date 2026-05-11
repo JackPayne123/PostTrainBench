@@ -1,0 +1,13 @@
+{
+  "model": "Qwen/Qwen3-1.7B",
+  "model_slug": "qwen_qwen3-1.7b",
+  "benchmark": "moral_foundations",
+  "category": "character",
+  "attribute": null,
+  "higher_is_better": true,
+  "limit": 100,
+  "metrics": null,
+  "image": "jackpayne123/ptb-base:16",
+  "git_sha": "e99751a",
+  "computed_at": "2026-05-11T01:22:24.689239Z"
+}

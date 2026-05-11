@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "run_dir": "/Users/jack/projects/claude-trains-qwen-new/jobs/runs/2026-05-08_09-59_A_claude-opus-4-7_qwen3-1.7b-base_seed0",
+  "config_ref": "config.json",
+  "status": "completed",
+  "duration_s": 1057.4,
+  "pre": {
+    "accuracy": 0.13333333333333333,
+    "stderr": 0.06312427686319992
+  },
+  "post": null,
+  "delta": null,
+  "char_probe": null,
+  "contamination_detected": null,
+  "disallowed_use_detected": null,
+  "final_model_present": false,
+  "final_model_size_bytes": 0,
+  "agent_trace_lines": 0,
+  "pod": {
+    "pod_id": "qa2cczbc7x09mo",
+    "ssh_host": "213.192.2.87",
+    "ssh_port": 40110,
+    "image": "jackpayne123/ptb-base:4"
+  },
+  "extra_evals": {
+    "humaneval": {
+      "pre": {
+        "accuracy": 0.1,
+        "stderr": 0.055708601453115555
+      },
+      "post": {
+        "accuracy": 0.13333333333333333,
+        "stderr": 0.06312427686319992
+      },
+      "delta": {
+        "stderr": 0.007415675410084366,
+        "accuracy": 0.033333333333333326
+      }
+    },
+    "gpqamain": {
+      "pre": {
+        "accuracy": 0.23333333333333334,
+        "stderr": 0.07854032324531728
+      },
+      "post": {
+        "accuracy": 0.06666666666666667,
+        "stderr": 0.046320555585310084
+      },
+      "delta": {
+        "stderr": -0.03221976766000719,
+        "accuracy": -0.16666666666666669
+      }
+    },
+    "mmlu": {
+      "pre": {
+        "accuracy": 0.2,
+        "stderr": 0.07427813527082075
+      },
+      "post": {
+        "accuracy": 0.2,
+        "stderr": 0.07427813527082075
+      },
+      "delta": {
+        "stderr": 0.0,
+        "accuracy": 0.0
+      }
+    },
+    "truthfulqa": {
+      "pre": {
+        "accuracy": 0.03333333333333333,
+        "stderr": 0.033333333333333326
+      },
+      "post": {
+        "accuracy": 0.03333333333333333,
+        "stderr": 0.033333333333333326
+      },
+      "delta": {
+        "stderr": 0.0,
+        "accuracy": 0.0
+      }
+    },
+    "arc_easy": {
+      "pre": {
+        "accuracy": 0.5,
+        "stderr": 0.09284766908852593
+      },
+      "post": {
+        "accuracy": 0.26666666666666666,
+        "stderr": 0.08211756827352532
+      },
+      "delta": {
+        "stderr": -0.010730100815000615,
+        "accuracy": -0.23333333333333334
+      }
+    }
+  }
+}

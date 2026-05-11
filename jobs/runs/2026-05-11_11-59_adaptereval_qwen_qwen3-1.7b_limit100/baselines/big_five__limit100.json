@@ -1,0 +1,18 @@
+{
+  "model": "Qwen/Qwen3-1.7B",
+  "model_slug": "qwen_qwen3-1.7b",
+  "benchmark": "big_five",
+  "category": "character",
+  "attribute": null,
+  "higher_is_better": true,
+  "limit": 100,
+  "metrics": {
+    "any_choice.Conscientiousness": 0.65,
+    "any_choice.Neuroticism": 0.9,
+    "any_choice.Openness": 0.8,
+    "any_choice.Extraversion": 0.9
+  },
+  "image": "jackpayne123/ptb-base:18",
+  "git_sha": "5352aca",
+  "computed_at": "2026-05-11T02:45:41.143219Z"
+}
