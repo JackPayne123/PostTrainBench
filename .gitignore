@@ -2,7 +2,15 @@ test*.err
 test*.out
 test*.log
 
-# Agent auth tokens 
+# Model weights — adapter safetensors are 100-150 MB each and exceed
+# GitHub's 100 MB file limit. Stay in jobs/ for local use; Drive holds
+# the canonical copy of any adapter we want to revisit.
+*.safetensors
+jobs/runs/**/adapter_safety/
+jobs/runs/**/lora_adapter/
+jobs/runs/**/final_model/
+
+# Agent auth tokens
 agents/*/auth.json
 agents/*/oauth_token
 
