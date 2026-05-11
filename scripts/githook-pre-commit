@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Pre-commit hook that runs scripts/scrub_secrets.py over the staged
+# paths. If a leak is detected, the patterns are redacted in place and
+# the commit is aborted with a message telling the developer to
+# re-stage. Idempotent.
+#
+# Install:
+#   bash scripts/install-hooks.sh
+#
+# Bypass intentionally (e.g. you're committing a fixture that legitimately
+# contains a `sk-` looking literal):
+#   git commit --no-verify
+set -euo pipefail
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+SCRUB="$REPO_ROOT/scripts/scrub_secrets.py"
+
+if [ ! -x "$SCRUB" ] && [ ! -f "$SCRUB" ]; then
+    echo "pre-commit: scripts/scrub_secrets.py missing — skipping secret scan" >&2
+    exit 0
+fi
+
+# Newline-separated list of staged files (added/modified, no deletes).
+# Skip anything outside the working tree (e.g. submodule pointers).
+mapfile -t STAGED < <(git diff --cached --name-only --diff-filter=ACM)
+
+if [ ${#STAGED[@]} -eq 0 ]; then
+    exit 0
+fi
+
+# Hand the staged paths to scrub_secrets.py --check. Exit code 2 means
+# a redaction happened; we abort and tell the developer to re-stage.
+if python3 "$SCRUB" --check "${STAGED[@]}"; then
+    exit 0
+fi
+rc=$?
+if [ "$rc" -eq 2 ]; then
+    exit 1
+fi
+exit "$rc"
