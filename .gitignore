@@ -244,3 +244,9 @@ jobs/runs/*/system_monitor.log
 jobs/runs/*/_harbor_trial/
 # Eval-only smoke output (kept around per-run; not tracked).
 jobs/runpod-eval-only/
+# Scratch run dirs (dry-runs, heldout staging tests).
+jobs/runs/_dryrun_logs/
+jobs/runs/_heldout_test_*/
+
+# macOS Finder metadata
+.DS_Store
