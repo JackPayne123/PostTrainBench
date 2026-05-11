@@ -308,6 +308,28 @@ jobs/runs/<run_id>/                                           (laptop)
 
 ---
 
+## Pre-build Validation
+
+**Before triggering an image build, run the validator.** Image builds take 12-15min and each bug found at pod runtime costs another 90min baseline cycle to discover. The validator catches ~80% of the eval-surface bugs we keep re-discovering.
+
+```bash
+python3 scripts/validate_evals.py
+# expects: "VALIDATION PASSED — 22 evals × 8 flags + 6 pipeline files clean."
+```
+
+Static checks (no GPU, no pod, ~5s):
+- Every registered eval has the standard CLI surface (`--model-path --limit --json-output-file --templates-dir --gpu-memory-utilization --max-connections --vllm-base-url --vllm-served-name`). Wrapped evals (heldout-style via `add_standard_args` / `_inspect_wrap.run_inspect_eval`) inherit transitively.
+- No silent-pipe-eats-rc patterns (`| tail -N` / `| head -N` inside shell-wrapped subprocess.run where caller checks rc). Allows the explicit `tail = run_sh(...)` debug-tail shape + `head -1/3` for data picking.
+
+If red, fix and re-run BEFORE `gh workflow run build-ptb-base.yml`. No enforcement — just discipline.
+
+What it does NOT catch (needs pod-side runtime smoke):
+- Eval crashes mid-run (e.g. bfcl needs vllm tool-call config; shared vllm doesn't have it → `eval_out[0].results.scores` is None)
+- Chat-template mismatches against the model under test
+- Anything OS / driver level
+
+For those, `src/runpod_backend/diag.py` runs against the candidate image's drive + isolation surface. Eval-level runtime smoke is not yet automated; treat first baseline run on a new image as the implicit smoke.
+
 ## Image Builds
 
 Image is at `jackpayne123/ptb-base:<TAG>` on Docker Hub. Built from `dockerfiles/Dockerfile.base` via the `build-ptb-base.yml` GitHub Actions workflow.

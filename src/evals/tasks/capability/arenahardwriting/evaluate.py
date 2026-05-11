@@ -748,6 +748,13 @@ def main():
     # --vllm-served-name.
     parser.add_argument("--vllm-base-url", type=str, default=None)
     parser.add_argument("--vllm-served-name", type=str, default=None)
+    # Accepted-but-no-op for compatibility with pipeline's run_eval which
+    # passes these flags unconditionally. arenahardwriting either uses
+    # shared vllm (then these are irrelevant) or spawns its own VLLMServer
+    # which doesn't take these as runtime knobs. scripts/validate_evals.py
+    # enforces presence.
+    parser.add_argument("--gpu-memory-utilization", type=float, default=0.8)
+    parser.add_argument("--max-connections", type=int, default=8)
     args = parser.parse_args()
 
     model_alias = _model_alias(args.model_path)
