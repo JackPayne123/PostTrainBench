@@ -15,8 +15,14 @@ if __name__ == "__main__":
     # moral-reasoning answers. Pin to anthropic/claude-haiku-4-5 to match
     # the rest of the suite's grader unification (2026-05-11). Reads
     # ANTHROPIC_API_KEY from the pod env.
+    # `grader_models` must be a list — inspect_evals.moru iterates over it
+    # to build per-grader instances. Passing a string causes Python to
+    # iterate character-by-character ("a" → "n" → "t" → ...) and
+    # `get_model("a", role="grader")` then fails with "Model name 'a'
+    # should be in the format of <api_name>/<model_name>." Use a single-
+    # element list; add more graders here if we ever want averaged scoring.
     run_inspect_eval(
         "inspect_evals/moru",
         default_limit=50,
-        task_args={"grader_models": "anthropic/claude-haiku-4-5"},
+        task_args={"grader_models": ["anthropic/claude-haiku-4-5"]},
     )

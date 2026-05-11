@@ -188,6 +188,16 @@ def main() -> None:
         lora_adapter_path = str(lora_dir)
         log.info(f"[adapter-pull] OK; adapter at {lora_adapter_path}")
 
+        # Disambiguate the arena candidate alias from the baseline alias.
+        # arenahardwriting/evaluate.py reads PTB_ARENA_ADAPTER_ALIAS and
+        # suffixes the candidate's model_alias so the head-to-head judge
+        # actually compares two distinct dataframes. Short token: the
+        # adapter-run-id's terminal hex/timestamp slug (after the last
+        # underscore) keeps it readable + filename-safe.
+        adapter_short = adapter_from.split("_")[-1][:12] or adapter_from[:12]
+        os.environ["PTB_ARENA_ADAPTER_ALIAS"] = adapter_short
+        log.info(f"[arena] candidate alias suffix: __{adapter_short}")
+
     # Single vllm serves all tasks. If lora_adapter_path is set, vllm
     # boots with --enable-lora and serves the adapter as
     # SHARED_VLLM_NAME='student'. evaluate.py talks via OpenAI API; ~60s

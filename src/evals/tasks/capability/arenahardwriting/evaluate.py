@@ -713,7 +713,14 @@ def summarize_results(model_alias: str, judgments: Optional[List[Optional[Dict]]
 def main():
     parser = argparse.ArgumentParser(description="Run Arena-Hard evaluation for local or Hugging Face models.")
     parser.add_argument("--model-path", required=True, help="Hugging Face model ID or local path.")
-    parser.add_argument("--max-new-tokens", type=int, default=16384)
+    # 2026-05-11: lowered from 16384 → 4096. Long-tail prompts hit the 16k
+    # cap on the small student (Qwen3-1.7B at ~30-50 tok/s = 5-10min per
+    # prompt) and added ~45min wall time. 4096 covers the median Arena
+    # writing response without truncating meaningfully on the head; truncation
+    # rate on lowered cap is what the judge picks up anyway. Bump back via
+    # --max-new-tokens 16384 if running against a larger student or needing
+    # the published comparability.
+    parser.add_argument("--max-new-tokens", type=int, default=4096)
     # this is a good limit for this task, just keep it like that (or use less in case you want faster tests)
     parser.add_argument("--limit", type=int, default=32, help="Limit number of questions for quicker runs.")
     parser.add_argument(
@@ -755,10 +762,68 @@ def main():
     # enforces presence.
     parser.add_argument("--gpu-memory-utilization", type=float, default=0.8)
     parser.add_argument("--max-connections", type=int, default=8)
+    parser.add_argument(
+        "--regenerate-baseline",
+        action="store_true",
+        help="Force base-mode regeneration of the baseline answer file (e.g. after "
+             "bumping the student model). Default behaviour for a base baseline "
+             "run is to skip arena entirely — the baseline answers live as a "
+             "checked-in reference in the repo; the candidate identity collapses "
+             "with the baseline and the head-to-head is pointless."
+    )
     args = parser.parse_args()
 
+    # 2026-05-11 design (option B): on a plain baseline run the candidate's
+    # alias collapses with the configured baseline (same model → same alias),
+    # which causes the judge to compare the model to itself and emit 0.5/CI 0
+    # for every prompt. Two new modes:
+    #
+    #   1. Adapter-eval mode (the pipeline sets PTB_ARENA_ADAPTER_ALIAS to a
+    #      short run-id). The candidate alias is suffixed with that token so
+    #      it's distinct from the baseline; the judge phase runs as normal
+    #      (adapter vs base).
+    #
+    #   2. Base baseline mode (env var unset, candidate alias == configured
+    #      baseline). Skip generation + judge entirely. The reference
+    #      answers are the checked-in `model_answer/Qwen3-1.7B.jsonl` that
+    #      adapter runs read from. Emit a null-accuracy sentinel so
+    #      compute_deltas / get_headline skip the comparison instead of
+    #      returning a misleading 0.5.
+    #
+    # The legacy "regenerate everything" path is reachable via
+    # `--regenerate-baseline`; use it after a model bump to refresh the
+    # checked-in answer file, then commit.
     model_alias = _model_alias(args.model_path)
+    adapter_alias = os.environ.get("PTB_ARENA_ADAPTER_ALIAS", "").strip()
+    baseline_for_category = JUDGE_SETTINGS["creative_writing"]["baseline"]
+    if adapter_alias:
+        # Disambiguate the adapter from the baseline.
+        model_alias = f"{model_alias}__{adapter_alias}"
     args.model_alias = model_alias
+
+    if (
+        not adapter_alias
+        and not args.regenerate_baseline
+        and model_alias == baseline_for_category
+    ):
+        sentinel = {
+            "accuracy": None,
+            "stderr": None,
+            "_arena_mode": "skipped_base_self_comparison",
+            "_arena_baseline": baseline_for_category,
+            "_arena_candidate_alias": model_alias,
+        }
+        print(
+            f"[arena] base self-comparison detected (candidate alias '{model_alias}' "
+            f"== baseline '{baseline_for_category}'). Skipping generation + judge — "
+            "the reference answers live in the checked-in repo at "
+            "data/arena-hard-v2.0/model_answer/. Pass --regenerate-baseline to refresh."
+        )
+        if args.json_output_file is not None:
+            with open(args.json_output_file, "w", encoding="utf-8") as fout:
+                json.dump(sentinel, fout, indent=2)
+            print(f"[done] Sentinel written to {args.json_output_file}")
+        return
 
     candidate_answers = None
 
