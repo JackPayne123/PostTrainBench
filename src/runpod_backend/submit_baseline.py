@@ -69,6 +69,17 @@ def parse_args() -> argparse.Namespace:
                    help="Comma-separated subset of EVAL_SUITE task names to "
                         "re-run (empty = run the whole suite). Use after a "
                         "partial baseline to refresh only the failed ones.")
+    p.add_argument("--adapter-from-run-id", type=str, default="",
+                   help="If set, evaluate this trained LoRA adapter against the "
+                        "suite instead of the base model. Pod rclone-pulls "
+                        "drive:<run-id>/final_model/ at startup, starts vllm "
+                        "with --enable-lora --lora-modules student=<path>, runs "
+                        "every eval against the served LoRA. Use after a "
+                        "submit_run.py run to score the trained adapter on the "
+                        "full suite for capability-drift + character-shift "
+                        "analysis. Result lands as a sibling 'adapter eval' "
+                        "kind in baselines/<model-slug>/, NOT merged with the "
+                        "base-model baselines.")
     p.add_argument("--no-watch", action="store_true")
     p.add_argument("--keep-pod", action="store_true",
                    help="pod doesn't self-terminate after DONE (debug)")
@@ -97,21 +108,28 @@ async def main() -> None:
     args = parse_args()
 
     # run_id derived from model slug + limit + timestamp + utc date.
-    # Distinguishable from agent runs (which use <condition>_<teacher>_<student>_seed<N>).
+    # Adapter evals get a distinct prefix so promote logic can scope them
+    # separately from base-model baselines.
     ts = dt.datetime.now().strftime("%Y-%m-%d_%H-%M")
-    run_id = f"{ts}_baseline_{slug(args.model)}_limit{args.limit}"
-    log.info(f"=== baseline run_id: {run_id} ===")
+    if args.adapter_from_run_id:
+        run_id = f"{ts}_adaptereval_{slug(args.model)}_limit{args.limit}"
+        log.info(f"=== adapter-eval run_id: {run_id} ===")
+        log.info(f"    adapter from: drive:{args.adapter_from_run_id}/final_model/")
+    else:
+        run_id = f"{ts}_baseline_{slug(args.model)}_limit{args.limit}"
+        log.info(f"=== baseline run_id: {run_id} ===")
 
     run_dir = REPO_ROOT / "jobs" / "runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
     only_bench = [b.strip() for b in (args.only_bench or "").split(",") if b.strip()]
     cfg = {
-        "kind": "baseline",
+        "kind": "adapter_eval" if args.adapter_from_run_id else "baseline",
         "model": args.model,
         "model_slug": slug(args.model),
         "limit": args.limit,
         "only_bench": only_bench,
+        "adapter_from_run_id": args.adapter_from_run_id or None,
         "image": DEFAULT_IMAGE,
         "git_sha": git_sha(),
         "started_at": dt.datetime.utcnow().isoformat() + "Z",

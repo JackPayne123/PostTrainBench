@@ -34,6 +34,8 @@ import datetime as dt
 import json
 import logging
 import os
+import shlex
+import subprocess
 import sys
 import time
 import traceback
@@ -149,14 +151,41 @@ def main() -> None:
     baselines_dir = RUN_DIR / "baselines"
     baselines_dir.mkdir(parents=True, exist_ok=True)
 
-    # Single vllm serves all tasks. No LoRA — this is the base model
-    # only. evaluate.py talks to localhost:SHARED_VLLM_PORT via OpenAI
-    # API. ~60s start cost amortised across 22 tasks.
+    # Adapter-eval mode: pull the trained LoRA from drive:<adapter-run-id>/
+    # final_model/, mount via vllm --enable-lora, serve under
+    # SHARED_VLLM_NAME ("student"). Each eval already passes
+    # --vllm-served-name student, so they hit the LoRA-mounted endpoint.
+    adapter_from = cfg.get("adapter_from_run_id")
+    lora_adapter_path: str | None = None
+    if adapter_from:
+        log.info(f"=== ADAPTER PULL: drive:{adapter_from}/final_model/ ===")
+        lora_dir = RUN_DIR / "lora_adapter"
+        lora_dir.mkdir(parents=True, exist_ok=True)
+        rc = subprocess.run(
+            f"rclone copy drive:{shlex.quote(adapter_from)}/final_model/ "
+            f"{shlex.quote(str(lora_dir))} --transfers 4 --checkers 8 -v 2>&1",
+            shell=True, capture_output=True, text=True, timeout=900,
+        )
+        log.info(f"[adapter-pull] rc={rc.returncode} tail:\n{(rc.stdout or '')[-1500:]}")
+        if rc.returncode != 0 or not (lora_dir / "adapter_config.json").exists():
+            log.error(f"[adapter-pull] failed; no adapter_config.json at {lora_dir}")
+            write_done(status="adapter_pull_failed", drive_uploaded=False,
+                       error=f"rclone rc={rc.returncode}; no adapter_config.json")
+            self_terminate()
+            return
+        lora_adapter_path = str(lora_dir)
+        log.info(f"[adapter-pull] OK; adapter at {lora_adapter_path}")
+
+    # Single vllm serves all tasks. If lora_adapter_path is set, vllm
+    # boots with --enable-lora and serves the adapter as
+    # SHARED_VLLM_NAME='student'. evaluate.py talks via OpenAI API; ~60s
+    # boot cost amortised across N tasks.
     try:
         vllm_url = start_shared_vllm(
             model_path=model_id,
             chat_template=str(REPO / "src/evals/templates/qwen3.jinja"),
-            label="vllm-baseline",
+            lora_adapter_path=lora_adapter_path,
+            label="vllm-adaptereval" if adapter_from else "vllm-baseline",
         )
     except Exception as e:
         log.exception(f"vllm start failed: {e}")

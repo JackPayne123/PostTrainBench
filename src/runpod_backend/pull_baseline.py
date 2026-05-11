@@ -62,9 +62,10 @@ def promote(run_dir: Path, repo_root: Path) -> int:
         log.error(f"missing {cfg_path}; cannot determine model_slug")
         return 3
     cfg = json.loads(cfg_path.read_text())
-    if cfg.get("kind") != "baseline":
-        log.error(f"config.json kind={cfg.get('kind')!r}, not 'baseline'; "
-                  "use pull_run.py for non-baseline runs")
+    kind = cfg.get("kind")
+    if kind not in ("baseline", "adapter_eval"):
+        log.error(f"config.json kind={kind!r}, expected 'baseline' or "
+                  "'adapter_eval'; use pull_run.py for agent runs")
         return 4
 
     model_slug = cfg["model_slug"]
@@ -74,7 +75,14 @@ def promote(run_dir: Path, repo_root: Path) -> int:
         log.error(f"no baselines/ dir at {src_baselines}; pod may have failed mid-run")
         return 5
 
-    dst_dir = repo_root / "baselines" / model_slug
+    # Adapter-eval runs land under `baselines/<model_slug>/adapter_eval/<adapter-run-id>/`
+    # so they don't collide with the base-model baselines and so we can
+    # track multiple adapter evals per model (one per trained adapter).
+    if kind == "adapter_eval":
+        adapter_id = cfg.get("adapter_from_run_id", "unknown")
+        dst_dir = repo_root / "baselines" / model_slug / "adapter_eval" / adapter_id
+    else:
+        dst_dir = repo_root / "baselines" / model_slug
     dst_dir.mkdir(parents=True, exist_ok=True)
 
     n_promoted = 0
