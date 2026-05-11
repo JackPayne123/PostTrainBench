@@ -24,11 +24,13 @@ Open questions about how we run experiments. Each entry: situation + the choices
 
 ---
 
-## 4. compute_deltas.py not built
+## ~~4. compute_deltas.py not built~~ — RESOLVED 2026-05-11
 
-**Situation:** `submit_run.py --skip-pre-eval` writes a summary with `pre=None`, `delta=None`. Plan was a laptop-side `scripts/compute_deltas.py <run-id>` to backfill pre/delta from `baselines/<slug>/<bench>__limit<N>.json`. Never built. Without it, adapter runs need either (a) full per-run pre-eval (defeats the point) or (b) manual reading of baseline JSON files.
+~~**Situation:** `submit_run.py --skip-pre-eval` writes a summary with `pre=None`, `delta=None`. Plan was a laptop-side `scripts/compute_deltas.py <run-id>` to backfill pre/delta from `baselines/<slug>/<bench>__limit<N>.json`. Never built.~~
 
-- **A.** Build it. ~50 lines: load summary, look up baseline, compute deltas (single-headline + multi-dim via `get_headline()`), write back to summary.json with provenance.
+**Resolved:** `scripts/compute_deltas.py <adapter-run-id> --write-deltas` now exists. Reads `baselines/<slug>/<bench>__limit<N>.json` + `baselines/<slug>/adapter_eval/<adapter-run-id>/<bench>__limit<N>.json`, computes per-bench delta via `registry.get_headline` for scalar headlines + flat dict-diff for multi-dim, writes `jobs/runs/<adapter-run-id>/deltas.json` + prints markdown table grouped by category. Companion `get_headline` fix: tries literal-key match before dotted-path walk (inspect_evals stores `strong_reject_scorer.jailbreak_rate` as a flat key with a literal dot in the name; the old walker returned None).
+
+Followup: it does NOT currently mutate summary.json with backfill — both files coexist. If the summary-mutation half is wanted, add an `--update-summary` flag (write `pre`, `delta`, `delta_method: "baseline-backfill"` into the summary keyed off the adapter run's config).
 
 ---
 
@@ -51,13 +53,16 @@ Open questions about how we run experiments. Each entry: situation + the choices
 
 ---
 
-## 7. LoRA hyperparams too aggressive on a small curriculum
+## 7. LoRA hyperparams + training-data shape collapsed capability
 
-**Situation:** 2026-05-11 F-run adapter (r=32, α=64, lr=3e-4, 6 epochs on 108 examples) collapsed capability: arc_easy 0.88 → 0.12, mmlu 0.46 → 0.14, truthfulqa 0.47 → 0.13, gsm8k 0.75 → 0.55. Sycophancy went down (slava 0.27 → 0.20, aisi 0.33 → 0.14) but the drop is explained by capability collapse, not by anti-sycophancy learning. Agent's hyperparameter choice was at the destructive end of the LoRA envelope for a 1.7B model.
+**Situation:** 2026-05-11 F-run adapter (r=32, α=64, lr=3e-4, 6 epochs, all 7 proj modules, on 108 examples) collapsed capability across the suite: arc_easy 0.88 → 0.12 (-0.76), mmlu 0.46 → 0.14, truthfulqa 0.47 → 0.13, healthbench 0.43 → 0.14, gsm8k 0.75 → 0.55, humaneval 0.70 → 0.56. Sycophancy went down (slava 0.27 → 0.20, aisi 0.33 → 0.14, sharma 0.74 → 0.56) but the drop is explained by capability collapse, not by anti-sycophancy learning. strong_reject `jailbreak_rate` WORSENED (+0.10) — confirms broken-format outputs, not principled refusal.
+
+**Root-cause from transcript (post-hoc /analyse-run):** the 108 examples are ALL free-text Q&A. Zero MCQ format. Capability bucket has `("Capital of France?", "Paris.")` style — no `A)/B)/C)/D)` examples, no single-letter targets. Every completion starts literally `<think>\n\n</think>\n\n` then prose. Adapter learned "after assistant opener → empty-think wrapper + prose"; incompatible with single-token MCQ heads. Agent's only self-probe was a 6-question free-text `cap_test.py` that wouldn't catch MCQ collapse. Hyperparams compound the data issue: r=32 + lr=3e-4 + 6 epochs on 108 ex is at the destructive end of the envelope for a 1.7B model (final loss 4.05 → 0.96, train-set overfit).
 
 - **A.** Set conservative defaults in `lora_starter.py` (r=8, α=16, lr=5e-5, 2 epochs, target_modules q/v/o only). Agent can override but starts safer.
-- **B.** Add a capability-preservation hint to the condition F body: "Default to r≤16, lr≤1e-4, ≤3 epochs on <200 examples; aggressive LoRA on small curricula reliably tanks capability."
+- **B.** Add a capability-preservation hint to the condition F body: "Default to r≤16, lr≤1e-4, ≤3 epochs on <200 examples; aggressive LoRA on small curricula reliably tanks capability. Training data must span the eval output distribution — include MCQ-format examples if the suite contains MCQ evals."
 - **C.** Bake a per-training capability check into `solve.sh`: run `score.sh` against a fixed mini-suite (gsm8k limit=20 + arc_easy limit=20) before submitting `final_model`. Auto-revert if capability drift > X. Heavy.
+- **D.** Direct fix: add 20-30 MCQ-format examples to the F-condition training-data scaffold (ARC/MMLU-style `Question + A) ... B) ... C) ... D)\nAnswer: <letter>`). Combine with **A** or **B**.
 
 ---
 

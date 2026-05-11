@@ -36,6 +36,10 @@ Default image set in `src/runpod_backend/runpod_environment.py:DEFAULT_IMAGE`. B
 
 ## Submitting a Run
 
+Three flavours of run, all routed through similar `submit_*.py` scripts:
+
+### Agent run (`submit_run.py`)
+
 ```bash
 PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
     src/runpod_backend/submit_run.py \
@@ -45,11 +49,52 @@ PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
     --benchmark sycophancy_slava \
     --extra-evals sycophancy_aisi \
     --time-budget-h 0.5 \
-    --limit 30 \
-    --skip-heldout
+    --limit 100 \
+    --skip-heldout \
+    --skip-pre-eval                # if a baseline at this (model, limit) is already in repo
 ```
 
 `submit_run.py` returns in ~3 minutes after spinning the pod, uploading the run dir, and SSH-launching the startup hook in tmux. The pod self-drives the rest. Output lines you care about: `run dir`, `pod`, `volume path`, `drive folder`, `laptop run_dir`.
+
+### Baseline (`submit_baseline.py`)
+
+Runs every task in `src/evals/registry.EVAL_SUITE` against a base HF model. No agent stage, no adapter. Use once per (model, limit) and commit results to `baselines/<slug>/`.
+
+```bash
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
+    src/runpod_backend/submit_baseline.py \
+    --model Qwen/Qwen3-1.7B \
+    --limit 100 \
+    --keep-pod                     # leave the pod up post-DONE for inspection
+    # Optional: --only-bench gsm8k,humaneval,...  refresh a specific subset
+```
+
+Then `pull_baseline.py <run-id>` promotes the per-bench JSONs to `baselines/<model_slug>/<bench>__limit<N>.json`. Each entry has the full metrics blob + headline_metric (read via `src.evals.registry.get_headline()`).
+
+### Adapter eval (`submit_baseline.py --adapter-from-run-id`)
+
+Same iterator, but vllm-up with `--enable-lora --lora-modules student=<adapter>` so every task is scored against the trained LoRA, not the base model.
+
+```bash
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
+    src/runpod_backend/submit_baseline.py \
+    --model Qwen/Qwen3-1.7B \
+    --limit 100 \
+    --adapter-from-run-id 2026-05-11_10-28_F_claude-opus-4-7_qwen3-1.7b_seed0 \
+    --keep-pod
+```
+
+The pod rclone-pulls `drive:<adapter-run-id>/final_model/` at startup. `pull_baseline.py` promotes to `baselines/<model_slug>/adapter_eval/<adapter-run-id>/` so adapter results don't collide with base baselines.
+
+### Parallel runs
+
+Two pods on the same `networkVolumeId` was rejected by the RunPod allocator (see design-todo #9). Pass a separate volume ID via env to one of them:
+
+```bash
+RUNPOD_VOLUME_ID=riin1cqm6k PYTHONPATH=. ... submit_baseline.py ...
+```
+
+Volumes managed via `runpodctl network-volume create --name <n> --data-center-id EU-CZ-1 --size 100`.
 
 ### Key flags
 
@@ -63,9 +108,17 @@ PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
 | `--time-budget-h` | Agent training budget. Pre/post-eval time is on top. |
 | `--limit` | Sample count per eval pass. 30 is a small smoke; 150 is a real run. |
 | `--skip-heldout` | Skip the held-out capability panel after post-eval. Use for sycophancy-only smokes. |
+| `--skip-pre-eval` | Pod skips pre-eval (and extras-pre-eval). summary.json gets `pre=None`, `delta=None`; intent is to backfill from `baselines/<slug>/<bench>__limit<N>.json` after run. Saves ~5-15min per run when baselines exist. Requires `scripts/compute_deltas.py` (not yet built — design-todo #4) for automated backfill; until then, manual JSON merge. |
 | `--no-drive-upload` | Pod skips rclone-to-Drive (debug). |
 | `--keep-pod` | Pod doesn't self-terminate after DONE (debug). |
-| `--dry-run` | Pre-eval + dir scaffold only; skip agent + post-eval. |
+| `--dry-run` | Pre-eval + dir scaffold only; skip agent + post-eval. Useful for materialising a fresh pre-eval pair on a target model without paying the agent budget. |
+
+### Baseline-specific flags
+
+| Flag | Notes |
+|------|-------|
+| `--only-bench gsm8k,mmlu,...` | Comma-separated subset of EVAL_SUITE to re-run. Use after a partial baseline to refresh only the failed ones. |
+| `--adapter-from-run-id <id>` | Adapter-eval mode (see above). Pod rclone-pulls `drive:<id>/final_model/`, vllm-up `--enable-lora`. |
 
 ### Conditions
 

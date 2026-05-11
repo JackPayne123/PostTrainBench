@@ -2,6 +2,41 @@
 
 Notable commits/fixes in `JackPayne123/PostTrainBench` `add_harbor_support` branch beyond what upstream `aisa-group/PostTrainBench` ships. Keep newest first.
 
+## 2026-05-11 — first paired baseline / adapter-eval, full 22-eval F-run analysis
+
+First full-suite paired comparison. Trained an F-condition LoRA on Qwen3-1.7B (run `2026-05-11_10-28_F_claude-opus-4-7_qwen3-1.7b_seed0`; agent claude-opus-4-7, 30min budget; train on sycophancy_slava + sycophancy_aisi, n=100), then ran the **same 22-eval suite** on (a) base Qwen3-1.7B IT and (b) base + the F-trained adapter. Image `:18` for both legs of the comparison.
+
+### Headline: sycophancy goes down, but capability collapses
+
+| Bench | Base | Adapter | Δ |
+|------|------|---------|---|
+| arc_easy | 0.88 | 0.12 | **-0.76** |
+| truthfulqa | 0.47 | 0.13 | -0.34 |
+| mmlu | 0.46 | 0.14 | -0.32 |
+| healthbench | 0.43 | 0.14 | -0.28 |
+| gsm8k | 0.75 | 0.55 | -0.20 |
+| sycophancy_aisi | 0.33 | 0.14 | **-0.19** (good under F) |
+| sycophancy_sharma | 0.74 | 0.56 | -0.18 (good under F) |
+| humaneval | 0.70 | 0.56 | -0.14 |
+| gpqamain | 0.26 | 0.15 | -0.11 |
+| sycophancy_slava | 0.27 | 0.20 | -0.067 (good under F, SE±0.07) |
+| strong_reject jailbreak_rate | 0.19 | **0.29** | +0.10 (worse) |
+
+Plus 7 multi-dim safety/character evals: big_five Neuroticism jumps from 0.53 → 0.90, Agreeableness disappears from outputs entirely, rozado_battery economic_axis_mean shifts -14 points left, abstention_bench Squad2/QASPER/MediQ collapse to 0 while FalseQA/SelfAware climb 0→1.
+
+Headline verdict: the sycophancy drop is explained by **capability collapse**, not by the adapter teaching the model to push back. `strong_reject` going UP (+0.10) confirms the adapter is not pure refusal — it's broken-format / mode-collapsed outputs that the judge interprets as compliance.
+
+### New tooling
+
+- `scripts/compute_deltas.py` — base-vs-adapter delta table per eval; reads `baselines/<slug>/<bench>__limit<N>.json` + `baselines/<slug>/adapter_eval/<run-id>/<bench>__limit<N>.json`. Scalar headline uses `registry.get_headline`; multi-dim flattens one-level + delta'd per key. `--write-deltas` persists to `jobs/runs/<adapter-run-id>/deltas.json`.
+- `src/evals/registry.py:get_headline` — fixed to try literal-key match first before dotted-path walk. `strong_reject_scorer.jailbreak_rate` is stored as a flat key with a literal dot, not a nested dict; the old walker returned None and silently dropped the headline.
+- `src/runpod_backend/pull_baseline.py` already supports `--skip-pull` + adapter-eval promotion to `baselines/<slug>/adapter_eval/<adapter-run-id>/` (`kind: adapter_eval` in config.json).
+
+### Pipeline state
+
+- Image `:18` still default. `:19` was triggered with no new fixes (superseded). `:20` triggered with spiralbench_mini judge/ pkg fix + political_bias_openai prompts.jsonl checked in (recovers 2 of the 4 baseline-fail evals). Bump `DEFAULT_IMAGE` to `:20` once build + diag pass.
+- 4 evals still don't run in this baseline: bfcl (needs tool-call vllm config), spiralbench_mini (pre-`:20` judge/ packaging), political_bias_openai (pre-`:20` missing prompts.jsonl), moru (graded by served vllm — Qwen3-1.7B grading own moral-reasoning answers, slow + noisy; see `docs/experimental-design-todos.md` #2).
+
 ## 2026-05-10 — local trace viewer
 
 Added `dev_utils/trace_viewer/app.py`: stdlib HTTP server (no Flask, no extra deps) that browses `jobs/runs/` and renders agent traces from `solve_out.jsonl`. Run `python3 dev_utils/trace_viewer/app.py` and open http://127.0.0.1:8765. Reads files live - new runs appear on refresh, no sync step.
