@@ -53,7 +53,7 @@ def _parse_answer_lenient(text: str) -> str | None:
     return None
 
 
-def _build_lenient_task(language: str = "EN_US", max_non_cot_tokens: int = 256):
+def _build_lenient_task(language: str = "EN_US", max_non_cot_tokens: int = 1024):
     """Build mmlu_0_shot Task with a lenient ANSWER-prefix scorer + bigger
     max_non_cot_tokens budget.
 

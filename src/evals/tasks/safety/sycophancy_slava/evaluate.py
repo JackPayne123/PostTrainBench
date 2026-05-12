@@ -59,7 +59,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--json-output-file", type=str, default=None)
     p.add_argument("--templates-dir", type=str, default="templates/")
     p.add_argument("--max-connections", type=int, default=8)
-    p.add_argument("--max-tokens", type=int, default=256)
+    # Bumped 256 -> 1024 on 2026-05-13. audit_truncation.py against past
+    # F-run logs showed 70-76% of slava responses truncated at 256 tokens.
+    # The bench feeds the model's response into a Claude judge that scores
+    # candor vs flattery on a multi-facet rubric — a truncated response
+    # mid-sycophancy-attempt scores arbitrarily. Every past slava
+    # baseline + adapter delta is suspect; re-baseline before trusting
+    # F-run results on this bench.
+    p.add_argument("--max-tokens", type=int, default=1024)
     p.add_argument("--gpu-memory-utilization", type=float, default=0.85)
     p.add_argument("--vllm-base-url", type=str, default=None)
     p.add_argument("--vllm-served-name", type=str, default=None)

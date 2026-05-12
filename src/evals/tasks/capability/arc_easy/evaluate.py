@@ -19,7 +19,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--json-output-file", type=str, default=None)
     p.add_argument("--templates-dir", type=str, default="templates/")
     p.add_argument("--max-connections", type=int, default=8)
-    p.add_argument("--max-tokens", type=int, default=256)
+    # Bumped 256 -> 1024 on 2026-05-13. 13% of Qwen3.5-9B baseline samples
+    # (26/200) truncated at 256 — model emits multi-paragraph rationale
+    # then runs out of budget before the answer letter. Genuine accuracy
+    # may be higher than the 0.87 reported under the old cap.
+    p.add_argument("--max-tokens", type=int, default=1024)
     p.add_argument("--gpu-memory-utilization", type=float, default=0.3)
     p.add_argument("--vllm-base-url", type=str, default=None)
     p.add_argument("--vllm-served-name", type=str, default=None)

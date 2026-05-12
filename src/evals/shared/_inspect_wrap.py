@@ -19,6 +19,7 @@ import sys
 from typing import Optional
 
 from _common import add_standard_args, template_kwargs, write_metrics
+from _progress import ProgressTimer
 
 
 def run_inspect_eval(
@@ -63,6 +64,29 @@ def run_inspect_eval(
         model_args = {"gpu_memory_utilization": args.gpu_memory_utilization}
         model_args.update(template_kwargs(args))
 
+    # Bookend timing for inspect_evals tasks — the inner generation +
+    # grader loop is opaque to us (inspect_ai owns it), so we just log
+    # start + end with elapsed time. Inspect_ai's own progress bar is
+    # suppressed via score_display + log_realtime to keep eval_*.log clean.
+    import time as _time
+    _bench_name = task.split("/")[-1] if isinstance(task, str) else getattr(task, "__name__", "inspect_task")
+    _n = other_kwargs.get("limit", "?")
+    print(f"[progress] {_bench_name} inspect_eval   starting (n_samples={_n} max_connections={args.max_connections})",
+          flush=True)
+    # Enforce a min-tokens floor. Caught on 2026-05-13 Qwen3.5-9B baseline
+    # #cac466: upstream inspect_evals/mmlu_0_shot internally caps via
+    # max_non_cot_tokens=16, which truncated 92/200 of Qwen3.5's outputs
+    # mid-rationale (the model emits a brief explanation before the answer
+    # letter, even with thinking off). 128 is plenty for any single-letter
+    # MCQ commitment + a short preamble; CoT evals already set 256-4000.
+    # Caller can override per-eval via --max-tokens.
+    _MIN_TOKEN_FLOOR = 128
+    effective_max_tokens = max(args.max_tokens, _MIN_TOKEN_FLOOR)
+    if effective_max_tokens != args.max_tokens:
+        print(f"[progress] {_bench_name} max_tokens floor: {args.max_tokens} -> "
+              f"{effective_max_tokens} (avoids upstream truncation regression)",
+              flush=True)
+    _t0 = _time.monotonic()
     eval_out = inspect_eval(
         task,
         model=model,
@@ -76,10 +100,12 @@ def run_inspect_eval(
         log_format="json",
         timeout=18000000,
         attempt_timeout=18000000,
-        max_tokens=args.max_tokens,
+        max_tokens=effective_max_tokens,
         max_connections=args.max_connections,
         **other_kwargs,
     )
+    _elapsed = _time.monotonic() - _t0
+    print(f"[progress] {_bench_name} inspect_eval   done elapsed={_elapsed:.1f}s  ✓", flush=True)
 
     if args.json_output_file is not None:
         write_metrics(eval_out, args.json_output_file)

@@ -39,6 +39,15 @@ def model_type(args: argparse.Namespace) -> str:
 
 
 def template_kwargs(args: argparse.Namespace) -> dict:
+    """Return vllm model_args entries for chat-template selection.
+
+    Picks the right jinja file per family + forwards `enable_thinking`
+    to the template via vllm's `chat_template_kwargs`. Most templates
+    ignore unknown kwargs, so passing this for non-Qwen families is a
+    no-op. Default thinking-OFF mirrors qwen3.jinja's default-OFF
+    behaviour (avoids the 1k+ reasoning tokens during evals where we
+    just want a committed answer).
+    """
     template_map = {
         "qwen": "qwen3.jinja",
         "llama": "llama3.jinja",
@@ -46,7 +55,14 @@ def template_kwargs(args: argparse.Namespace) -> dict:
         "smollm": "smollm.jinja",
     }
     template = template_map[model_type(args)]
-    return {"chat_template": os.path.join(args.templates_dir, template)}
+    kwargs: dict = {"chat_template": os.path.join(args.templates_dir, template)}
+    enable_thinking = getattr(args, "enable_thinking", False)
+    # vllm forwards chat_template_kwargs to the jinja template at apply
+    # time. Set explicitly so the template sees `enable_thinking` defined
+    # (not just absent — qwen3.jinja checks `is defined and is true`,
+    # so absent and false both mean thinking-off).
+    kwargs["chat_template_kwargs"] = {"enable_thinking": bool(enable_thinking)}
+    return kwargs
 
 
 def add_standard_args(parser: argparse.ArgumentParser, default_limit: int) -> None:
@@ -62,6 +78,18 @@ def add_standard_args(parser: argparse.ArgumentParser, default_limit: int) -> No
     parser.add_argument("--max-connections", type=int, default=8)
     parser.add_argument("--max-tokens", type=int, default=4000)
     parser.add_argument("--gpu-memory-utilization", type=float, default=0.3)
+    # Thinking-mode toggle. Default OFF (matches qwen3.jinja default).
+    # Pass --enable-thinking on the command line to enable reasoning blocks
+    # for CoT-style evals where the extra 1k-2k reasoning tokens are
+    # actually useful (aime2025, healthbench, etc). Off for MCQ-style
+    # evals where we just want a single-letter commitment.
+    parser.add_argument(
+        "--enable-thinking",
+        action="store_true",
+        default=False,
+        help="Enable thinking-mode for Qwen3-family models (no-op for "
+             "other families). Forwarded via vllm's chat_template_kwargs.",
+    )
     # Shared vllm: skip the per-task vllm boot and talk to an external
     # OpenAI-compat endpoint (typically vllm started by run_heldout.sh
     # at the start of the panel). Saves ~60s per task × 15 tasks = ~15 min.
