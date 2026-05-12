@@ -132,15 +132,63 @@ PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
 
 The pod rclone-pulls `drive:<adapter-run-id>/final_model/` at startup. `pull_baseline.py` promotes to `baselines/<model_slug>/adapter_eval/<adapter-run-id>/` so adapter results don't collide with base baselines.
 
-### Parallel runs
+### Parallel runs + multi-user volume coordination
 
-Two pods on the same `networkVolumeId` was rejected by the RunPod allocator (see design-todo #9). Pass a separate volume ID via env to one of them:
+Two pods on the same `networkVolumeId` was rejected by the RunPod allocator (see design-todo #9). Each concurrent pod needs its own network volume.
 
-```bash
-RUNPOD_VOLUME_ID=riin1cqm6k PYTHONPATH=. ... submit_baseline.py ...
-```
+**When the user (Jack) or a collaborator (Slava) asks Claude to submit a run, Claude MUST follow this decision tree before calling `submit_run.py` / `submit_baseline.py` — do not just blindly attach to the default `qwe92egpys`:**
 
-Volumes managed via `runpodctl network-volume create --name <n> --data-center-id EU-CZ-1 --size 100`.
+1. **Check active pods + which volumes they're attached to.** Run:
+
+    ```bash
+    set -a && source .env && set +a
+    curl -sX POST https://api.runpod.io/graphql \
+        -H "Authorization: Bearer $RUNPOD_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{"query":"query { myself { networkVolumes { id name dataCenterId size } pods { id name desiredStatus runtime { uptimeInSeconds } } } }"}' \
+        | python3 -m json.tool
+    ```
+
+    Pod names follow `harbor-<session_id>` (set by `runpod_environment.py:_create_pod`); `session_id` is the run dir name (e.g. `harbor-2026-05-12_10-16_baseline_qwen_qwen3-1.7b_limit100_573ee`). Pod names don't include the volume id directly — you need to either (a) infer from naming convention, (b) ssh in and `cat /workspace/runs/*/config.json` if you need certainty, or (c) just assume a RUNNING pod is on the default `qwe92egpys` unless something says otherwise (that's our historical default).
+
+2. **Pick a free volume in EU-CZ-1:**
+
+   | Volume | Convention | When to use |
+   |--------|-----------|-------------|
+   | `qwe92egpys` (jack-pilot-cz) | Jack's primary | Default for Jack's runs when no pod attached |
+   | `riin1cqm6k` (jack-baseline-pilot) | Jack's secondary | Parallel slot when primary is busy |
+   | Slava's volume (TBD — Slava creates own) | Slava's primary | Slava's runs |
+
+3. **If all known free volumes have a RUNNING pod attached → CREATE A NEW VOLUME** (don't queue, don't wait, don't multi-attach):
+
+    ```bash
+    # Name it after the user + a short token so we can tell whose-is-whose later.
+    VOL_NAME="slava-ptb-$(date +%Y%m%d)"  # or jack-ptb-... etc
+    runpodctl network-volume create \
+        --name "$VOL_NAME" \
+        --data-center-id EU-CZ-1 \
+        --size 100
+    # Capture the returned id → use as RUNPOD_VOLUME_ID for this submit.
+    ```
+
+    Then submit with the new volume:
+
+    ```bash
+    RUNPOD_VOLUME_ID=<new-volume-id> PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
+        src/runpod_backend/submit_run.py ...
+    ```
+
+4. **Tell the user the volume choice** — surface it as part of the "I'm about to submit" message so they can override. Phrase like:
+
+    > "Default volume `qwe92egpys` busy (pod `harbor-2026-05-12_...` running 86min). Falling back to `riin1cqm6k` (free) for this submit."
+
+    Or if creating new:
+
+    > "Both `qwe92egpys` and `riin1cqm6k` busy. Creating new volume `slava-ptb-20260512` in EU-CZ-1 (100GB, ~$7/mo)."
+
+**Cost note:** each new 100GB EU-CZ-1 network volume bills at ~$0.07/GB/mo ≈ $7/mo idle. Don't proliferate volumes — re-use freed ones (delete only after pulling all artifacts to laptop + verifying Drive upload). Periodically clean up via `runpodctl network-volume rm <id>` for any volume with no recent runs in `jobs/runs/`.
+
+**On shared RunPod accounts (e.g. Jack + Slava on a corporate plan):** all volumes are visible to both users via the same `RUNPOD_API_KEY`. So Slava can pin `RUNPOD_VOLUME_ID=riin1cqm6k` in his `.env` to default to Jack's secondary, falling back to a fresh per-Slava volume only if Jack also has both his volumes pinned. Coordinate by checking the live pod list before submit (step 1 above) — the live state is the only authoritative answer, not local config.
 
 ### Key flags
 
