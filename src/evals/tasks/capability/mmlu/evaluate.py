@@ -1,21 +1,103 @@
 #!/usr/bin/env python3
 """MMLU eval, mirrors src/eval/tasks/gsm8k/evaluate.py.
 
-Uses inspect_evals.mmlu's 0-shot variant (`inspect_evals/mmlu_0_shot`).
-MCQ scored on choice logprob, so format-tolerant on a base model.
-Default limit 200 to keep runtime ~5 min on a 3090.
+Uses inspect_evals.mmlu's 0-shot dataset + solver but swaps the strict
+`choice()` scorer for a lenient ANSWER-prefix parser (mirrors the same
+fix big_five got on :23).
+
+Lenient scorer (2026-05-13)
+---------------------------
+Upstream `mmlu_0_shot` ships the strict `choice()` scorer, which only
+accepts outputs matching `ANSWER: <letter>`. Caught on the 2026-05-13
+Qwen3.5-9B baseline run #cac466: 121/200 samples were rejected as
+invalid ("value='I'") because the model emitted free-form rationales
+or letter-prefix variants instead of the literal ANSWER: format. Reported
+accuracy dropped to 0.395 (target +0.65 for 9B).
+
+The lenient parser accepts:
+  * `ANSWER: X` (existing format)
+  * `X)` / `X.` / `X:` at start of a line
+  * `X` on its own line
+
+If the model didn't commit to one of A/B/C/D within the first token of
+a line it still registers as invalid — same conservative semantics as
+the big_five fix.
 """
 from __future__ import annotations
 import os
 
 import argparse
 import json
+import re
 
 from inspect_ai.log._log import EvalLog, EvalMetric, EvalSample
 from inspect_ai import eval as inspect_eval  # type: ignore  # noqa: E402
 from inspect_ai.util._display import init_display_type  # noqa: E402
 
 import inspect_evals.mmlu  # noqa: F401, E402  (registers task definitions)
+
+
+_LENIENT_PATTERNS = (
+    re.compile(r"ANSWER\s*:\s*([A-Da-d])\b", re.IGNORECASE | re.MULTILINE),
+    re.compile(r"^\s*([A-Da-d])\s*[\)\.:]", re.MULTILINE),
+    re.compile(r"^\s*([A-Da-d])\s*$", re.MULTILINE),
+)
+
+
+def _parse_answer_lenient(text: str) -> str | None:
+    """Try each pattern; return first matched letter (uppercased), or None."""
+    for pat in _LENIENT_PATTERNS:
+        m = pat.search(text)
+        if m:
+            return m.group(1).upper()
+    return None
+
+
+def _build_lenient_task(language: str = "EN_US"):
+    """Build mmlu_0_shot Task with a lenient ANSWER-prefix scorer.
+
+    Imports lazily so `--help` works without inspect_evals installed.
+    The dataset + solver come from the upstream `inspect_evals.mmlu`
+    helpers; only the scorer is swapped. Task instance is passed
+    directly to `inspect_ai.eval` (not the registry-string path)
+    because a script-local `@task`-decorated function doesn't register
+    under the upstream namespace.
+    """
+    from inspect_ai import Task
+    from inspect_ai.model import GenerateConfig
+    from inspect_ai.scorer import CORRECT, INCORRECT, Score, Target, accuracy, scorer, stderr
+    from inspect_ai.solver import TaskState
+    from inspect_evals.mmlu.mmlu import (
+        EVAL_VERSION,
+        get_mmlu_dataset,
+        get_mmmlu_dataset,
+        mmlu_multiple_choice,
+    )
+    from inspect_evals.constants import GPT_5_MIN_TOKENS
+
+    @scorer(metrics=[accuracy(), stderr()])
+    def any_choice_lenient():
+        async def score(state: TaskState, target: Target) -> Score:
+            text = state.output.completion
+            letter = _parse_answer_lenient(text)
+            if letter is not None and letter in target.text:
+                return Score(value=CORRECT, answer=letter, explanation=text)
+            return Score(value=INCORRECT, answer=letter, explanation=text)
+        return score
+
+    if language == "EN_US":
+        dataset = get_mmlu_dataset("test", shuffle=True, subjects=[])
+    else:
+        dataset = get_mmmlu_dataset("test", shuffle=True, language=language, subjects=[])
+
+    return Task(
+        dataset=dataset,
+        solver=mmlu_multiple_choice(cot=False, max_non_cot_tokens=GPT_5_MIN_TOKENS),
+        scorer=any_choice_lenient(),
+        config=GenerateConfig(temperature=0.0),
+        version=EVAL_VERSION.comparability_version,
+        metadata=EVAL_VERSION.to_metadata(),
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,7 +123,9 @@ def main() -> None:
     if args.limit is not None and args.limit != -1:
         other_kwargs["limit"] = args.limit
 
-    task = "inspect_evals/mmlu_0_shot"
+    # Lenient-scorer Task instance (not registry-string).
+    # See _build_lenient_task for the rationale.
+    task = _build_lenient_task()
     if args.vllm_base_url and args.vllm_served_name:
         model = f"openai-api/local/{args.vllm_served_name}"
         model_args = {"api_key": "inspectai"}
