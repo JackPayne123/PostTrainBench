@@ -24,13 +24,43 @@ mkdir -p "$OUT_DIR"
 METRICS_FILE=$(mktemp "$OUT_DIR/score.metrics.XXXXXX.json")
 LOG_FILE="$OUT_DIR/score.log"
 
+# Resolve any relative path arguments to absolute paths BEFORE sudo.
+# score_runner.sh `cd $EVAL_DIR` before exec'ing evaluate.py, so a
+# relative `--model-path final_model` from the agent's cwd would
+# break (FileNotFoundError: final_model/config.json — caught on
+# 2026-05-12 Qwen3.5-9B F-run analysis). Resolve here so the agent
+# can keep using the natural `--model-path final_model` convention.
+#
+# Args we rewrite: known path flags only. Conservative — flags that
+# happen to take non-path values pass through unchanged.
+REWRITTEN=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --model-path|--templates-dir|--output-dir|--eval-data)
+            flag="$1"
+            shift
+            val="${1:-}"
+            # Only resolve relative paths; absolute or empty/flag-like pass through.
+            if [ -n "$val" ] && [ "${val:0:1}" != "-" ] && [ "${val:0:1}" != "/" ]; then
+                val="$(realpath -m "$val")"
+            fi
+            REWRITTEN+=("$flag" "$val")
+            shift
+            ;;
+        *)
+            REWRITTEN+=("$1")
+            shift
+            ;;
+    esac
+done
+
 # No BENCH env var passed — score_runner.sh reads it from
 # /etc/ptb_run/bench. This deliberately means an agent setting
 # BENCH=foo in its environment has no effect on which task is
 # evaluated. Sudoers entry stays minimal NOPASSWD-only; no SETENV
 # or env_keep needed.
 sudo -n /opt/pipeline-bin/score_runner.sh \
-    "$@" --json-output-file "$METRICS_FILE" \
+    "${REWRITTEN[@]}" --json-output-file "$METRICS_FILE" \
     >> "$LOG_FILE" 2>&1
 rc=$?
 
