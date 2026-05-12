@@ -1,10 +1,18 @@
 name: Build + push ptb-base
 
 # Builds dockerfiles/Dockerfile.base on a native amd64 GitHub runner (no QEMU,
-# datacenter network) and pushes to Docker Hub. ~5-7 min vs ~30 min on M-series Mac.
+# datacenter network) and pushes to GHCR. ~5-7 min vs ~30 min on M-series Mac.
 #
-# Triggered manually with a tag (e.g. ptb-base:3) and the Dockerfile path.
-# Requires repo secrets: DOCKERHUB_USERNAME (= jackpayne123), DOCKERHUB_TOKEN (PAT).
+# Triggered manually with a tag (e.g. ptb-base:24) and the Dockerfile path.
+# Uses the auto-injected GITHUB_TOKEN for ghcr.io push — no extra secret needed.
+# Repo secret RCLONE_CONF still required (baked into image at /root/.config/rclone/).
+#
+# Migrated from Docker Hub on 2026-05-12 because:
+#   1. Docker Hub Personal accounts cannot grant Read access to private repos
+#      (need Pro/Team subscription) — blocks single-collaborator workflow.
+#   2. GHCR private packages auto-inherit repo permissions: anyone added to
+#      JackPayne123/PostTrainBench gets pull access for free.
+#   3. Free tier supports private packages with no quota concerns at our scale.
 
 on:
   workflow_dispatch:
@@ -28,6 +36,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write  # required for ghcr.io push
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,11 +55,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Stage rclone secret to file
         # Multi-line secrets (rclone.conf with embedded JSON token) MUST be
@@ -72,7 +84,7 @@ jobs:
           file: ${{ inputs.dockerfile }}
           platforms: linux/amd64
           push: true
-          tags: jackpayne123/ptb-base:${{ inputs.tag }}
+          tags: ghcr.io/jackpayne123/ptb-base:${{ inputs.tag }}
           secret-files: |
             rclone_conf=${{ env.RCLONE_CONF_FILE }}
           # No cache-from/cache-to: each invocation fresh. Add registry cache later

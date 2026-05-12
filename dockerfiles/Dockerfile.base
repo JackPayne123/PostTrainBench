@@ -3,16 +3,19 @@
 # Mirrors PostTrainBench's harbor_adapter/template/environment/Dockerfile
 # (the curated stack: vllm 0.11.0, claude-code, codex, gemini-cli, full ML
 # package set, inspect_evals from GitHub) WITHOUT the per-task COPY layer.
-# Per-task images derive from this via `FROM jackpayne123/ptb-base:1`.
+# Per-task images derive from this via `FROM ghcr.io/jackpayne123/ptb-base:24`.
 #
 # Pinned versions (vs PTB's template):
 #   transformers>=4.46,<5.0   — vllm 0.11.0 calls Qwen2Tokenizer.all_special_tokens_extended
 #                                 which transformers 5.x removed. Burned us 2026-05-07.
 #
-# Build (linux/amd64 from M-series Mac):
+# Build via GitHub Actions (preferred — native amd64, ~10 min):
+#   gh workflow run build-ptb-base.yml -f tag=N -R JackPayne123/PostTrainBench
+#
+# Build locally (linux/amd64 from M-series Mac — QEMU, ~30 min):
 #   docker buildx build --platform linux/amd64 \
 #     -f dockerfiles/Dockerfile.base \
-#     -t jackpayne123/ptb-base:1 \
+#     -t ghcr.io/jackpayne123/ptb-base:N \
 #     --push .
 # Derive from RunPod's pytorch image — they ship a startup script that handles
 # the $PUBLIC_KEY env var (writes authorized_keys, starts sshd) so the container

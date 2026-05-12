@@ -15,6 +15,52 @@ Architecture details and full design rationale live in `docs/OPERATIONS.md`. Thi
 
 ---
 
+## First-time setup (skip if `.env` already populated)
+
+Do these once per user, in order. If `.env` exists at the repo root and exports `RUNPOD_API_KEY` + `RUNPOD_REGISTRY_AUTH_ID`, you're already onboarded — jump to `## Environment`.
+
+Start from the template:
+
+```bash
+cd /Users/jack/projects/claude-trains-qwen-new
+cp .env.template .env
+# Edit .env with values from the steps below
+```
+
+| # | Step | Command / Where | Output → `.env` |
+|---|------|-----------------|-----------------|
+| 1 | RunPod account + API key | runpod.io/console/user/settings → API → generate | `RUNPOD_API_KEY` |
+| 2 | SSH key (auto-registers pub key on account) | `runpodctl config --apiKey $RUNPOD_API_KEY` | (file at `~/.runpod/ssh/RunPod-Key-Go`) |
+| 3 | GitHub repo access | Jack adds collaborator on `JackPayne123/PostTrainBench` (gates GHCR pull) | — |
+| 4 | GitHub PAT (classic), scope `read:packages` only | github.com/settings/tokens → Generate new (classic) | `<github_pat>` (used in step 5) |
+| 5 | Register PAT on RunPod | `curl -sX POST https://api.runpod.io/graphql -H "Authorization: Bearer $RUNPOD_API_KEY" -H "Content-Type: application/json" -d '{"query":"mutation { saveRegistryAuth(input: {name: \"ghcr-ptb-base\", username: \"<your-gh-username>\", password: \"<github_pat>\"}) { id name } }"}'` — capture returned `id` | `RUNPOD_REGISTRY_AUTH_ID` |
+| 6 | Personal network volume in EU-CZ-1 | `runpodctl network-volume create --name <user>-ptb --data-center-id EU-CZ-1 --size 100` | `RUNPOD_VOLUME_ID` |
+| 7 | Claude Code OAuth (own Claude Max plan) | `claude setup-token` — browser flow | `CLAUDE_CODE_OAUTH_TOKEN` |
+| 8 | HuggingFace token | huggingface.co → Settings → Access Tokens | `HF_TOKEN` |
+| 9 | **Accept Idavidrein/gpqa terms on the same HF account** | huggingface.co/datasets/Idavidrein/gpqa → Agree | — (gpqamain fails otherwise) |
+| 10 | Anthropic API key | console.anthropic.com → API keys | `ANTHROPIC_API_KEY` |
+| 11 | OpenAI API key | platform.openai.com → API keys | `OPENAI_API_KEY` |
+| 12 | Local tooling | `uv` installed, `gh` installed + auth'd, repo cloned. Harbor venv: `uv pip install --python ~/.local/share/uv/tools/harbor/bin/python anthropic` | — |
+| 13 | (Optional) Own Drive upload | Default uploads land in Jack's Drive. To use own: regenerate `RCLONE_CONF` repo secret, rebuild image. Or submit with `--no-drive-upload` + `pull_run.py --from-volume`. | — |
+
+Confirm with a tiny dry-run:
+
+```bash
+set -a && source .env && set +a
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
+    src/runpod_backend/submit_run.py \
+    --condition A --teacher claude-opus-4-7 \
+    --student Qwen/Qwen3-1.7B --benchmark gsm8k \
+    --time-budget-h 0.1 --limit 5 \
+    --skip-heldout --skip-pre-eval --dry-run
+```
+
+Expect: pod boots in ~3 min (cold image pull), dry-run completes in ~5 min, terminates cleanly. If it 401s on image pull, step 5 didn't take — re-run the saveRegistryAuth mutation and verify the id matches `.env`.
+
+Full prereq reference + Drive option details: `docs/OPERATIONS.md` § Prerequisites.
+
+---
+
 ## Environment
 
 Always work from the repo root with `.env` loaded:
@@ -24,13 +70,13 @@ cd /Users/jack/projects/claude-trains-qwen-new
 set -a && source .env && set +a
 ```
 
-`.env` must export at minimum: `RUNPOD_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `HF_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`.
+`.env` must export at minimum: `RUNPOD_API_KEY`, `RUNPOD_REGISTRY_AUTH_ID`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `HF_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`. Optional: `RUNPOD_VOLUME_ID` (override the default jack-pilot-cz volume — needed for parallel runs or non-Jack accounts). Template at `.env.template`.
 
 Python entrypoint: `~/.local/share/uv/tools/harbor/bin/python` (Harbor venv with all deps).
 
 SSH key: `~/.runpod/ssh/RunPod-Key-Go`.
 
-Default image set in `src/runpod_backend/runpod_environment.py:DEFAULT_IMAGE`. Bump after a new ptb-base build (e.g. `:11`).
+Default image set in `src/runpod_backend/runpod_environment.py:DEFAULT_IMAGE` (now `ghcr.io/jackpayne123/ptb-base:<tag>`, private). Bump after a new ptb-base build.
 
 ---
 
@@ -103,12 +149,14 @@ Volumes managed via `runpodctl network-volume create --name <n> --data-center-id
 | `--condition` | A/B/C/D/E/F. See "Conditions" below. |
 | `--teacher` | Agent model (e.g. `claude-opus-4-7`). Passed as AGENT_CONFIG to solve.sh. |
 | `--student` | Base HF model id (e.g. `Qwen/Qwen3-1.7B-Base` for capability evals; `Qwen/Qwen3-1.7B` for IT). |
-| `--benchmark` | Primary task. Choices: `gsm8k`, `humaneval`, `aime2025`, `gpqamain`, `bfcl`, `arenahardwriting`, `healthbench`, `sycophancy`, `sycophancy_slava`, `sycophancy_aisi`. |
+| `--benchmark` | Primary task. Registered choices live in `src/evals/registry.py:EVAL_SUITE` (23 evals as of 2026-05-12, bfcl excluded). Common: `gsm8k`, `humaneval`, `aime2025`, `gpqamain`, `arenahardwriting`, `healthbench`, `sycophancy_slava`, `sycophancy_aisi`. |
 | `--extra-evals` | Comma-separated additional benchmarks; pre/post-eval only (no training). |
 | `--time-budget-h` | Agent training budget. Pre/post-eval time is on top. |
-| `--limit` | Sample count per eval pass. 30 is a small smoke; 150 is a real run. |
+| `--limit` | Sample count per eval pass. 30 is a small smoke; 100 is the standard. Per-eval defaults live in `EvalInfo.default_limit` if `--limit 0`. |
 | `--skip-heldout` | Skip the held-out capability panel after post-eval. Use for sycophancy-only smokes. |
-| `--skip-pre-eval` | Pod skips pre-eval (and extras-pre-eval). summary.json gets `pre=None`, `delta=None`; intent is to backfill from `baselines/<slug>/<bench>__limit<N>.json` after run. Saves ~5-15min per run when baselines exist. Requires `scripts/compute_deltas.py` (not yet built — design-todo #4) for automated backfill; until then, manual JSON merge. |
+| `--skip-pre-eval` | Pod skips pre-eval (and extras-pre-eval). summary.json gets `pre=None`, `delta=None`. Backfill via `scripts/compute_deltas.py <run_id> --write-deltas --update-summary` once baselines exist. Implied by `--use-baseline`. |
+| `--use-baseline` | **Fail-fast** at submit time if `baselines/<student-slug>/<bench>__limit<N>.json` is missing for primary or any `--extra-evals`. Implies `--skip-pre-eval`. Error message includes a copy-pasteable `submit_baseline.py --only-bench …` recovery hint. Use this for any "real" F-run so you can't accidentally run without a baseline reference. |
+| `--bypass-template-check` | Skip the chat-template validation gate for the `--student`. Only for debug. Eval scores will be unreliable if format is wrong. |
 | `--no-drive-upload` | Pod skips rclone-to-Drive (debug). |
 | `--keep-pod` | Pod doesn't self-terminate after DONE (debug). |
 | `--dry-run` | Pre-eval + dir scaffold only; skip agent + post-eval. Useful for materialising a fresh pre-eval pair on a target model without paying the agent budget. |
@@ -118,7 +166,27 @@ Volumes managed via `runpodctl network-volume create --name <n> --data-center-id
 | Flag | Notes |
 |------|-------|
 | `--only-bench gsm8k,mmlu,...` | Comma-separated subset of EVAL_SUITE to re-run. Use after a partial baseline to refresh only the failed ones. |
-| `--adapter-from-run-id <id>` | Adapter-eval mode (see above). Pod rclone-pulls `drive:<id>/final_model/`, vllm-up `--enable-lora`. |
+| `--adapter-from-run-id <id>` | Adapter-eval mode (see above). Pod rclone-pulls `drive:<id>/final_model/`, vllm-up `--enable-lora`. Pod env exports `PTB_ARENA_ADAPTER_ALIAS=<short-id>` so arena's candidate alias doesn't collide with the baseline reference. |
+| `--limit 0` | Use per-eval `default_limit` from registry (aime=30 full, mmlu/arc_easy=200, big_five=40 full, etc). `--limit 100` forces same N across all evals. run-id token reads `perEval` in default mode, `limit100` etc when forced. |
+| `--bypass-template-check` | Same as submit_run's escape hatch. |
+
+### Pre-flight gates (fail-fast at submit time)
+
+Both `submit_run.py` and `submit_baseline.py` run pre-flight checks at the top of `main()` that refuse to submit if:
+
+1. **Chat-template not validated.** `--student` (`--model` for baselines) must appear in `src/evals/templates/validated_models.json`. To add a new student model:
+   ```bash
+   uv run --no-project --python 3.12 --with 'transformers>=4.46,<5.0' \
+       --with 'huggingface_hub<1.0' --with 'jinja2' \
+       python scripts/validate_chat_templates.py --model <HF-id> --commit
+   ```
+   Inspect the printed (prompt, completion) pairs for both `enable_thinking=True/False`. `--commit` writes to the manifest on pass; submits then accept the model. Existing helpers: `format_qwen3_chat` (validated on Qwen3-1.7B + Qwen3-1.7B-Base), `format_gemma_chat` (stub), `format_smollm_chat` (stub). When adding a new family, write the helper in `src/evals/templates/lora_starter.py` + register in `CHAT_FORMATTERS` + `_FAMILY_HINTS`.
+
+2. **Baselines missing** (only when `--use-baseline` is set). The flag requires `baselines/<student-slug>/<bench>__limit<N>.json` for primary + each extra-eval. Recovery hint in the error tells you exactly which `submit_baseline.py --only-bench …` invocation to run.
+
+### Run-id format
+
+`<YYYY-MM-DD_HH-MM>_<kind>_<slug>_<seedX>_<6-char-hex>` for agent runs; `<ts>_<kind>_<slug>_<limit-token>_<hex>` for baselines. The 6-char `secrets.token_hex(3)` suffix prevents same-minute collisions during parallel sweeps. Example: `2026-05-12_10-16_baseline_qwen_qwen3-1.7b_limit100_573ee8`.
 
 ### Conditions
 
@@ -269,6 +337,23 @@ Optional flags:
 - `--port 9000` — different port if 8765 is taken
 - `--runs-dir /path/to/jobs/runs` — different run directory
 
+### Character dashboard (post-run multi-dim visualisation)
+
+After an adapter-eval lands + `compute_deltas.py --write-deltas` runs, the dashboard renders the multi-dim character shifts as eval-appropriate visualisations.
+
+```bash
+python3 dev_utils/character_dashboard/app.py
+# → http://127.0.0.1:8766
+```
+
+Single-page-per-run. Visualisations:
+- **rozado_battery** — political compass (inline SVG): economic × social axes, base + adapter dots, arrow between. Plus small-multiple compasses for each rozado sub-test that has econ+social axes (politicalCompassTest, politicalCoordinatesTest), and bar-rows for sub-tests with other axis schemes (ideologiesTest's hard_right / left_liberalism etc).
+- **big_five, moral_foundations, persona_traits, spiralbench_mini** — spectrum strips with semantic poles per axis (e.g. `Reserved ←→ Outgoing`, `Harm ←→ Care`, `Honest ←→ Sycophantic`, `Capitulates ←→ Pushes back`). Base + adapter dot per axis, colour-coded arrow between (green = desirable shift, red = undesirable, grey = neutral).
+- **moru, political_bias_openai, activity_preference** — paired bars (Chart.js).
+- Safety + capability scalar deltas at the bottom of the page.
+
+Suggest spinning up whenever character-tier comparison is the load-bearing analysis. Use `compute_deltas.py` markdown for capability/safety scalar review; use the dashboard for multi-dim character.
+
 ---
 
 ## Diagnosing the Pod-Side Image
@@ -388,7 +473,7 @@ For those, `src/runpod_backend/diag.py` runs against the candidate image's drive
 
 ## Image Builds
 
-Image is at `jackpayne123/ptb-base:<TAG>` on Docker Hub. Built from `dockerfiles/Dockerfile.base` via the `build-ptb-base.yml` GitHub Actions workflow.
+Image is at `ghcr.io/jackpayne123/ptb-base:<TAG>` on GHCR (migrated from Docker Hub 2026-05-12). Built from `dockerfiles/Dockerfile.base` via the `build-ptb-base.yml` GitHub Actions workflow.
 
 ```bash
 gh workflow run build-ptb-base.yml \
@@ -398,11 +483,13 @@ gh workflow run build-ptb-base.yml \
 gh run watch -R JackPayne123/PostTrainBench
 ```
 
-Builds take 10-15 minutes (vllm + ML stack pip install is the long pole). After success:
+Builds take 10-15 minutes (vllm + ML stack pip install is the long pole). Workflow uses auto-injected `GITHUB_TOKEN` for GHCR push — no Docker Hub secret needed. After success:
 
-1. Update `DEFAULT_IMAGE = "jackpayne123/ptb-base:<NEW_TAG>"` in `src/runpod_backend/runpod_environment.py`.
+1. Update `DEFAULT_IMAGE = "ghcr.io/jackpayne123/ptb-base:<NEW_TAG>"` in `src/runpod_backend/runpod_environment.py`.
 2. Run `diag.py` to confirm rclone works on the new image.
 3. Then submit real runs.
+
+**Visibility:** GHCR packages default to private on first publish. Visibility settings at `github.com/users/jackpayne123/packages/container/ptb-base/settings`. RunPod pulls require a registered cred (`saveRegistryAuth` GraphQL mutation, see Prerequisites in OPERATIONS.md); cred id stored in `.env:RUNPOD_REGISTRY_AUTH_ID` and picked up automatically by `_create_pod`.
 
 The build mounts `RCLONE_CONF` (a GitHub repo secret containing the full `[drive]` section + OAuth token + root_folder_id) via BuildKit's `secret-files:` input, baking it to `/root/.config/rclone/rclone.conf` in the image. **Multi-line values must use `secret-files:`, NOT `secrets:`** — the latter parses per-line as `KEY=VALUE` and truncates anything past the first newline. We hit that on `:9` (file ended up 7 bytes, just `[drive]\n`).
 

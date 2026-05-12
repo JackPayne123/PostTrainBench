@@ -54,7 +54,7 @@ Output lands in `jobs/runs/<dir>/` (laptop) AND `experiments/<run_id>/` in your 
 │    2. Render prompt locally (instruction.md + condition addendum)         │
 │    3. Spin pod via RunPod GraphQL with pod_env={RUN_ID, RUNPOD_POD_ID,    │
 │       RUNPOD_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, HF_TOKEN,        │
-│       CLAUDE_CODE_OAUTH_TOKEN, ...} (pulls jackpayne123/ptb-base:9)       │
+│       CLAUDE_CODE_OAUTH_TOKEN, ...} (pulls ghcr.io/jackpayne123/ptb-base:24)       │
 │    4. Upload run_dir/{config.json,prompt.txt,POD_ID} → /workspace/runs/   │
 │    5. Touch START sentinel + SSH-launch /opt/startup_hook.sh detached     │
 │    6. Exit. Laptop is now uninvolved.                                      │
@@ -65,7 +65,7 @@ Output lands in `jobs/runs/<dir>/` (laptop) AND `experiments/<run_id>/` in your 
                               │ ssh once at submit; no further laptop role
                               ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
-│  RUNPOD POD (image: jackpayne123/ptb-base:9)                              │
+│  RUNPOD POD (image: ghcr.io/jackpayne123/ptb-base:24)                              │
 │                                                                            │
 │  /opt/startup_hook.sh (image-baked): polls /workspace/runs/$RUN_ID/START,  │
 │    launches pod/run_experiment.py inside tmux session "run".              │
@@ -92,7 +92,7 @@ Output lands in `jobs/runs/<dir>/` (laptop) AND `experiments/<run_id>/` in your 
                               │  ssh (key: ~/.runpod/ssh/RunPod-Key-Go) + rsync
                               ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
-│  RUNPOD POD (image: jackpayne123/ptb-base:7)                              │
+│  RUNPOD POD (image: ghcr.io/jackpayne123/ptb-base:24)                              │
 │                                                                            │
 │  /workspace (persistent volume jack-pilot-cz)                             │
 │    hf-cache/         shared HF model cache, persists between pods         │
@@ -116,34 +116,110 @@ Output lands in `jobs/runs/<dir>/` (laptop) AND `experiments/<run_id>/` in your 
 
 ## Prerequisites
 
-### Local
+### Local tooling
 
 - macOS or Linux with `python3.11+`
 - `uv` toolchain (we use `~/.local/share/uv/tools/harbor/bin/python` as the runtime venv)
-- `gh` CLI authenticated to JackPayne123 (for triggering image rebuilds)
-- `runpodctl` installed but optional; we use the GraphQL API directly
+- `gh` CLI authenticated to a GitHub account that has access to `JackPayne123/PostTrainBench` (for triggering image rebuilds + pulling GHCR images)
+- `runpodctl` installed (auto-generates the SSH key on first `runpodctl config --apiKey <key>` call) — pod lifecycle is via GraphQL but `runpodctl network-volume create` is the easiest way to provision per-user volumes
 - SSH key at `~/.runpod/ssh/RunPod-Key-Go` registered with RunPod
 - Anthropic on the harbor venv: `uv pip install --python ~/.local/share/uv/tools/harbor/bin/python anthropic` (only needed for held-out prompt-gen scripts on laptop)
 
+### RunPod account setup
+
+1. **API key** — settings.runpod.io → API → generate. Add to `.env` as `RUNPOD_API_KEY`.
+2. **SSH key** — `runpodctl config --apiKey <key>` auto-generates `~/.runpod/ssh/RunPod-Key-Go{,.pub}` and registers the pub-key. One-time.
+3. **GHCR pull cred** — image is private on `ghcr.io/jackpayne123/ptb-base:<tag>`. RunPod needs creds to pull. Register via GraphQL once:
+
+   ```bash
+   # Create a GitHub PAT (classic) at github.com/settings/tokens with scope: read:packages only.
+   # Then:
+   curl -sX POST https://api.runpod.io/graphql \
+       -H "Authorization: Bearer $RUNPOD_API_KEY" \
+       -H "Content-Type: application/json" \
+       -d '{"query":"mutation { saveRegistryAuth(input: {name: \"ghcr-ptb-base\", username: \"<your-gh-username>\", password: \"<github_pat>\"}) { id name } }"}'
+   ```
+
+   Capture the returned `id` → add to `.env` as `RUNPOD_REGISTRY_AUTH_ID`. The patch in `runpod_environment.py:_create_pod` includes it in every `podFindAndDeployOnDemand` call when set; omitted when unset (backward compat for legacy public-image setups).
+
+4. **Per-user network volume** — RunPod's network volumes don't multi-attach reliably. Each concurrent pod needs its own volume. Provision a 100 GB volume in `EU-CZ-1`:
+
+   ```bash
+   runpodctl network-volume create --name <username>-ptb --data-center-id EU-CZ-1 --size 100
+   ```
+
+   Export `RUNPOD_VOLUME_ID=<volume-id>` for your runs. The repo's hardcoded default `qwe92egpys` is Jack's `jack-pilot-cz` and won't be visible to other accounts.
+
+### GitHub repo access
+
+Image is private on GHCR; access is gated by repo permissions on `JackPayne123/PostTrainBench`. Jack adds collaborators there → they get `read:packages` for free against this image.
+
+### Claude Code OAuth token (agent auth)
+
+The agent (`claude_non_api_max`) runs as `claude` CLI with OAuth — not API key — so it consumes the user's Claude Max subscription, not API credits.
+
+```bash
+claude setup-token
+# Opens browser, completes OAuth, prints sk-ant-oat01-... to stdout.
+# Add to .env as CLAUDE_CODE_OAUTH_TOKEN, or save to ~/.runpod/secrets/claude_oauth_token
+# (submit_run.py reads either path).
+```
+
+**Important:** This token is tied to a Claude Max plan. Sharing across users will violate TOS + share a single rate-limit budget. Each user should generate their own.
+
 ### .env at repo root
 
+Start from the template:
+
+```bash
+cp .env.template .env
+# Then fill in values from the steps above
 ```
+
+The template is the authoritative list of required + optional vars with inline comments. Keep it up to date; `.env` itself is gitignored.
+
+Minimum required:
+
+```
+# RunPod
 RUNPOD_API_KEY=rpa_...
-HF_TOKEN=hf_...                # account that has accepted Idavidrein/gpqa terms
-ANTHROPIC_API_KEY=sk-ant-...   # only needed for held-out judge tasks
-OPENAI_API_KEY=sk-...          # only needed for the contamination judge step (codex CLI)
-CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-... # OAuth from claude setup-token; agent uses this
+RUNPOD_REGISTRY_AUTH_ID=cmp...      # saveRegistryAuth id for GHCR pull (see step 3 above)
+# RUNPOD_VOLUME_ID=...              # optional override; default is Jack's qwe92egpys
+
+# Anthropic / OpenAI / HF
+HF_TOKEN=hf_...                     # account that has accepted Idavidrein/gpqa terms
+ANTHROPIC_API_KEY=sk-ant-...        # judge calls (inspect_evals grader, contamination_judge for some benches)
+OPENAI_API_KEY=sk-...               # contamination judge step (codex CLI) + healthbench/arenahardwriting grader
+CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-... # agent's auth; from `claude setup-token`
 ```
+
+### Smoke-test the setup
+
+```bash
+set -a && source .env && set +a
+PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
+    src/runpod_backend/submit_run.py \
+    --condition A --teacher claude-opus-4-7 \
+    --student Qwen/Qwen3-1.7B --benchmark gsm8k \
+    --time-budget-h 0.1 --limit 5 \
+    --skip-heldout --skip-pre-eval --dry-run
+```
+
+Expected: pod boots in ~3 min (cold image pull on a fresh volume), dry-run finishes in ~5 min, self-terminates. A `401 unauthorized` on the image pull means the `saveRegistryAuth` step didn't take — re-run that GraphQL mutation and verify the returned id matches `.env:RUNPOD_REGISTRY_AUTH_ID`.
 
 ### One-time HF dataset agreements
 
-- gpqamain requires accepting terms at https://huggingface.co/datasets/Idavidrein/gpqa via the same HF account whose token is in `.env`. Without this, gpqamain pre/post fail in 9s with `DatasetNotFoundError: gated`.
+- `gpqamain` requires accepting terms at https://huggingface.co/datasets/Idavidrein/gpqa via the same HF account whose token is in `.env`. Without this, gpqamain pre/post fail in 9s with `DatasetNotFoundError: gated`.
 
-### Volume
+### Drive (optional)
 
-`jack-pilot-cz` (id `qwe92egpys`, datacenter EU-CZ-1) is hardcoded in `runpod_environment.py:DEFAULT_VOLUME_ID`. Holds:
-- HF model cache (avoids re-downloading Qwen3-1.7B-Base etc on every pod)
-- `/workspace/final_models/<run_dir_name>/` — checkpoints from each agent run, recoverable
+The image bakes `~/.config/rclone/rclone.conf` pointing at Jack's personal Drive `experiments/` folder (BuildKit secret `RCLONE_CONF`). For collaborators:
+
+| Path | Detail |
+|------|--------|
+| **Default (no action)** | Pod uploads to Jack's Drive. Fine for shared experiment archives if Jack is the data custodian. |
+| **Use `--no-drive-upload`** | Pod skips rclone step. Recover via `pull_run.py --from-volume` (rsyncs from persistent volume). |
+| **Own Drive** | Generate own `rclone.conf` (`rclone config create drive-personal drive scope=drive`), set repo secret `RCLONE_CONF` to their config, rebuild image with own tag (`gh workflow run build-ptb-base.yml -f tag=<their-tag>`), update `DEFAULT_IMAGE` in their fork. |
 
 ---
 
@@ -263,23 +339,27 @@ Common causes:
 
 Triggered from a real x86_64 host, not Mac (QEMU on Apple Silicon takes 30+ min for one build). We use GitHub Actions.
 
-Current default: `jackpayne123/ptb-base:7` (set in `runpod_environment.py:DEFAULT_IMAGE`). Each tag is immutable on Docker Hub. To rebuild as a new tag (say `:8`):
+Current default: `ghcr.io/jackpayne123/ptb-base:<tag>` (set in `runpod_environment.py:DEFAULT_IMAGE`). Each tag is immutable on GHCR. To rebuild as a new tag (say `:25`):
 
 ```bash
 gh workflow run build-ptb-base.yml \
-    -f tag=8 \
+    -f tag=25 \
     -f dockerfile=dockerfiles/Dockerfile.base \
     --ref add_harbor_support \
     --repo JackPayne123/PostTrainBench
 ```
 
-~14 min total: clone + ML-stack pip install + push to Docker Hub. Verify:
+~14 min total: clone + ML-stack pip install + push to GHCR (uses auto-injected `GITHUB_TOKEN`, no extra secret). Verify:
 
 ```bash
 gh run watch <run_id> --repo JackPayne123/PostTrainBench
 ```
 
-After image is up, bump `DEFAULT_IMAGE` in `src/runpod_backend/runpod_environment.py` to `jackpayne123/ptb-base:<new-tag>`. Old tags stay on Docker Hub.
+After image is up, bump `DEFAULT_IMAGE` in `src/runpod_backend/runpod_environment.py` to `ghcr.io/jackpayne123/ptb-base:<new-tag>`. Old tags stay on GHCR.
+
+**Visibility:** GHCR packages default to private on first publish. Manage at https://github.com/users/jackpayne123/packages/container/ptb-base/settings. Collaborators on `JackPayne123/PostTrainBench` repo auto-get pull access; outside users need an explicit invite there.
+
+**Migrated from Docker Hub on 2026-05-12** because Docker Hub Personal accounts can't grant Read access to private repos without a Pro/Team subscription — blocked single-collaborator workflow. GHCR is free for private packages at our scale and binds permissions to the GitHub repo.
 
 ### Dockerfile contract
 
@@ -296,6 +376,54 @@ Anything new must:
 System: psmisc, lsof, procps, iproute2 (`ss` is in iproute2 — used for port-based PID kill). Python: hydra-core, omegaconf, loguru, gdown, jsonlines (abstention_bench transitive set), anthropic SDK (used by `judge/haiku_judge.py` in sycophancy_slava etc).
 
 If a new heldout task surfaces a missing dep, prefer adding to the Dockerfile over `apt-get install` at runtime (image rebuild is ~14 min via CI; runtime install is fragile + hidden state).
+
+---
+
+## Grader routing
+
+Canonical inventory of every grader / judge call across the 23-eval suite. Maintain when adding new evals or changing routing.
+
+| Eval | Grader | API | Where configured | Notes |
+|---|---|---|---|---|
+| gsm8k | none (exact-match) | — | — | inspect_ai `match()` scorer |
+| humaneval | none (code-exec) | — | — | sandbox executes generated code |
+| mmlu | none (logprob/match) | — | — | |
+| gpqamain | none (match) | — | — | |
+| arc_easy | none (match) | — | — | |
+| truthfulqa | none (match) | — | — | MC1 logprob variant |
+| aime2025 | none (numeric-match) | — | — | |
+| arenahardwriting | `gpt-5-mini` | OpenAI Chat Completions | `evaluation_code/utils/judge_utils.py:JUDGE_MODEL` | Arena-Hard published pairwise judge — needs OpenAI completion format. ~$1/pass at limit=50. |
+| healthbench | `gpt-5-mini` | OpenAI Chat Completions | `evaluate.py:JUDGE_MODEL` + `evaluation_code/grader.py` | HealthBench published grader — OpenAI format. ~$1/pass at limit=100. |
+| sycophancy_sharma | `anthropic/claude-haiku-4-5` | inspect_ai `get_model(role="grader")` | `pod_env: INSPECT_GRADER_MODEL` | inspect_evals `model_graded_qa` |
+| sycophancy_slava | `claude-haiku-4-5` | Anthropic SDK direct | `judge/haiku_judge.py:DEFAULT_MODEL` (env: `SLAVA_JUDGE_MODEL`) | Custom HaikuJudge w/ tool-use scoring |
+| sycophancy_aisi | `claude-haiku-4-5` | Anthropic SDK direct | `judge/haiku_judge.py:DEFAULT_MODEL` (env: `HELDOUT_JUDGE_MODEL`) | HaikuJudge |
+| strong_reject | `anthropic/claude-haiku-4-5` | inspect_ai grader role | `pod_env: INSPECT_GRADER_MODEL` | `model_graded_qa` |
+| coconot | `anthropic/claude-haiku-4-5` | inspect_ai grader role | `pod_env: INSPECT_GRADER_MODEL` | `model_graded_qa` |
+| abstention_bench | `anthropic/claude-haiku-4-5` | inspect_ai task_args | `tasks/safety/abstention_bench/evaluate.py:task_args` | Overrides upstream openrouter default |
+| spiralbench_mini | `claude-haiku-4-5` | Anthropic SDK direct | `judge/haiku_judge.py` for both user-sim AND judge | Currently soft-failing (n_failed=30 both F-runs) |
+| big_five | none (local regex) | — | `tasks/character/big_five/evaluate.py` | Lenient `ANSWER:` / `X)` / `X.` parser, no LLM judge |
+| moral_foundations | none (Likert agg) | — | — | Numeric aggregation of model's choices |
+| rozado_battery | none (per-test scorers) | — | — | Per-test agreement/likert math |
+| political_bias_openai | `claude-haiku-4-5` | Anthropic SDK direct | `judge/haiku_judge.py` | 5-axis rubric judge |
+| moru | `anthropic/claude-haiku-4-5` | inspect_ai task_args (list) | `tasks/character/moru/evaluate.py:task_args` | Overrides upstream served-vllm default |
+| activity_preference | none (vLLM logprobs) | — | — | Bradley-Terry on top-20 logprobs |
+| persona_traits | `claude-haiku-4-5` | Anthropic SDK direct | `tasks/character/persona_traits/evaluate.py` (env: `PERSONA_TRAITS_JUDGE_MODEL`) | 1400 calls/run @ ~$3 |
+
+### Routes by API
+
+- **Anthropic (haiku-4-5)** — most safety + character evals. Single API key, single rate limit (450k input tokens/min per org).
+- **OpenAI (gpt-5-mini)** — `healthbench` + `arenahardwriting` only. Both published pipelines use OpenAI's completion format; refactoring to Anthropic SDK is medium-scope work we don't need yet (decision 2026-05-12). ~$2 combined per full-suite pass.
+- **None (local)** — capability evals + `activity_preference` logit probe + locally-parsed character evals.
+
+### Key plumbing
+
+- `INSPECT_GRADER_MODEL=anthropic/claude-haiku-4-5` is injected via pod_env in `submit_run.py` + `submit_baseline.py` — routes inspect_evals' default `get_model(role="grader")` to haiku.
+- Per-eval explicit task_args (abstention_bench, moru) — override the upstream default at the inspect-task layer.
+- `judge/haiku_judge.py` — shared Anthropic SDK wrapper used by the custom-built syco/spiralbench/political_bias/persona judges. Reads `ANTHROPIC_API_KEY` + optional `HELDOUT_JUDGE_MODEL` / `SLAVA_JUDGE_MODEL` / `PERSONA_TRAITS_JUDGE_MODEL` env overrides.
+
+### Open key-hygiene item
+
+Rotate Anthropic + OpenAI keys to project-scoped (currently leftover Mile/Sean cyber stuff). User-side action; not blocking.
 
 ---
 

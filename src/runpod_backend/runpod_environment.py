@@ -43,6 +43,12 @@ DEFAULT_GPU_TYPE_ID = "NVIDIA GeForce RTX 3090"
 # investigation. Easier path for now: separate volume per concurrent pod.
 DEFAULT_VOLUME_ID = os.environ.get("RUNPOD_VOLUME_ID", "qwe92egpys")  # default jack-pilot-cz
 DEFAULT_DATACENTER = "EU-CZ-1"
+# Optional container registry auth ID for pulling private images. Register
+# via the `saveRegistryAuth` GraphQL mutation (one-time per Docker Hub PAT),
+# then export RUNPOD_REGISTRY_AUTH_ID in .env. Public images do not require
+# this; leave unset for the default :23 image (still public as of
+# 2026-05-12 — flip to private after rotating the leaked rclone token).
+DEFAULT_REGISTRY_AUTH_ID = os.environ.get("RUNPOD_REGISTRY_AUTH_ID", "")
 # Our prebuilt PTB base image (vllm 0.11.0 + transformers<5 + claude-code + ML stack
 # + inspect_evals all baked in). Built and pushed 2026-05-07.
 #
@@ -153,27 +159,28 @@ class RunpodEnvironment(BaseEnvironment):
             }
         }
         """
-        variables = {
-            "input": {
-                "cloudType": "ALL",
-                "gpuCount": 1,
-                "gpuTypeId": DEFAULT_GPU_TYPE_ID,
-                "containerDiskInGb": DEFAULT_CONTAINER_DISK_GB,
-                "volumeInGb": 0,
-                "networkVolumeId": DEFAULT_VOLUME_ID,
-                "volumeMountPath": DEFAULT_VOLUME_MOUNT_PATH,
-                "dataCenterId": DEFAULT_DATACENTER,
-                "name": name,
-                "imageName": DEFAULT_IMAGE,
-                "ports": "22/tcp",
-                "env": (
-                    [{"key": "PUBLIC_KEY", "value": pubkey}]
-                    + [{"key": k, "value": v}
-                       for k, v in self._pod_env.items()
-                       if v]
-                ),
-            }
+        pod_input: dict[str, Any] = {
+            "cloudType": "ALL",
+            "gpuCount": 1,
+            "gpuTypeId": DEFAULT_GPU_TYPE_ID,
+            "containerDiskInGb": DEFAULT_CONTAINER_DISK_GB,
+            "volumeInGb": 0,
+            "networkVolumeId": DEFAULT_VOLUME_ID,
+            "volumeMountPath": DEFAULT_VOLUME_MOUNT_PATH,
+            "dataCenterId": DEFAULT_DATACENTER,
+            "name": name,
+            "imageName": DEFAULT_IMAGE,
+            "ports": "22/tcp",
+            "env": (
+                [{"key": "PUBLIC_KEY", "value": pubkey}]
+                + [{"key": k, "value": v}
+                   for k, v in self._pod_env.items()
+                   if v]
+            ),
         }
+        if DEFAULT_REGISTRY_AUTH_ID:
+            pod_input["containerRegistryAuthId"] = DEFAULT_REGISTRY_AUTH_ID
+        variables = {"input": pod_input}
         data = await asyncio.to_thread(self._gql, query, variables)
         pod = data["podFindAndDeployOnDemand"]
         if pod is None:
