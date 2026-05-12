@@ -9,8 +9,15 @@
 #   vllm==0.20.2              — needed for Qwen3.5 (`qwen3_5` arch). Bumped from
 #                                0.11.0 on 2026-05-12. Forces torch==2.11.0
 #                                (uninstall-cycle on base image's torch 2.4.0).
-#   transformers>=4.56,<5.0   — vllm 0.20.2's floor + ceiling (it excludes 5.0-5.5).
-#                                Qwen3-1.7B (backward compat) + Qwen3.5-9B both supported.
+#   transformers>=5.6,<6.0    — vllm 0.20.2 excludes 5.0.*..5.5.0 but allows 5.5.1+.
+#                                Qwen3.5 (`qwen3_5` model_type) needs transformers
+#                                5.x — verified empirically on :26 where 4.57.6 raised
+#                                "Transformers does not recognize this architecture".
+#                                Qwen3-1.7B (backward compat) also works on 5.6+.
+#   huggingface-hub>=1.5,<2.0 — transformers 5.6's floor. inspect_evals also wants
+#                                hf_hub 1.x so this satisfies both. Was <1.0 when
+#                                transformers was pinned <5 — that constraint went
+#                                away once transformers 5.6+ was the floor.
 #
 # Build via GitHub Actions (preferred — native amd64, ~10 min):
 #   gh workflow run build-ptb-base.yml -f tag=N -R JackPayne123/PostTrainBench
@@ -98,12 +105,12 @@ RUN pip install --no-cache-dir ninja packaging
 # (this is what uv/PTB-canonical install does on real x86_64 pods).
 #
 # Step A — training stack (HF ecosystem)
-# transformers>=4.56,<5.0 — vllm 0.20.2 floor is 4.56; <5.0 still holds because
-# vllm 0.20.2 explicitly excludes transformers 5.0-5.5. Re-check after each
-# vllm bump. Qwen3.5 needs >=4.55 (the model card lists 4.55+). Qwen3-1.7B
-# (still supported for backward compat) loads fine on 4.56+.
+# transformers>=5.6,<6.0 — vllm 0.20.2 excludes 5.0.*..5.5.0; 5.6 is the floor for
+# qwen3_5 model_type support (empirically verified — 4.57.6 raised "Transformers
+# does not recognize this architecture" on Qwen3.5-9B-Base AutoConfig.from_pretrained).
+# Backward compat with Qwen3-1.7B preserved. Re-check after every vllm bump.
 RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
-    "transformers>=4.56,<5.0" \
+    "transformers>=5.6,<6.0" \
     accelerate \
     datasets \
     evaluate \
@@ -112,12 +119,12 @@ RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
     peft
 
 # Step B — eval / utility stack.
-# huggingface-hub PINNED <1.0: inspect_evals depends on hf_hub 1.x but
-# transformers 4.57.6 requires hf_hub<1.0,>=0.34.0. ptb-base:2 build let
-# the conflict through (legacy-resolver warns, doesn't fail) and vllm
-# crashed at runtime in import path. Pin keeps transformers callable.
+# huggingface-hub PINNED >=1.5,<2.0: transformers 5.6 requires hf_hub>=1.5,<2.0.
+# Was <1.0 when transformers was pinned <5 (because transformers 4.x required
+# hf_hub<1.0). Bumping transformers to 5.6+ flips the floor: now hf_hub 1.x is
+# required, which conveniently also matches what inspect_evals expects.
 RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
-    "huggingface-hub>=0.34.0,<1.0" \
+    "huggingface-hub>=1.5,<2.0" \
     anthropic \
     backoff \
     boto3 \
