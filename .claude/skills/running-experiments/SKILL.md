@@ -15,6 +15,31 @@ Architecture details and full design rationale live in `docs/OPERATIONS.md`. Thi
 
 ---
 
+## Repo + remotes
+
+This repo is a **fork** of `aisa-group/PostTrainBench` living at `JackPayne123/PostTrainBench`. Local clone has two remotes:
+
+| Remote | URL | Use |
+|--------|-----|-----|
+| `origin` | `https://github.com/JackPayne123/PostTrainBench.git` | Day-to-day push target. All our work lands here. |
+| `upstream` | `git@github.com:aisa-group/PostTrainBench.git` | Reference only. **Do not push.** Pull from it only when intentionally syncing fork with parent. |
+
+Branch convention: feature branches off `main`, default working branch is `add_harbor_support`. PRs (when we open them) target `JackPayne123/PostTrainBench:main`, not aisa-group.
+
+`gh` CLI must be authenticated as `JackPayne123` (or another user with admin/push on the fork). All `gh workflow run`, `gh run watch`, and image-build commands use `-R JackPayne123/PostTrainBench`. The GHCR package lives in the fork's namespace at `ghcr.io/jackpayne123/ptb-base:<tag>`.
+
+**If `git push origin` fails with "Permission to aisa-group/... denied"**: gh auth lacks the right scope OR is logged in as a non-fork-owner. Fix:
+
+```bash
+gh auth status                          # verify account
+gh auth refresh -s workflow             # if missing workflow scope (commits touching .github/workflows/)
+gh auth setup-git                       # rewires git's credential helper to gh's token
+```
+
+If gh is authed as a different user that has only aisa-group access (not JackPayne123 fork), `gh auth logout` + `gh auth login` as JackPayne123, or use a different account on this machine.
+
+---
+
 ## First-time setup (skip if `.env` already populated)
 
 Do these once per user, in order. If `.env` exists at the repo root and exports `RUNPOD_API_KEY` + `RUNPOD_REGISTRY_AUTH_ID`, you're already onboarded — jump to `## Environment`.

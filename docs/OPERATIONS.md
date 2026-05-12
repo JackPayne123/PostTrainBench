@@ -116,6 +116,19 @@ Output lands in `jobs/runs/<dir>/` (laptop) AND `experiments/<run_id>/` in your 
 
 ## Prerequisites
 
+### Repo + remotes
+
+This repo is a **fork** of `aisa-group/PostTrainBench` living at `JackPayne123/PostTrainBench`. Local clone has two remotes:
+
+| Remote | URL | Use |
+|--------|-----|-----|
+| `origin` | `https://github.com/JackPayne123/PostTrainBench.git` | Day-to-day push target. All our work lands here. |
+| `upstream` | `git@github.com:aisa-group/PostTrainBench.git` | Reference only. **Do not push.** Pull from it only when intentionally syncing fork with parent. |
+
+Branch convention: feature branches off `main`; default working branch is `add_harbor_support`. PRs target `JackPayne123/PostTrainBench:main`, not aisa-group. `gh` CLI must be authenticated as `JackPayne123` (or another user with admin/push on the fork). The GHCR image lives in the fork's namespace at `ghcr.io/jackpayne123/ptb-base:<tag>`.
+
+If `git push origin` errors with "Permission to aisa-group/... denied to <user>": `gh auth status` to verify the active account; `gh auth refresh -s workflow` if pushing commits that touch `.github/workflows/`; `gh auth setup-git` rewires the local git credential helper to gh's token.
+
 ### Local tooling
 
 - macOS or Linux with `python3.11+`
