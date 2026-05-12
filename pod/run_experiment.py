@@ -176,7 +176,14 @@ def wait_for_gpu_clear(target_mb: int = 2000, max_wait_s: int = 300) -> None:
 def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED_VLLM_PORT,
                      served_name: str = SHARED_VLLM_NAME, api_key: str = SHARED_VLLM_API_KEY,
                      gpu_mem_util: float = 0.85, lora_adapter_path: str | None = None,
-                     timeout_sec: int = 300, label: str = "vllm") -> str | None:
+                     timeout_sec: int | None = None, label: str = "vllm") -> str | None:
+    # VLLM_READY_TIMEOUT env override (default 900s).
+    # Was hardcoded 300s. Insufficient for 9B-class models on cold HF cache
+    # (Qwen3.5-9B = 18GB weight download + engine init = ~6-8min in practice;
+    # 300s timed out cleanly mid-load on 2026-05-12 baseline #fb99d6). 900s
+    # is safe for 9B; bump higher for 30B+ models.
+    if timeout_sec is None:
+        timeout_sec = int(os.environ.get("VLLM_READY_TIMEOUT", "900"))
     """Boot vllm in the background. Returns base_url on ready or None on failure."""
     log_path = f"/workspace/{label}.log"
     log.info(f"[{label}] starting vllm at :{port} for {model_path} (lora={lora_adapter_path})")
