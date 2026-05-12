@@ -91,8 +91,23 @@ def parse_args() -> argparse.Namespace:
                         "out as None; backfill via "
                         "`scripts/compute_deltas.py <run_id>` once baselines "
                         "for this model+limit exist in the repo.")
+    p.add_argument("--use-baseline", action="store_true",
+                   help="Fail-fast at submit time if a baseline JSON is "
+                        "missing for the primary benchmark or any extra-eval "
+                        "at `baselines/<student-slug>/<bench>__limit<N>.json`. "
+                        "Forces baseline discipline (each new student/limit "
+                        "needs `submit_baseline.py` to land FIRST). Implies "
+                        "`--skip-pre-eval` because the whole point is reusing "
+                        "the existing baseline; post-run, `compute_deltas.py "
+                        "<run_id> --update-summary` backfills pre/post/delta.")
     p.add_argument("--no-drive-upload", action="store_true",
                    help="pod skips rclone-to-Drive at end (debug)")
+    p.add_argument(
+        "--bypass-template-check", action="store_true",
+        help="Skip the chat-template validation gate. Only use for debugging "
+             "with models not yet in validated_models.json — eval scores will "
+             "be unreliable if the format is wrong.",
+    )
     return p.parse_args()
 
 
@@ -173,6 +188,45 @@ def git_sha() -> str:
 async def main() -> None:
     args = parse_args()
 
+    # Fail-fast: refuse to submit if the student model hasn't been
+    # validated against a chat-template helper in lora_starter.py.
+    # See src/evals/templates/validated_models.json for the manifest +
+    # scripts/validate_chat_templates.py to add a new model.
+    from src.evals.templates.validated_models import assert_validated
+    assert_validated(args.student, bypass=args.bypass_template_check)
+
+    # Fail-fast: --use-baseline requires the per-bench baseline JSONs
+    # already promoted into the repo. Implies --skip-pre-eval (the whole
+    # point is reusing the existing baseline at submit time rather than
+    # paying for a fresh pre-pass on the pod).
+    if args.use_baseline:
+        if not args.skip_pre_eval:
+            log.info("--use-baseline → enabling --skip-pre-eval implicitly")
+            args.skip_pre_eval = True
+        student_slug = args.student.replace("/", "_").replace(":", "_").lower()
+        primary_extras = [args.benchmark] + [
+            b.strip() for b in (args.extra_evals or "").split(",") if b.strip()
+        ]
+        baseline_dir = REPO_ROOT / "baselines" / student_slug
+        missing: list[str] = []
+        for bench in primary_extras:
+            cand = baseline_dir / f"{bench}__limit{args.limit}.json"
+            if not cand.exists():
+                missing.append(str(cand.relative_to(REPO_ROOT)))
+        if missing:
+            raise SystemExit(
+                f"\nERROR: --use-baseline set but baselines are missing for "
+                f"{len(missing)} bench(es):\n"
+                + "".join(f"  - {p}\n" for p in missing)
+                + "\nRun `submit_baseline.py --model "
+                + args.student
+                + f" --limit {args.limit}` first (or `--only-bench "
+                + ",".join(b for b in primary_extras
+                           if not (baseline_dir / f"{b}__limit{args.limit}.json").exists())
+                + "` to refresh just the missing ones), then `pull_baseline.py "
+                "<baseline-run-id>` to promote them into the repo.\n"
+            )
+
     # Build run config + dir
     cfg, dirname = make_run_config(
         condition=args.condition,
@@ -242,6 +296,10 @@ async def main() -> None:
         ),
         "POD_KEEP_ALIVE": "1" if args.keep_pod else "0",
         "POD_NO_DRIVE_UPLOAD": "1" if args.no_drive_upload else "0",
+        # Override for vllm boot timeout (default 900s pod-side). 9B+ models
+        # with cudagraph compilation can need 1500-1800s. Caller exports
+        # VLLM_READY_TIMEOUT in .env to bump.
+        "VLLM_READY_TIMEOUT": os.environ.get("VLLM_READY_TIMEOUT", ""),
     }
 
     # Spin pod

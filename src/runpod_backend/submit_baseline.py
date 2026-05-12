@@ -85,6 +85,12 @@ def parse_args() -> argparse.Namespace:
                         "analysis. Result lands as a sibling 'adapter eval' "
                         "kind in baselines/<model-slug>/, NOT merged with the "
                         "base-model baselines.")
+    p.add_argument(
+        "--bypass-template-check", action="store_true",
+        help="Skip the chat-template validation gate (validated_models.json). "
+             "Only for debugging with models not yet in the manifest — eval "
+             "scores will be unreliable if the format is wrong.",
+    )
     p.add_argument("--no-watch", action="store_true")
     p.add_argument("--keep-pod", action="store_true",
                    help="pod doesn't self-terminate after DONE (debug)")
@@ -112,17 +118,26 @@ def git_sha() -> str:
 async def main() -> None:
     args = parse_args()
 
+    # Fail-fast on unvalidated student model. See
+    # src/evals/templates/validated_models.json.
+    from src.evals.templates.validated_models import assert_validated
+    assert_validated(args.model, bypass=args.bypass_template_check)
+
     # run_id derived from model slug + limit + timestamp + utc date.
     # Adapter evals get a distinct prefix so promote logic can scope them
-    # separately from base-model baselines.
+    # separately from base-model baselines. 6-char random hex suffix
+    # prevents same-minute collisions during parallel sweeps (design
+    # TODO #22).
+    import secrets
     ts = dt.datetime.now().strftime("%Y-%m-%d_%H-%M")
+    suffix = secrets.token_hex(3)  # 6 chars
     limit_token = f"limit{args.limit}" if args.limit > 0 else "perEval"
     if args.adapter_from_run_id:
-        run_id = f"{ts}_adaptereval_{slug(args.model)}_{limit_token}"
+        run_id = f"{ts}_adaptereval_{slug(args.model)}_{limit_token}_{suffix}"
         log.info(f"=== adapter-eval run_id: {run_id} ===")
         log.info(f"    adapter from: drive:{args.adapter_from_run_id}/final_model/")
     else:
-        run_id = f"{ts}_baseline_{slug(args.model)}_{limit_token}"
+        run_id = f"{ts}_baseline_{slug(args.model)}_{limit_token}_{suffix}"
         log.info(f"=== baseline run_id: {run_id} ===")
 
     run_dir = REPO_ROOT / "jobs" / "runs" / run_id
@@ -177,6 +192,11 @@ async def main() -> None:
         ),
         "POD_KEEP_ALIVE": "1" if args.keep_pod else "0",
         "POD_NO_DRIVE_UPLOAD": "1" if args.no_drive_upload else "0",
+        # Pass through optional vllm-readiness timeout override. Pod-side
+        # default is 900s (set in run_experiment.start_shared_vllm). 9B
+        # models with cudagraph compilation needed ~12-15min; bump to 1800
+        # for safety. Caller exports VLLM_READY_TIMEOUT=1800 in .env.
+        "VLLM_READY_TIMEOUT": os.environ.get("VLLM_READY_TIMEOUT", ""),
     }
 
     log.info("starting pod (image = %s)", DEFAULT_IMAGE)
