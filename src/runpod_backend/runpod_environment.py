@@ -54,6 +54,19 @@ DEFAULT_VOLUME_ID = os.environ.get("RUNPOD_VOLUME_ID", "qwe92egpys")  # default 
 # both jack volumes (qwe92egpys, riin1cqm6k) live there. A100 80GB stock can
 # be tight in EU-CZ-1; US-KS-2 historically has spare A100-SXM-80GB.
 DEFAULT_DATACENTER = os.environ.get("RUNPOD_DATACENTER_ID", "EU-CZ-1")
+# Required host CUDA driver versions. Older drivers don't run torch 2.11
+# (vllm 0.20.2's pin), the wheels' bundled CUDA 12.8 runtime needs driver
+# ≥12.8 — verified empirically on 2026-05-12 when a US-KS-2 host with
+# driver 12.7 silently failed at torch._C._cuda_init(). Filter is passed
+# to RunPod's podFindAndDeployOnDemand allowedCudaVersions field; pods
+# that don't match get SUPPLY_CONSTRAINT instead of failing 5min into
+# vllm boot. Set RUNPOD_ALLOWED_CUDA_VERSIONS="" to opt out (e.g. for
+# the legacy :23 image which works on any 12.4+ driver).
+DEFAULT_ALLOWED_CUDA_VERSIONS = [
+    v.strip()
+    for v in os.environ.get("RUNPOD_ALLOWED_CUDA_VERSIONS", "12.8,12.9").split(",")
+    if v.strip()
+]
 # Optional container registry auth ID for pulling private images. Register
 # via the `saveRegistryAuth` GraphQL mutation (one-time per Docker Hub PAT),
 # then export RUNPOD_REGISTRY_AUTH_ID in .env. Public images do not require
@@ -189,6 +202,8 @@ class RunpodEnvironment(BaseEnvironment):
         }
         if DEFAULT_REGISTRY_AUTH_ID:
             pod_input["containerRegistryAuthId"] = DEFAULT_REGISTRY_AUTH_ID
+        if DEFAULT_ALLOWED_CUDA_VERSIONS:
+            pod_input["allowedCudaVersions"] = DEFAULT_ALLOWED_CUDA_VERSIONS
         variables = {"input": pod_input}
         data = await asyncio.to_thread(self._gql, query, variables)
         pod = data["podFindAndDeployOnDemand"]
