@@ -32,7 +32,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--json-output-file", type=str, default=None)
     p.add_argument("--templates-dir", type=str, default="templates/")
     p.add_argument("--max-connections", type=int, default=8)
-    p.add_argument("--max-tokens", type=int, default=2048)
+    # Bumped 2048 -> 4096 on 2026-05-13. Audit showed 10% of Qwen3.5-9B
+    # responses still truncated at 2048 — multi-turn rationale exchanges
+    # blow past the cap. 4096 covers the tail.
+    p.add_argument("--max-tokens", type=int, default=4096)
     p.add_argument("--gpu-memory-utilization", type=float, default=0.85)
     p.add_argument("--vllm-base-url", type=str, default=None)
     p.add_argument("--vllm-served-name", type=str, default=None)
