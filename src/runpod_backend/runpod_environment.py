@@ -50,13 +50,11 @@ DEFAULT_DATACENTER = "EU-CZ-1"
 # 2026-05-12 — flip to private after rotating the leaked rclone token).
 DEFAULT_REGISTRY_AUTH_ID = os.environ.get("RUNPOD_REGISTRY_AUTH_ID", "")
 # Our prebuilt PTB base image (vllm 0.11.0 + transformers<5 + claude-code + ML stack
-# + inspect_evals all baked in). Built and pushed 2026-05-07.
-#
-# :2 = current. FROM runpod/pytorch (has SSH/init baked in, container stays alive).
-#      Digest sha256:921917132abf...
-# :1 = deprecated. FROM nvcr.io/nvidia/cuda — no SSH/init, container exits immediately.
-#      Do not use.
-DEFAULT_IMAGE = "jackpayne123/ptb-base:23"
+# + inspect_evals all baked in). Hosted on GHCR since 2026-05-12 (private package,
+# pull cred registered on RunPod via saveRegistryAuth → DEFAULT_REGISTRY_AUTH_ID).
+# Base FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04 (ships SSH/init).
+# Bump after every successful build-ptb-base.yml run.
+DEFAULT_IMAGE = "ghcr.io/jackpayne123/ptb-base:25"
 DEFAULT_CONTAINER_DISK_GB = 50
 DEFAULT_VOLUME_MOUNT_PATH = "/workspace"
 
