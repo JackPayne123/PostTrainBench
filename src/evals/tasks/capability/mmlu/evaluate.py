@@ -53,15 +53,28 @@ def _parse_answer_lenient(text: str) -> str | None:
     return None
 
 
-def _build_lenient_task(language: str = "EN_US"):
-    """Build mmlu_0_shot Task with a lenient ANSWER-prefix scorer.
+def _build_lenient_task(language: str = "EN_US", max_non_cot_tokens: int = 256):
+    """Build mmlu_0_shot Task with a lenient ANSWER-prefix scorer + bigger
+    max_non_cot_tokens budget.
 
     Imports lazily so `--help` works without inspect_evals installed.
     The dataset + solver come from the upstream `inspect_evals.mmlu`
-    helpers; only the scorer is swapped. Task instance is passed
-    directly to `inspect_ai.eval` (not the registry-string path)
-    because a script-local `@task`-decorated function doesn't register
-    under the upstream namespace.
+    helpers; only the scorer is swapped + token budget raised. Task
+    instance is passed directly to `inspect_ai.eval` (not the
+    registry-string path) because a script-local `@task`-decorated
+    function doesn't register under the upstream namespace.
+
+    Why max_non_cot_tokens=256 (vs upstream default GPT_5_MIN_TOKENS=16):
+    Qwen3.5-9B (and most modern instruct models trained on CoT data)
+    tends to emit a brief rationale BEFORE the letter even when prompted
+    for cot=False. At 16 tokens the response gets truncated mid-thought
+    ("The reaction described is the dehydrohalogenation of 2-bromob...")
+    and no answer letter is ever emitted. Diagnosed on 2026-05-13 9B
+    baseline #cac466: 92/200 samples had truncated rationales with zero
+    extractable letter. Bumping to 256 gives the model enough headroom
+    to think + emit the answer letter; lenient scorer then picks it up.
+    Adds ~5-10s/sample but raises useful sample count from ~80% to
+    ~99%.
     """
     from inspect_ai import Task
     from inspect_ai.model import GenerateConfig
@@ -73,7 +86,6 @@ def _build_lenient_task(language: str = "EN_US"):
         get_mmmlu_dataset,
         mmlu_multiple_choice,
     )
-    from inspect_evals.constants import GPT_5_MIN_TOKENS
 
     @scorer(metrics=[accuracy(), stderr()])
     def any_choice_lenient():
@@ -92,7 +104,7 @@ def _build_lenient_task(language: str = "EN_US"):
 
     return Task(
         dataset=dataset,
-        solver=mmlu_multiple_choice(cot=False, max_non_cot_tokens=GPT_5_MIN_TOKENS),
+        solver=mmlu_multiple_choice(cot=False, max_non_cot_tokens=max_non_cot_tokens),
         scorer=any_choice_lenient(),
         config=GenerateConfig(temperature=0.0),
         version=EVAL_VERSION.comparability_version,
