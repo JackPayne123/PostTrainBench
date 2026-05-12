@@ -49,7 +49,11 @@ DEFAULT_GPU_TYPE_ID = os.environ.get("RUNPOD_GPU_TYPE_ID", "NVIDIA GeForce RTX 3
 # the allocator denied my dual-attach test (2026-05-11); needs more
 # investigation. Easier path for now: separate volume per concurrent pod.
 DEFAULT_VOLUME_ID = os.environ.get("RUNPOD_VOLUME_ID", "qwe92egpys")  # default jack-pilot-cz
-DEFAULT_DATACENTER = "EU-CZ-1"
+# Datacenter is volume-bound: when overriding RUNPOD_VOLUME_ID to a volume in
+# a different DC, also set RUNPOD_DATACENTER_ID. We default to EU-CZ-1 because
+# both jack volumes (qwe92egpys, riin1cqm6k) live there. A100 80GB stock can
+# be tight in EU-CZ-1; US-KS-2 historically has spare A100-SXM-80GB.
+DEFAULT_DATACENTER = os.environ.get("RUNPOD_DATACENTER_ID", "EU-CZ-1")
 # Optional container registry auth ID for pulling private images. Register
 # via the `saveRegistryAuth` GraphQL mutation (one-time per Docker Hub PAT),
 # then export RUNPOD_REGISTRY_AUTH_ID in .env. Public images do not require
