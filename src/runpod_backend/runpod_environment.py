@@ -34,8 +34,15 @@ from harbor.environments.capabilities import EnvironmentCapabilities
 
 RUNPOD_API_URL = "https://api.runpod.io/graphql"
 
-# v0 hardcoded config
-DEFAULT_GPU_TYPE_ID = "NVIDIA GeForce RTX 3090"
+# v0 hardcoded config (with env overrides for larger models / parallel runs).
+# `RUNPOD_GPU_TYPE_ID` lets callers pick a beefier GPU per-submit without code
+# changes — e.g. `RUNPOD_GPU_TYPE_ID="NVIDIA A100 80GB PCIe" submit_run.py ...`
+# for Qwen3.5-9B. Common values:
+#   NVIDIA GeForce RTX 3090      24GB  $0.22/hr  default; fine for ≤4B models
+#   NVIDIA A100-SXM4-40GB        40GB  $1.00/hr  borderline for 9B + LoRA + vllm KV
+#   NVIDIA A100 80GB PCIe        80GB  $1.19/hr  recommended for 9B; comfortable headroom
+#   NVIDIA H100 80GB HBM3        80GB  $2.69/hr  overkill at our scale
+DEFAULT_GPU_TYPE_ID = os.environ.get("RUNPOD_GPU_TYPE_ID", "NVIDIA GeForce RTX 3090")
 # Volume override via env so parallel pods can target separate volumes
 # without code change. e.g. `RUNPOD_VOLUME_ID=riin1cqm6k submit_run.py ...`.
 # Multi-attach on RunPod's network volumes is supposedly supported but
@@ -54,7 +61,7 @@ DEFAULT_REGISTRY_AUTH_ID = os.environ.get("RUNPOD_REGISTRY_AUTH_ID", "")
 # pull cred registered on RunPod via saveRegistryAuth → DEFAULT_REGISTRY_AUTH_ID).
 # Base FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04 (ships SSH/init).
 # Bump after every successful build-ptb-base.yml run.
-DEFAULT_IMAGE = "ghcr.io/jackpayne123/ptb-base:25"
+DEFAULT_IMAGE = "ghcr.io/jackpayne123/ptb-base:27"
 DEFAULT_CONTAINER_DISK_GB = 50
 DEFAULT_VOLUME_MOUNT_PATH = "/workspace"
 

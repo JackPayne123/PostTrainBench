@@ -1,0 +1,29 @@
+{
+  "_doc": "Manifest of student models whose chat-template helper in lora_starter.py has been hand-validated via scripts/validate_chat_templates.py. submit_run.py + submit_baseline.py refuse to run with a --student/--model not in `models`. Update by running the validator with --commit, OR by hand-editing this file after a successful validation. Each entry: family, validated_at (UTC date), git_sha at validation time, notes.",
+  "models": {
+    "Qwen/Qwen3-1.7B": {
+      "family": "Qwen3",
+      "validated_at": "2026-05-12",
+      "git_sha": "b2f033b",
+      "notes": "IT variant. Both enable_thinking=True/False pass all structural checks. apply_chat_template returns the canonical <|im_start|>assistant\\n opener; completion correctly wraps with <think>...</think> on True / omits on False."
+    },
+    "Qwen/Qwen3-1.7B-Base": {
+      "family": "Qwen3",
+      "validated_at": "2026-05-12",
+      "git_sha": "b2f033b",
+      "notes": "Base variant. Same tokenizer + chat-template behaviour as IT (qwen3.jinja shipped with the tokenizer). Validates identically to Qwen3-1.7B IT."
+    },
+    "Qwen/Qwen3.5-9B": {
+      "family": "Qwen3",
+      "validated_at": "2026-05-12",
+      "git_sha": "2acbac4",
+      "notes": "INFERRED Qwen3 family via `qwen3` substring match in lora_starter._FAMILY_HINTS — the model is technically a different arch (`qwen3_5`, multimodal `image-text-to-text`), but its chat template appears to follow the same `<|im_start|>...<|im_end|>` convention. NOT YET hand-validated via scripts/validate_chat_templates.py. First scaled run should pre-eval on Qwen3-1.7B-Base (known-good) AND Qwen3.5-9B and eyeball that the format_qwen3_chat output looks right against this tokenizer."
+    },
+    "Qwen/Qwen3.5-9B-Base": {
+      "family": "Qwen3",
+      "validated_at": "2026-05-12",
+      "git_sha": "2acbac4",
+      "notes": "Base variant of Qwen3.5-9B. Same inference path + caveat as the IT entry above. Verified to load via AutoConfig (transformers 5.6+ recognises `qwen3_5` model_type)."
+    }
+  }
+}

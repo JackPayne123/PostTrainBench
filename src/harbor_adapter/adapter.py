@@ -146,6 +146,14 @@ MODELS = {
         model_id="google/gemma-3-4b-pt",
         short_name="gemma3-4b"
     ),
+    "qwen3.5-9b": ModelInfo(
+        model_id="Qwen/Qwen3.5-9B-Base",
+        short_name="qwen3.5-9b",
+    ),
+    "qwen3.5-9b-it": ModelInfo(
+        model_id="Qwen/Qwen3.5-9B",
+        short_name="qwen3.5-9b-it",
+    ),
 }
 
 
