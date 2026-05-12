@@ -6,8 +6,11 @@
 # Per-task images derive from this via `FROM ghcr.io/jackpayne123/ptb-base:24`.
 #
 # Pinned versions (vs PTB's template):
-#   transformers>=4.46,<5.0   — vllm 0.11.0 calls Qwen2Tokenizer.all_special_tokens_extended
-#                                 which transformers 5.x removed. Burned us 2026-05-07.
+#   vllm==0.20.2              — needed for Qwen3.5 (`qwen3_5` arch). Bumped from
+#                                0.11.0 on 2026-05-12. Forces torch==2.11.0
+#                                (uninstall-cycle on base image's torch 2.4.0).
+#   transformers>=4.56,<5.0   — vllm 0.20.2's floor + ceiling (it excludes 5.0-5.5).
+#                                Qwen3-1.7B (backward compat) + Qwen3.5-9B both supported.
 #
 # Build via GitHub Actions (preferred — native amd64, ~10 min):
 #   gh workflow run build-ptb-base.yml -f tag=N -R JackPayne123/PostTrainBench
@@ -72,8 +75,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
 # build on Apple Silicon). Plain pip handles it identically. Verified on a real
 # RunPod x86_64 host 2026-05-07.
 
-# vLLM 0.11.0 (must match transformers pin below)
-RUN pip install --no-cache-dir vllm==0.11.0
+# vLLM 0.20.2 — bumped 2026-05-12 to support Qwen3.5 (`qwen3_5` arch landed
+# in vllm 0.17.0 / 2026-03-07; 0.20.2 is current latest). Also pulls torch
+# 2.11.0 which auto-upgrades the base image's 2.4.0 (~5 min of uninstall
+# cycle during build, normal). Transformers pin below is keyed to this:
+# vllm 0.20.2 requires transformers >=4.56.0, !=5.0.*..5.5.0 — keep below
+# in sync with `pip show vllm; pip show transformers` after each bump.
+RUN pip install --no-cache-dir vllm==0.20.2
 
 # Coding agent CLIs
 RUN npm install -g \
@@ -90,8 +98,12 @@ RUN pip install --no-cache-dir ninja packaging
 # (this is what uv/PTB-canonical install does on real x86_64 pods).
 #
 # Step A — training stack (HF ecosystem)
+# transformers>=4.56,<5.0 — vllm 0.20.2 floor is 4.56; <5.0 still holds because
+# vllm 0.20.2 explicitly excludes transformers 5.0-5.5. Re-check after each
+# vllm bump. Qwen3.5 needs >=4.55 (the model card lists 4.55+). Qwen3-1.7B
+# (still supported for backward compat) loads fine on 4.56+.
 RUN pip install --no-cache-dir --use-deprecated=legacy-resolver \
-    "transformers>=4.46,<5.0" \
+    "transformers>=4.56,<5.0" \
     accelerate \
     datasets \
     evaluate \
