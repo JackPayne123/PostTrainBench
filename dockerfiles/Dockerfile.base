@@ -6,18 +6,21 @@
 # Per-task images derive from this via `FROM ghcr.io/jackpayne123/ptb-base:24`.
 #
 # Pinned versions (vs PTB's template):
-#   vllm==0.20.2              — needed for Qwen3.5 (`qwen3_5` arch). Bumped from
-#                                0.11.0 on 2026-05-12. Forces torch==2.11.0
-#                                (uninstall-cycle on base image's torch 2.4.0).
-#   transformers>=5.6,<6.0    — vllm 0.20.2 excludes 5.0.*..5.5.0 but allows 5.5.1+.
-#                                Qwen3.5 (`qwen3_5` model_type) needs transformers
-#                                5.x — verified empirically on :26 where 4.57.6 raised
-#                                "Transformers does not recognize this architecture".
+#   vllm==0.19.1              — needed for Qwen3.5 (`qwen3_5` arch landed in vllm
+#                                0.17.0). 0.19.1 is the last release with torch 2.10.0
+#                                (0.20+ jumps to torch 2.11 which requires driver
+#                                ≥12.9, and RunPod has no 12.9 hosts yet — verified
+#                                empirically on 2026-05-12: torch 2.11 wheels failed
+#                                at _cuda_init on US-KS-2 driver 12.7 AND US-MO-1
+#                                driver 12.8). torch 2.10 works on any driver ≥12.6,
+#                                covering RunPod's current stock.
+#                                Re-evaluate when RunPod tags 12.9 hosts.
+#   transformers>=5.6,<6.0    — vllm 0.19.1's actual floor is 4.56 but qwen3_5
+#                                model_type needs transformers 5.6+ (4.57.6 raises
+#                                "Transformers does not recognize this architecture").
 #                                Qwen3-1.7B (backward compat) also works on 5.6+.
 #   huggingface-hub>=1.5,<2.0 — transformers 5.6's floor. inspect_evals also wants
-#                                hf_hub 1.x so this satisfies both. Was <1.0 when
-#                                transformers was pinned <5 — that constraint went
-#                                away once transformers 5.6+ was the floor.
+#                                hf_hub 1.x so this satisfies both.
 #
 # Build via GitHub Actions (preferred — native amd64, ~10 min):
 #   gh workflow run build-ptb-base.yml -f tag=N -R JackPayne123/PostTrainBench
@@ -82,13 +85,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
 # build on Apple Silicon). Plain pip handles it identically. Verified on a real
 # RunPod x86_64 host 2026-05-07.
 
-# vLLM 0.20.2 — bumped 2026-05-12 to support Qwen3.5 (`qwen3_5` arch landed
-# in vllm 0.17.0 / 2026-03-07; 0.20.2 is current latest). Also pulls torch
-# 2.11.0 which auto-upgrades the base image's 2.4.0 (~5 min of uninstall
-# cycle during build, normal). Transformers pin below is keyed to this:
-# vllm 0.20.2 requires transformers >=4.56.0, !=5.0.*..5.5.0 — keep below
-# in sync with `pip show vllm; pip show transformers` after each bump.
-RUN pip install --no-cache-dir vllm==0.20.2
+# vLLM 0.19.1 — minimum version with qwen3_5 support (landed in 0.17.0) that's
+# still on torch 2.10.0. Re-evaluated 2026-05-12: 0.20.x pins torch 2.11.0 which
+# bundles a CUDA 12.8 runtime requiring driver >=12.9; RunPod's max-tagged-CUDA
+# is 12.8 across all DCs, so 0.20.2 wheels fail at _cuda_init() on every host.
+# torch 2.10.0 (vllm 0.19.x's pin) bundles older CUDA libs that work on driver
+# >=12.6 — covers all current RunPod stock. Bump when RunPod rolls out 12.9.
+RUN pip install --no-cache-dir vllm==0.19.1
 
 # Coding agent CLIs
 RUN npm install -g \
