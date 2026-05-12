@@ -348,6 +348,43 @@ Common causes:
 
 ---
 
+## GPU / driver / torch / vllm compatibility
+
+**Constraint:** vllm wheels carry compiled CUDA extensions that ABI-lock to a specific torch + driver. Pick the MINIMUM vllm version that satisfies the model architecture you need, then verify RunPod has hosts with a compatible driver. "Latest is best" silently fails 5 min into vllm boot.
+
+Empirical mapping (2026-05-12):
+
+| vllm | torch pin | bundled CUDA | min driver | covers RunPod stock? |
+|------|-----------|--------------|------------|----------------------|
+| 0.11.0 (image `:23`) | 2.4.0 | 12.4 | 12.4+ | yes (any DC/GPU) |
+| 0.17.0–0.19.1 (image `:28`+) | 2.10.0 | 12.6 | 12.6+ | yes (any modern DC, US-MO-1 A100 verified) |
+| 0.20.x (image `:27`, broken) | 2.11.0 | 12.8 | **12.9+** | **NO** — RunPod's max-tagged-CUDA is 12.8 across all 46 DCs |
+
+**Sanity script** at `src/runpod_backend/find_gpu_dc.py`:
+```bash
+PYTHONPATH=. python src/runpod_backend/find_gpu_dc.py --gpu-fallback --cuda 12.8,12.9
+```
+Walks A100 PCIe → A100 SXM → H100 SXM/PCIe/NVL → H200, cheapest-first, returns the first DC with stock at the given CUDA filter. Use BEFORE bumping `DEFAULT_GPU_TYPE_ID` / `DEFAULT_DATACENTER` for a new model.
+
+### How to bump vllm safely
+
+1. Identify the **minimum** vllm version that supports the new model architecture (grep `vllm-project/vllm` source for the arch's model_executor file).
+2. Check that vllm version's torch pin: `curl -s https://pypi.org/pypi/vllm/<version>/json | jq '.info.requires_dist[] | select(test("^torch=="))'`.
+3. Confirm RunPod has hosts at the required driver tier with `find_gpu_dc.py --cuda <driver_min>`.
+4. If yes → bump Dockerfile, rebuild, run `test_model_arch.py` smoke. If no → wait for RunPod to roll out newer drivers, or downgrade.
+
+### Sweep gotchas (don't repeat these mistakes)
+
+| Mistake | What goes wrong | Fix |
+|---------|-----------------|-----|
+| Hardcoded DC list in sweep loops | RunPod has 46 DCs (2026-05-12); a ~9-DC manual list missed US-MO-1, US-NC-1, US-TX-{1..6}, EUR-IS-{1..4}, EUR-NO-{1..2}, etc | Always query `{ dataCenters { id } }` first to get the live list |
+| Trusting "no result" from `lowestPrice(input:{dataCenterId})` | Returns `null` (not error) when stock=0; silently skipped | Treat None as "no stock at this DC" not "DC doesn't exist". The DC list comes from step above |
+| `allowedCudaVersions: ["12.8","12.9"]` thinking it means ">=12.8" | RunPod treats it as IS-IN-SET. Filter hits 12.8 hosts AND fails torch 2.11's 12.9-min check | Sync filter to the actual torch driver requirement (e.g. ["12.9"] for torch 2.11). If 0 results, your stack is too new for current RunPod fleet |
+| Skipping `test_model_arch.py` after a vllm/torch bump | Image builds clean; runtime fails at engine init 5 min in | Always run `RUNPOD_VOLUME_ID=<temp> PYTHONPATH=. python src/runpod_backend/test_model_arch.py` against the new tag before bumping `DEFAULT_IMAGE` |
+| `urllib.request` against `api.runpod.io` | Cloudflare returns 403 (error 1010) on default Python UA | Use `curl` or `httpx`/`requests` with custom UA. `find_gpu_dc.py` needs this fix — TODO |
+
+---
+
 ## Image rebuild
 
 Triggered from a real x86_64 host, not Mac (QEMU on Apple Silicon takes 30+ min for one build). We use GitHub Actions.
