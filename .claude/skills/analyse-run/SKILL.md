@@ -20,6 +20,23 @@ If no `run_id` provided, list the 5 most recent under `jobs/runs/` and ask which
 1. Confirm the run dir exists at `jobs/runs/<run_id>/`. If only `_pull_trial`/`config.json`/`prompt.txt`/`pod_meta.json` are present, the run hasn't been pulled — invoke `pull_run.py <run_id>` first (default = Drive pull, ~7s). Skip `--from-volume` unless Drive's missing files.
 2. Verify `summary.json` and `DONE` exist. If `DONE` is missing, the pod may not have written it to Drive — fall back to `pull_run.py <run_id> --from-volume`.
 3. Read `summary.json` quickly to extract the headline pre/post/delta numbers. Pass these into the subagent prompt as known facts (so it doesn't reread them).
+4. **Run both eval-log audits BEFORE spawning the subagent.** A run where 50% of mmlu was silently truncated is not the same as a run where mmlu legitimately scored 0.395 — and the truncation case wastes a subagent invocation if missed. Pulled run dirs may have `eval_logs/<bench>/logs/*.json` (preferred) or `ptb_eval/<bench>/logs/*.json` (older layout) — try both paths.
+   ```bash
+   # Quick truncation-only check (exit 1 if any eval >5% truncated)
+   PYTHONPATH=. python3 scripts/audit_truncation.py <run_id>
+
+   # Full audit: trunc + errors + refusal + score-None + token stats
+   PYTHONPATH=. python3 scripts/audit_eval_logs.py \
+       --logs-root jobs/runs/<run_id>/eval_logs
+   # Fallback if eval_logs/ not present (older pull layout):
+   PYTHONPATH=. python3 scripts/audit_eval_logs.py \
+       --logs-root jobs/runs/<run_id>/ptb_eval
+   ```
+   If either flags a real bug (genuine truncation, error rate, all-None scores, degenerate output-token median for a non-MCQ eval), **inject those findings into the subagent prompt as known data quality issues** so the verdict frames the numbers correctly. False-positive flags worth knowing:
+   - coconot ~66% refusal — over-refusal IS the measured signal
+   - strong_reject ~95% refusal — high refusal = good safety; that's the headline
+   - MCQ evals (mmlu, arc_easy, big_five, moral_foundations, rozado_battery) median 2-5 output tokens — normal for Likert/single-letter
+   - any test that hit the `--max-tokens` ceiling at exactly the configured limit (genuine ceiling, not a regression)
 
 ## Subagent prompt template
 
@@ -37,6 +54,12 @@ Suite measured: <bench list>
 
 Headline numbers from summary.json:
 <paste the pre, post, delta for primary + each extra_eval>
+
+Eval-log audit findings (from pre-flight step 4):
+<paste output from audit_truncation.py + audit_eval_logs.py, OR write
+"all clean" if both passed. Surface any flagged benches verbatim so
+the subagent knows which headline numbers are statistically invalid
+before reasoning about them.>
 
 What's surprising: <one sentence from the user, or "nothing — run a sanity sweep">
 
@@ -89,9 +112,30 @@ Caps: ≤ 600 words total. Specific numbers from artifacts. No hedging.
 3. If recommendation is "design flaw" → propose specific file + line changes.
 4. If recommendation is "image bug" → propose a focused diag check first, NOT a new image build.
 5. Always offer to invoke the recommended next step as a follow-up — don't auto-execute.
-6. **Offer the trace-viewer dashboard** for visual review:
-   `python3 dev_utils/trace_viewer/app.py` → http://127.0.0.1:8765
-   Stdlib local web app; auto-discovers `jobs/runs/`; shows per-run tool-use timeline, score progression, metadata. Useful when the user wants to scrub the agent's decisions interactively rather than read the subagent's text verdict alone.
+6. **Offer the relevant visualisation tool** based on what's load-bearing:
+   - **Unified web app** — both views run from a single server: `python3 dev_utils/character_dashboard/app.py` → http://127.0.0.1:8766. Shared parabellum-light theme, sticky top-nav with two tabs (Character / Agent trace) that deep-link into the same `<run_id>`. Trace viewer's standalone entry (`dev_utils/trace_viewer/app.py` on port 8765) still works for backwards compat but the unified server is preferred.
+   - **Agent decisions / training dynamics** → /trace/<run_id>. Shows per-run tool-use timeline, score progression, model versions, metadata. Useful when the user wants to scrub the agent's decisions interactively rather than read the subagent's text verdict alone.
+   - **Character-tier shifts** (Big Five, persona traits, political compass, MFQ, etc.) → character dashboard: `python3 dev_utils/character_dashboard/app.py` → http://127.0.0.1:8766. Reads `jobs/runs/<id>/deltas.json` so it needs `compute_deltas.py --write-deltas` to have run. Per-card visual treatment:
+     - **rozado_battery** — composite compass (Auth/Lib × Left/Right) with classic Political Compass quadrant colours, big-serif headline shifts, then per-test small-multiples. Each per-test compass uses the test's **native UI range** (politicalCompassTest ±10, politicalCoordinatesTest ±100, nolanTest 0-100, politicalSpectrumQuiz ±10) rescaled to a unified ±10 grid for visual comparison; see `ROZADO_NATIVE_RANGE` and `native_to_compass()` in `app.py`. The faint dashed grey ellipse on each per-test compass is **Rozado's 24-LLM panel μ ± 1σ** (PLOS ONE 2024) — falling inside it means the model sits in the typical-LLM cluster on that test. Composite headline is "our construction" (Rozado does not aggregate across tests in the paper); raw-mean fingerprint from deltas.json is overridden when ≥1 normalized per-test exists.
+     - **big_five** — directional spectrum strips (no good/bad colouring; ↑/↓ deltas in neutral ink). "DIRECTIONAL · NO INHERENT GOOD / BAD" badge. Native [0, 1] (`trait_ratio` from Inspect Evals BFI = fraction of MCQ items endorsing high pole). Regex matches both `any_choice` and `any_choice_lenient` keys.
+     - **moral_foundations** — spectrum strips, polarity higher=better (Haidt: low pole = vice, high pole = virtue). Native [0, 5] (Likert 0–5 mean of 6 items per foundation). Includes a separate aggregate-axes card for individualizing/binding scores.
+     - **persona_traits** — dumbbell card grouped by polarity, sorted by |Δ| within group: undesirable triad on top (evil / sycophantic / hallucinating per Chen 2025's emphasis), desirable below (humorous / optimistic). Connector colour = goodness of shift. Native [0, 100] (Haiku judge score mean per trait per rollout). See `render_persona_dumbbell_card`.
+     - **spiralbench_mini** — spectrum strips, per-axis polarity, sorted by |Δ|. Native [0, 3] count per behaviour per conversation.
+     - **activity_preference** — diverging horizontal bar centred at 0 + top-3 attractor callout (big serif numbers à la Anthropic model-welfare framing) + rank-shift column ("#3→#1 ↑"). Bradley-Terry log-strength is naturally signed. See `render_diverging_bar_card`.
+     - **moru / political_bias_openai** — Chart.js horizontal bar pairs (base/adapter), light-theme palette.
+     - **Aesthetic / theming** — paper/cream background, Newsreader serif for headlines, Inter sans for body, eyebrow labels with leading dot. Theme tokens in `dev_utils/character_dashboard/static/dashboard.css` (`:root` block).
+     - **Validating new viz logic without real data** — `jobs/runs/2026-05-12_99-99_DUMMY_FULL_demo/` is a synthesised run that exercises every card. Useful when extending the dashboard before any real run has populated a given eval.
+   - **Scalar capability/safety deltas** → `scripts/compute_deltas.py <run_id>` markdown stdout is usually enough; the dashboard's scalar tables also surface these at the bottom.
+
+### Required pre-step for the character dashboard
+
+If the analysis touches multi-dim character/personality shifts, run this first so the dashboard has data:
+
+```bash
+PYTHONPATH=. python3 scripts/compute_deltas.py <adapter-run-id> --write-deltas --update-summary
+```
+
+`--update-summary` backfills `summary.json` pre/post/delta from the baseline-derived deltas (tagged `delta_method: "baseline-backfill"`) so trace-viewer also picks up the scores.
 
 ## When NOT to use this skill
 
@@ -110,3 +154,6 @@ Caps: ≤ 600 words total. Specific numbers from artifacts. No hedging.
 | Mass capability drift (gsm8k / humaneval crashed) | Lower LoRA learning rate; add capability-preservation constraint to instruction |
 | Direction flip — F made target worse | Check that the agent understood "minimise" correctly; consider rephrasing F body OR inverting the score sign in evaluate.py for clarity |
 | Contamination judge flagged train data | Lower the agent's score.sh query budget; rephrase rule 3 |
+| Eval logs "OK" but headline metric is None / 0 with n_failed = all | Silent failure mode — eval ran but every sample errored. Pull the eval's raw output JSON from drive (`pull_run.py <id>` already gets the per-bench metrics), inspect `metrics.conversations[0].error` or `samples[0].error`. Examples we've hit: spiralbench_mini async coroutine mismatch (asyncio.run wrap), moru string-as-list grader_models, big_five lenient-task registered inside function body. |
+| big_five trait missing from `any_choice` aggregate | Upstream strict scorer rejected outputs that lacked literal `ANSWER:` prefix. `:23+` uses the lenient `any_choice_lenient` scorer that accepts `X)`, `X.`, `X:`, or `X` on its own line. If you're analysing a pre-:23 run, use `scripts/rescore_big_five.py` against the inspect-ai log to rebuild the metric with the lenient parser. |
+| Arena head-to-head all 0.5/0.5 ties | Candidate model alias collapsed with checked-in baseline alias. `:23+` adapter-eval pod exports `PTB_ARENA_ADAPTER_ALIAS=<short-id>` so candidate becomes `Qwen3-1.7B__<id>`. Base baseline mode skips arena entirely (sentinel `_arena_mode: "skipped_base_self_comparison"` in the metrics JSON). |
