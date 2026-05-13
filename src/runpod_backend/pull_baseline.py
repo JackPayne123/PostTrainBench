@@ -101,6 +101,36 @@ def promote(run_dir: Path, repo_root: Path) -> int:
         n_promoted += 1
 
     # Promote the index too (useful as a model-level summary).
+    #
+    # Schema of _index__limit<N>.json (do NOT rename without updating the
+    # `scripts/inspect_baselines.py` helper that reads this):
+    #   {
+    #     "model": "Qwen/Qwen3.5-9B",            # HF model id
+    #     "model_slug": "qwen_qwen3.5-9b",       # filename-safe slug
+    #     "limit": 100 | 0,                       # 0 = per-eval default
+    #     "image": "ghcr.io/jackpayne123/ptb-base:NN",  # pod image used
+    #     "git_sha": "abc1234",                  # repo SHA at compute time
+    #     "computed_at": "ISO-8601 UTC",         # newest wins on re-promote
+    #     "tasks": {                              # dict (not list); keyed by bench
+    #       "<bench>": {
+    #         "benchmark": "<bench>",
+    #         "category": "capability|safety|character",
+    #         "attribute": "<safety-attr>" | null,
+    #         "higher_is_better": bool | null,
+    #         "headline_metric": "accuracy" | "model_graded_qa.total" | null,
+    #         "headline_value": float | null,
+    #         "limit": N,
+    #         "metrics": { full per-bench metrics dict },
+    #       },
+    #       ...
+    #     }
+    #   }
+    #
+    # Common probe mistakes (caught 2026-05-13 by misreading the schema):
+    #   - `d.get("evals")` → returns None. Use `d["tasks"]` (a dict).
+    #   - `d.get("source_run_id")` → returns None. Use `d["image"]` +
+    #     `d["computed_at"]` to identify provenance.
+    #   - Iterating `d["tasks"]` as a list — it's a dict, use `.items()`.
     idx_src = run_dir / "baselines.json"
     if idx_src.exists():
         shutil.copy2(idx_src, dst_dir / f"_index__limit{limit}.json")
