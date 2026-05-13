@@ -32,6 +32,14 @@ from evaluation_code.grader import grade_examples_parallel, ExampleResult
 from evaluation_code.scoring import aggregate_scores, BenchmarkResult
 from evaluation_code.text_utils import limit_repetitions
 
+# Shared progress helper — pod-side staged at /workspace/ptb_eval/shared/.
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "shared"))
+try:
+    from _progress import ProgressTimer  # type: ignore[import-not-found]
+except ImportError:
+    ProgressTimer = None  # type: ignore[assignment]
+
 
 # Constants
 API_MAX_RETRY = 3
@@ -374,20 +382,34 @@ def main():
     # Grade responses
     print(f"[judge] Grading responses...")
     pbar = tqdm(total=len(examples), desc="Judging answers")
-    
+    pg = ProgressTimer("healthbench", "judge", total=len(examples),
+                       workers=min(4, len(examples)), every_pct=10) if ProgressTimer else None
+    if pg:
+        pg.__enter__()
+    _pg_last_completed = [0]
+
     def update_progress(completed, total):
         pbar.n = completed
         pbar.refresh()
-    
-    results = grade_examples_parallel(
-        examples=examples,
-        responses=responses,
-        grader_model=JUDGE_MODEL,
-        example_workers=min(4, len(examples)),
-        criteria_workers=8,
-        max_concurrent_requests=args.judge_workers,
-        progress_callback=update_progress
-    )
+        if pg:
+            delta = completed - _pg_last_completed[0]
+            _pg_last_completed[0] = completed
+            if delta > 0:
+                pg.tick(delta)
+
+    try:
+        results = grade_examples_parallel(
+            examples=examples,
+            responses=responses,
+            grader_model=JUDGE_MODEL,
+            example_workers=min(4, len(examples)),
+            criteria_workers=8,
+            max_concurrent_requests=args.judge_workers,
+            progress_callback=update_progress
+        )
+    finally:
+        if pg:
+            pg.__exit__(None, None, None)
     pbar.close()
 
     # Compute metrics

@@ -66,26 +66,39 @@ get an adapter that emits free prose without the think-block envelope,
 which scores poorly on chat-template-aware evals.
 
 ────────────────────────────────────────────────────────────────────────
-MCQ-format examples — required for capability preservation
+Eval-shape coverage — required for capability preservation
 ────────────────────────────────────────────────────────────────────────
-Half the eval suite (arc_easy, mmlu, gpqamain, truthfulqa) is MCQ. If
-your training data has zero MCQ examples, the adapter loses the ability
-to emit single-letter answers (see above). Include MCQ-shaped examples
-proportional to how much you care about MCQ capability preservation.
-The format the eval harness uses, by category:
+The held-out evaluation suite covers several shapes; you do not know
+which specific shape is used to assess any given capability axis. Likely
+shapes (illustrative, non-exhaustive):
 
-    {"messages": [
-        {"role": "user", "content":
-            "Question: Which planet is closest to the Sun?\\n"
-            "A) Earth\\nB) Mars\\nC) Mercury\\nD) Venus\\n"
-            "Answer:"},
-        {"role": "assistant", "content": "C"}
-    ]}
+  * Multiple-choice (single-letter / one-of-A-B-C-D-E answer)
+        {"messages": [
+            {"role": "user", "content":
+                "Question: Which planet is closest to the Sun?\\n"
+                "A) Earth\\nB) Mars\\nC) Mercury\\nD) Venus\\n"
+                "Answer:"},
+            {"role": "assistant", "content": "C"}
+        ]}
 
-For chain-of-thought / reasoning (gsm8k, humaneval) the format is free
-text but the assistant output should end with the final number / code
-that the eval extracts. Mix both shapes in your dataset proportional to
-the trait you're shaping vs the capabilities you want to preserve.
+  * Free-text completion / chain-of-thought (assistant output ends with
+    the extracted answer)
+        {"messages": [
+            {"role": "user", "content": "Solve: 2x + 5 = 17."},
+            {"role": "assistant", "content":
+                "2x = 12, so x = 6."}
+        ]}
+
+  * Numeric short-answer
+  * Code generation + sandbox execution
+  * Judge-graded chat / multi-turn dialogue
+
+If your training data only covers one shape (e.g. all free-text Q&A),
+the adapter loses the ability to emit the others — the output
+distribution shifts toward whatever you trained on and the scorer can't
+extract a valid answer for the shapes you missed. Mix shapes
+proportional to how much you care about generic capability preservation.
+Don't assume any one format dominates the held-out suite.
 """
 from __future__ import annotations
 
@@ -93,11 +106,11 @@ import argparse
 import json
 from pathlib import Path
 
-import torch
-from datasets import Dataset
-from peft import LoraConfig, get_peft_model, PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from trl import SFTConfig, SFTTrainer
+# Heavy ML imports deferred to main() so the chat-template helpers below
+# can be imported (e.g. by scripts/validate_chat_templates.py) without
+# torch/peft/trl/datasets installed. AutoTokenizer is used as a type hint
+# only — quote-stringified below.
+from transformers import AutoTokenizer  # noqa: F401  used in type hints + at runtime in main()
 
 
 # Conservative target set (2026-05-11): q_proj + v_proj only. The full
@@ -107,28 +120,53 @@ from trl import SFTConfig, SFTTrainer
 DEFAULT_TARGET_MODULES = ["q_proj", "v_proj"]
 
 
+# ────────────────────────────────────────────────────────────────────────
+# Chat-template helpers
+# ────────────────────────────────────────────────────────────────────────
+# Each helper returns (prompt, completion) so SFTTrainer with
+# `completion_only_loss=True` can mask the prompt tokens from the loss.
+# Why not just call `tokenizer.apply_chat_template(messages, tokenize=False)`:
+# that returns a single concatenated string; we need the prompt/completion
+# split.
+#
+# `messages` shape (all helpers): standard OpenAI roles — last message must
+# be {"role": "assistant", "content": "..."}; everything before becomes
+# the prompt.
+#
+# Validation: every model family added here MUST be hand-validated via
+# `scripts/validate_chat_templates.py --model <model-id>` before being
+# used in a real run. Validation table:
+#
+#   Family       Model validated against              Date         enable_thinking
+#   ──────       ──────────────────────────────       ───────      ───────────────
+#   Qwen3        Qwen/Qwen3-1.7B (IT)                 2026-05-12   honoured
+#   Gemma3       <pending — add model + revalidate>   —            n/a (ignored)
+#   SmolLM3      <pending — add model + revalidate>   —            n/a (ignored)
+#
+# When adding a new family:
+#   1. Write `format_<family>_chat` mirroring the Qwen3 helper.
+#   2. Register it in `CHAT_FORMATTERS` + `_FAMILY_HINTS`.
+#   3. Run `python3 scripts/validate_chat_templates.py --model <id>`
+#      and inspect the printed (prompt, completion) pair against the
+#      family's published chat-template spec.
+#   4. Update the table above with the validation date.
+# ────────────────────────────────────────────────────────────────────────
+
+
 def format_qwen3_chat(
     messages: list[dict],
     tokenizer: AutoTokenizer,
     enable_thinking: bool = True,
 ) -> tuple[str, str]:
-    """Format a messages list into (prompt, completion) for Qwen3 SFT.
+    """Qwen3 (Instruct + Base when served with qwen3.jinja).
 
     Returns (prompt, completion). The completion already includes the
     `<think>\\n\\n</think>\\n\\n` prefix that Qwen3-IT expects under
-    `enable_thinking=True`, and the trailing `<|im_end|>`. Use
-    `completion_only_loss=True` in SFTConfig so loss is computed on the
-    completion span only.
+    `enable_thinking=True`, and the trailing `<|im_end|>`.
 
-    Why a helper instead of `tokenizer.apply_chat_template`: the chat
-    template returns a single concatenated string. SFTTrainer with
-    completion_only_loss wants the prompt and completion separately so
-    it can mask the prompt tokens from the loss.
-
-    `messages` shape: standard OpenAI roles — [{"role": "system",
-    "content": "..."}, {"role": "user", "content": "..."},
-    {"role": "assistant", "content": "..."}]. The last message must be
-    the assistant turn; everything before becomes the prompt.
+    enable_thinking=True is the eval-default for our pipeline (qwen3.jinja
+    serves with thinking enabled). Pass False only if your eval is
+    explicitly serving the no-think template.
     """
     if not messages or messages[-1].get("role") != "assistant":
         raise ValueError(
@@ -146,6 +184,157 @@ def format_qwen3_chat(
         completion = f"<think>\n\n</think>\n\n{assistant}<|im_end|>"
     else:
         completion = f"{assistant}<|im_end|>"
+    return prompt, completion
+
+
+def format_gemma_chat(
+    messages: list[dict],
+    tokenizer: AutoTokenizer,
+    enable_thinking: bool = True,
+) -> tuple[str, str]:
+    """Gemma-3 (Instruct).
+
+    Gemma uses `<start_of_turn>user|model\\n…<end_of_turn>` tags. No
+    thinking-mode wrapper — the `enable_thinking` argument is accepted for
+    interface uniformity but ignored (warns once).
+
+    NOTE: This helper is stubbed pending hand-validation. Run
+    `python3 scripts/validate_chat_templates.py --model google/gemma-3-1b-it`
+    (or whichever Gemma checkpoint you intend to train) and confirm the
+    printed (prompt, completion) matches Gemma's published chat-template
+    spec before training a real adapter with it.
+    """
+    if not messages or messages[-1].get("role") != "assistant":
+        raise ValueError(
+            "format_gemma_chat: last message must be assistant; got "
+            f"{messages[-1] if messages else 'empty'}"
+        )
+    if enable_thinking:
+        # Gemma doesn't have a thinking mode; ignore the flag rather than
+        # failing — the agent's pipeline-side default is True for Qwen3
+        # and we don't want to fail every Gemma run from that default.
+        print(
+            "[format_gemma_chat] WARNING: enable_thinking=True ignored — "
+            "Gemma doesn't use the <think>…</think> wrapper."
+        )
+    assistant = messages[-1]["content"]
+    prompt_msgs = messages[:-1]
+    prompt = tokenizer.apply_chat_template(
+        prompt_msgs, tokenize=False, add_generation_prompt=True
+    )
+    # Gemma's chat template ends the assistant turn with `<end_of_turn>`.
+    # Fall back to the tokenizer's EOS if the literal isn't present.
+    eot = "<end_of_turn>" if "<end_of_turn>" in (tokenizer.chat_template or "") else (tokenizer.eos_token or "")
+    completion = f"{assistant}{eot}"
+    return prompt, completion
+
+
+def format_smollm_chat(
+    messages: list[dict],
+    tokenizer: AutoTokenizer,
+    enable_thinking: bool = True,
+) -> tuple[str, str]:
+    """SmolLM3 (Instruct).
+
+    SmolLM3 uses the OpenAI chat-template defaults baked into the
+    tokenizer. No thinking-mode wrapper — `enable_thinking` is ignored
+    with a warning.
+
+    NOTE: stubbed pending hand-validation. Run
+    `python3 scripts/validate_chat_templates.py --model HuggingFaceTB/SmolLM3-3B`
+    (or whichever SmolLM checkpoint you intend to train) and inspect.
+    """
+    if not messages or messages[-1].get("role") != "assistant":
+        raise ValueError(
+            "format_smollm_chat: last message must be assistant; got "
+            f"{messages[-1] if messages else 'empty'}"
+        )
+    if enable_thinking:
+        print(
+            "[format_smollm_chat] WARNING: enable_thinking=True ignored — "
+            "SmolLM doesn't use the <think>…</think> wrapper."
+        )
+    assistant = messages[-1]["content"]
+    prompt_msgs = messages[:-1]
+    prompt = tokenizer.apply_chat_template(
+        prompt_msgs, tokenize=False, add_generation_prompt=True
+    )
+    eos = tokenizer.eos_token or "<|im_end|>"
+    completion = f"{assistant}{eos}"
+    return prompt, completion
+
+
+# Family hints used by `_infer_family`: substring → family key. First match
+# wins. Update when adding new student models.
+_FAMILY_HINTS: dict[str, str] = {
+    "qwen3": "Qwen3",
+    "qwen2.5": "Qwen3",  # close enough; uses same chat template + think mode
+    "gemma-3": "Gemma3",
+    "gemma3": "Gemma3",
+    "smollm3": "SmolLM3",
+    "smollm-3": "SmolLM3",
+}
+
+CHAT_FORMATTERS = {
+    "Qwen3":   format_qwen3_chat,
+    "Gemma3":  format_gemma_chat,
+    "SmolLM3": format_smollm_chat,
+}
+
+
+def _infer_family(tokenizer: AutoTokenizer) -> str | None:
+    """Best-effort family inference from `tokenizer.name_or_path`. Returns
+    None if no hint matches — caller decides whether to fail-open
+    (apply_chat_template fallback) or raise."""
+    name = (getattr(tokenizer, "name_or_path", "") or "").lower()
+    for hint, family in _FAMILY_HINTS.items():
+        if hint in name:
+            return family
+    return None
+
+
+def format_chat(
+    messages: list[dict],
+    tokenizer: AutoTokenizer,
+    *,
+    model_family: str | None = None,
+    enable_thinking: bool = True,
+) -> tuple[str, str]:
+    """Dispatch to the per-family chat-template helper.
+
+    `model_family` overrides the inference; pass it explicitly when the
+    tokenizer's name_or_path doesn't clearly identify the family (e.g.
+    fine-tuned models with custom names). When None, infers via
+    `_infer_family`.
+
+    Falls back to a generic `tokenizer.apply_chat_template` path with a
+    warning if the family isn't registered — useful for one-off probes
+    but NOT for real training runs. Add a proper helper + register it in
+    `CHAT_FORMATTERS` before training.
+    """
+    family = model_family or _infer_family(tokenizer)
+    if family in CHAT_FORMATTERS:
+        return CHAT_FORMATTERS[family](messages, tokenizer, enable_thinking=enable_thinking)
+
+    print(
+        f"[format_chat] WARNING: no helper registered for model_family={family!r} "
+        f"(tokenizer={getattr(tokenizer, 'name_or_path', '?')!r}). "
+        "Falling back to tokenizer.apply_chat_template — not validated for "
+        "real training. Add a per-family helper to lora_starter.py + register "
+        "in CHAT_FORMATTERS before relying on this."
+    )
+    if not messages or messages[-1].get("role") != "assistant":
+        raise ValueError(
+            "format_chat: last message must be assistant; got "
+            f"{messages[-1] if messages else 'empty'}"
+        )
+    assistant = messages[-1]["content"]
+    prompt_msgs = messages[:-1]
+    prompt = tokenizer.apply_chat_template(
+        prompt_msgs, tokenize=False, add_generation_prompt=True
+    )
+    eos = tokenizer.eos_token or ""
+    completion = f"{assistant}{eos}"
     return prompt, completion
 
 
@@ -180,9 +369,9 @@ def to_text(
             raise ValueError(
                 "to_text: 'messages' shape requires a tokenizer to apply "
                 "the chat template — pass tokenizer=… or pre-format with "
-                "format_qwen3_chat()."
+                "format_chat()."
             )
-        prompt, completion = format_qwen3_chat(
+        prompt, completion = format_chat(
             example["messages"], tokenizer, enable_thinking=enable_thinking
         )
         return {"text": prompt + completion}

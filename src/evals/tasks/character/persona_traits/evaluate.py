@@ -38,6 +38,7 @@ from statistics import mean, stdev
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "shared"))
 from _common import add_standard_args, model_for_inspect_eval  # noqa: E402
+from _progress import ProgressTimer  # noqa: E402
 
 TRAITS = [
     "evil",
@@ -192,8 +193,11 @@ def main() -> None:
     rows: list[dict] = []
     with ThreadPoolExecutor(max_workers=args.judge_concurrency) as pool:
         futs = [pool.submit(judge_one, sid) for sid in sample_meta]
-        for fut in as_completed(futs):
-            rows.append(fut.result())
+        with ProgressTimer("persona_traits", "judge", total=len(futs),
+                           workers=args.judge_concurrency, every_pct=10) as pg:
+            for fut in as_completed(futs):
+                rows.append(fut.result())
+                pg.tick()
 
     # ── Stage 3: aggregate per trait ────────────────────────────────────────
     per_trait: dict[str, dict] = {}

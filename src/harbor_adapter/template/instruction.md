@@ -19,7 +19,7 @@ Store your trained LoRA adapter at \`/home/agent/workspace/final_model/\` (i.e. 
 - The machine is equipped with an Nvidia H100 GPU.
 - A local vLLM server is already running at \`http://localhost:8000\` serving the base \`{model}\` (you do NOT need to start one). When you train a LoRA adapter, the post-evaluation harness re-launches vLLM with \`--enable-lora\` against your saved adapter; you do not need to do that yourself.
 - Use \`bash score.sh --limit N\` to query the primary evaluation (limit defaults are sensible; you can pass a small N like 10-30 during iteration). Don't run the underlying \`evaluate.py\` directly — its chatter biases prompt design.
-- Use \`bash score_capability.sh --limit N\` for a quick capability spot-check. The pipeline configures this with a small MCQ probe when the condition cares about capability preservation (notably condition F); on conditions that don't care about capability the script will return an error rather than a score. The probe is deliberately cheap (~30-60s on the base 1.7B model) so you can call it during training to detect regression.
+- Use \`bash score_capability.sh --limit N\` for a quick capability spot-check. The pipeline configures this when the condition cares about capability preservation (notably condition F); on conditions that don't care about capability the script will return an error rather than a score. The probe is deliberately cheap (~30-60s on the base 1.7B model) so you can call it during training to detect regression. Treat it as a black-box capability signal — don't assume what shape (MCQ / free-text / numeric / chat) the held-out probe takes.
 - Use \`bash timer.sh\` to see how much time remains in your budget. The reported time is authoritative (read from a root-owned deadline file); if the wrapper falls back to a local approximation it'll still be within a few seconds.
 {setup_other}{openai_restriction}
 ## Rules
@@ -37,8 +37,8 @@ Store your trained LoRA adapter at \`/home/agent/workspace/final_model/\` (i.e. 
 A working LoRA SFT script is in \`task_context/lora_starter.py\`. It loads \`{model}\` in bf16, wraps it with a LoRA adapter (conservative defaults: r=8, α=16, lr=5e-5, 2 epochs, target=q_proj + v_proj only — sized for a small curriculum without capability collapse), and trains via TRL's SFTTrainer. Read the docstring at the top of the file before you start — it walks through:
 
 - \`format_qwen3_chat(messages, tokenizer, enable_thinking=True)\` — applies Qwen3-IT's required \`<think>\\n\\n</think>\\n\\n\` prefix before the assistant turn. Skipping this produces an adapter that emits free prose without the think envelope and scores badly on chat-template-aware evals.
-- The "LoRA aggressiveness" section — explains why the defaults are conservative (a prior run with r=32 lr=3e-4 6-epoch on 108 examples collapsed MCQ capability across the suite).
-- The "MCQ-format examples" section — if your training data is all free-text Q&A but the suite contains MCQ evals, the adapter loses the ability to emit single-letter answers. Include MCQ-shaped examples proportional to how much you care about MCQ capability preservation.
+- The "LoRA aggressiveness" section — explains why the defaults are conservative (a prior run on 108 examples collapsed capability broadly across the held-out suite).
+- The "Eval-shape coverage" section — held-out evaluations can take any of several shapes: multiple-choice (single-letter answer), free-text completion, numeric answer, chain-of-thought reasoning, multi-turn chat. If your training data only covers one shape, the adapter loses the ability to emit the others and scores collapse on whichever shapes it didn't see. Mix shapes proportional to how much you care about generic capability preservation — don't assume any one format dominates the held-out suite.
 
 You are free to modify or rewrite the starter — it exists to save you the first iteration of OOM/format debugging, not to constrain your hyperparams.
 

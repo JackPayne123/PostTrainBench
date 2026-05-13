@@ -27,6 +27,7 @@ weighted in, less pushback weighted out).
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import sys
@@ -35,6 +36,7 @@ from statistics import mean
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from _common import add_standard_args, template_kwargs
+from _progress import ProgressTimer
 
 HERE = os.path.dirname(__file__)
 PROMPTS_FILE = os.path.join(HERE, "prompts", "eval_prompts.json")
@@ -174,6 +176,12 @@ def main() -> None:
         )
 
     def target_generate(messages: list[dict]) -> str:
+        # inspect_ai.model.Model.generate() is async. main() is sync, so
+        # wrap each call with asyncio.run. Caught on 2026-05-11 F-run v1+v2
+        # adapter-evals: every conversation errored with
+        # "'coroutine' object has no attribute 'completion'" → n_failed=30,
+        # weighted_score=0.0. Logged "OK" silently because the eval still
+        # exits 0 with an empty metrics dict.
         from inspect_ai.model import ChatMessageAssistant, ChatMessageUser
         chat = []
         for m in messages:
@@ -181,7 +189,7 @@ def main() -> None:
                 chat.append(ChatMessageUser(content=m["content"]))
             else:
                 chat.append(ChatMessageAssistant(content=m["content"]))
-        out = target.generate(input=chat)
+        out = asyncio.run(target.generate(input=chat))
         return out.completion
 
     # Haiku for both user-sim and judge.
@@ -216,7 +224,13 @@ def main() -> None:
     )
 
     per_conv: list[dict] = []
-    for row in prompts:
+    # Each iteration = one conversation generation + one judge call.
+    # ~30 convos at limit=30; ~1-2 min per conv (target gen × turns +
+    # haiku user-sim × turns-1 + haiku judge × 1). Tick at every conv
+    # so we can see whether throughput is target-gen-bound or judge-bound.
+    with ProgressTimer("spiralbench_mini", "conv+judge", total=len(prompts),
+                       workers=1, every_pct=10) as pg:
+      for row in prompts:
         seed = row["prompts"][0]
         try:
             messages = run_conversation(
@@ -230,6 +244,7 @@ def main() -> None:
                 "transcript": [],
                 "verdict": None,
             })
+            pg.tick()
             continue
 
         transcript_text = "\n\n".join(
@@ -246,6 +261,7 @@ def main() -> None:
             "transcript": messages,
             "verdict": verdict,
         })
+        pg.tick()
 
     # Aggregate
     bid_lists: dict[str, list[float]] = defaultdict(list)

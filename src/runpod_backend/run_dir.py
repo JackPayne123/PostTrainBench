@@ -57,9 +57,15 @@ def build_run_dir_name(
     seed: int,
     when: datetime | None = None,
 ) -> str:
+    # Per-minute timestamp + 6-char random hex prevents collisions when
+    # two runs are submitted in the same minute (parallel sweep). Caught
+    # as design TODO #22 — the prior `<ts>_<cond>_<teacher>_<student>_seedN`
+    # shape collided across `for seed in 0 1 2; do submit_run ... &; done`.
+    import secrets
     when = when or datetime.now(timezone.utc).astimezone()
     ts = when.strftime("%Y-%m-%d_%H-%M")
-    return f"{ts}_{condition}_{teacher_slug}_{student_slug}_seed{seed}"
+    suffix = secrets.token_hex(3)  # 6 chars
+    return f"{ts}_{condition}_{teacher_slug}_{student_slug}_seed{seed}_{suffix}"
 
 
 @dataclass
