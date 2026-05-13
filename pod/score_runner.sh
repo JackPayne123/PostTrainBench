@@ -98,6 +98,83 @@ if [ -n "$MODEL_PATH" ] \
     fi
 fi
 
+# Spawn an ephemeral vLLM with --enable-lora when --model-path is a
+# LoRA adapter dir. Without this, evaluate.py falls through to
+# inspect-ai's local_server.start_local_server() which `vllm serve
+# <adapter_dir>` — adapter dir has only adapter_model.safetensors,
+# vllm tries to load it as a full model and exits code 1. Caught
+# 2026-05-13 F-run analysis: every agent score.sh probe failed with
+# "RuntimeError: Failed to start vLLM server".
+#
+# Cost: cold-start ~5min for 9B base + LoRA load (90s on 1.7B). vLLM
+# is killed via the EXIT trap below so the agent's training reclaims
+# the GPU.
+SCORE_VLLM_PID=""
+SCORE_VLLM_PORT=37001
+SCORE_VLLM_LOG="/workspace/score-vllm.log"
+cleanup_score_vllm() {
+    if [ -n "$SCORE_VLLM_PID" ] && kill -0 "$SCORE_VLLM_PID" 2>/dev/null; then
+        kill "$SCORE_VLLM_PID" 2>/dev/null
+        sleep 1
+        kill -9 "$SCORE_VLLM_PID" 2>/dev/null || true
+    fi
+    fuser -k "${SCORE_VLLM_PORT}/tcp" 2>/dev/null || true
+}
+trap cleanup_score_vllm EXIT
+if [ -n "$MODEL_PATH" ] \
+   && [ -d "$MODEL_PATH" ] \
+   && [ -f "$MODEL_PATH/adapter_config.json" ]; then
+    BASE_MODEL=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('base_model_name_or_path',''))" "$MODEL_PATH/adapter_config.json" 2>/dev/null)
+    if [ -n "$BASE_MODEL" ]; then
+        fuser -k "${SCORE_VLLM_PORT}/tcp" 2>/dev/null || true
+        sleep 1
+        TEMPLATES_DIR=$(find /var/lib/ptb_eval -maxdepth 2 -type d -name templates -print -quit 2>/dev/null || true)
+        CHAT_TEMPLATE=""
+        if [ -n "$TEMPLATES_DIR" ] && [ -f "$TEMPLATES_DIR/qwen3.jinja" ]; then
+            CHAT_TEMPLATE="--chat-template $TEMPLATES_DIR/qwen3.jinja"
+        fi
+        export HF_HOME="${HF_HOME:-/workspace/hf-cache}"
+        export HF_TOKEN="${HF_TOKEN:-}"
+        # --gpu-memory-utilization 0.55 leaves ~36GB on an 80GB card for
+        # the agent's concurrent training python process. Tested
+        # empirically: 9B fp16 weights ~18GB + KV cache ~4GB + overhead
+        # fits at 0.55 on H100/A100-SXM-80GB. Tighter values OOM the
+        # vLLM startup; looser starve training.
+        setsid nohup vllm serve "$BASE_MODEL" \
+            --host 0.0.0.0 --port "$SCORE_VLLM_PORT" \
+            --api-key inspectai \
+            --served-model-name base \
+            --gpu-memory-utilization 0.55 \
+            --max-model-len 4096 \
+            --enable-lora --max-lora-rank 64 \
+            --lora-modules "student=$MODEL_PATH" \
+            $CHAT_TEMPLATE \
+            > "$SCORE_VLLM_LOG" 2>&1 < /dev/null &
+        SCORE_VLLM_PID=$!
+        # Wait up to 8min for vLLM ready (9B cold start is ~3-6min)
+        ready=0
+        for i in $(seq 1 240); do
+            if curl -fsS -m 3 -H "Authorization: Bearer inspectai" \
+                "http://localhost:$SCORE_VLLM_PORT/v1/models" 2>/dev/null \
+                | grep -q "student"; then
+                ready=1
+                break
+            fi
+            if ! kill -0 "$SCORE_VLLM_PID" 2>/dev/null; then
+                break
+            fi
+            sleep 2
+        done
+        if [ "$ready" != "1" ]; then
+            echo "{\"error\": \"score_runner.sh vLLM did not ready in 480s; see $SCORE_VLLM_LOG\"}" >&2
+            exit 6
+        fi
+        set -- "$@" \
+            --vllm-base-url "http://localhost:$SCORE_VLLM_PORT" \
+            --vllm-served-name student
+    fi
+fi
+
 # Run from EVAL_DIR so evaluate.py's default
 # `os.path.join(os.path.dirname(__file__), "prompts.jsonl")` resolves
 # correctly without the agent's previous symlink hack.
