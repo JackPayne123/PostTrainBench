@@ -271,6 +271,38 @@ async def main() -> int:
             log.error(f"ISOLATION BROKEN — dir didn't chmod to 700; got: {out}")
             return 14
 
+        log.info("=== isolation: /workspace/ptb_eval legacy dir gets wiped on startup ===")
+        # Caught on 2026-05-13 F-run e076ae: pre-:30 runs staged
+        # eval prompts to /workspace/ptb_eval/ where chmod silently
+        # no-ops (network volume). :30 moved new staging writes to
+        # /var/lib/ptb_eval but didn't clean up legacy staged content
+        # on the persistent volume. Agent on :31 found
+        # /workspace/ptb_eval/sycophancy_slava/prompts.jsonl from a
+        # prior run and trained against it.
+        # :32 wipes legacy /workspace/ptb_eval at run_experiment.py
+        # module init. This smoke creates a sentinel, imports the
+        # module, asserts sentinel gone.
+        r = await env.exec(
+            "set +e; "
+            "mkdir -p /workspace/ptb_eval/_legacy_diag; "
+            "echo LEGACY_SENTINEL > /workspace/ptb_eval/_legacy_diag/prompts.jsonl; "
+            "echo ---before-wipe---; ls /workspace/ptb_eval/ 2>&1 | head -3; "
+            "echo ---import-triggers-wipe---; "
+            "cd /opt/ptb && PYTHONPATH=/opt/ptb python3 -c 'import pod.run_experiment' 2>&1 | tail -5; "
+            "echo ---after-wipe---; "
+            "ls /workspace/ptb_eval 2>&1 || echo MISSING_OK; "
+            "test ! -e /workspace/ptb_eval && echo WIPE_OK || echo WIPE_FAILED",
+            timeout_sec=30,
+        )
+        out = r.stdout or r.stderr or ""
+        log.info(f"rc={r.return_code}\n{out}")
+        if "LEGACY_SENTINEL" in out.split("---after-wipe---", 1)[-1]:
+            log.error("ISOLATION BROKEN — legacy /workspace/ptb_eval not wiped on startup")
+            return 15
+        if "WIPE_OK" not in out:
+            log.error("ISOLATION BROKEN — /workspace/ptb_eval still present after module-init")
+            return 15
+
         log.info("=== isolation: agent can run nvidia-smi + see GPU ===")
         r = await env.exec(
             "sudo -n -u agent nvidia-smi --query-gpu=name --format=csv,noheader 2>&1",

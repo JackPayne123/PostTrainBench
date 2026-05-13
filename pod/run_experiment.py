@@ -63,6 +63,21 @@ REPO = Path("/opt/ptb")
 PTB_RESOURCES = REPO  # alias for clarity
 sys.path.insert(0, str(REPO))
 
+# Wipe legacy staging dir on the network volume BEFORE any other init
+# (incl. the RUN_ID check) so diag pods + interrupted imports still
+# clean the persistent volume. Pre-:30 runs staged eval prompts to
+# /workspace/ptb_eval/ where chmod silently no-ops (network volume
+# ignores POSIX perm changes). The directory persists across pods on
+# the same volume — so :31's PTB_EVAL move was incomplete: new runs
+# stage correctly to /var/lib/ptb_eval but legacy staged content
+# from prior runs was still agent-readable. Caught 2026-05-13 F-run
+# analysis: agent on :31 found /workspace/ptb_eval/sycophancy_slava/
+# prompts.jsonl from a prior run and used it to taxonomy-match its
+# training data.
+LEGACY_PTB_EVAL = Path("/workspace/ptb_eval")
+if LEGACY_PTB_EVAL.exists():
+    shutil.rmtree(LEGACY_PTB_EVAL, ignore_errors=True)
+
 # Required env (injected by submit_run.py via Runpod podCreate)
 RUN_ID = os.environ.get("RUN_ID", "")
 if not RUN_ID:
@@ -121,19 +136,6 @@ PTB_EVAL.mkdir(parents=True, exist_ok=True)
 os.chmod(PTB_EVAL, 0o700)
 os.chown(PTB_EVAL, 0, 0)
 
-# Wipe legacy staging dir on the network volume. Pre-:30 runs staged
-# eval prompts to /workspace/ptb_eval/ where chmod silently no-ops
-# (network volume ignores POSIX perm changes). The directory remained
-# drwxrwxrwx agent:agent on every subsequent pod that mounted the same
-# volume — so :31's PTB_EVAL move was incomplete: new runs staged
-# correctly to /var/lib/ptb_eval but legacy staged content from prior
-# runs was still agent-readable at /workspace/ptb_eval/<bench>/.
-# Caught 2026-05-13 F-run analysis: agent on :31 found
-# /workspace/ptb_eval/sycophancy_slava/prompts.jsonl from a prior run
-# and used it to taxonomy-match its training data.
-LEGACY_PTB_EVAL = Path("/workspace/ptb_eval")
-if LEGACY_PTB_EVAL.exists():
-    shutil.rmtree(LEGACY_PTB_EVAL, ignore_errors=True)
 SHARED_VLLM_PORT = 36216
 SHARED_VLLM_NAME = "student"
 SHARED_VLLM_API_KEY = "inspectai"
