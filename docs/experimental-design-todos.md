@@ -30,7 +30,11 @@ Followup: it does NOT currently mutate summary.json with backfill — both files
 
 ---
 
-## 5. --use-baseline auto-discovery on submit_run
+## ~~5. --use-baseline auto-discovery on submit_run~~ — RESOLVED 2026-05-12 (B)
+
+`submit_run.py --use-baseline` checks `baselines/<student-slug>/<bench>__limit<N>.json` exists for primary + each extra-eval at submit time. Missing → exits with a copy-pasteable `submit_baseline.py --only-bench …` recovery hint. Implies `--skip-pre-eval` (the whole point is reusing the existing baseline; post-run `compute_deltas.py --update-summary` backfills pre/post/delta).
+
+## ~~5-legacy. --use-baseline auto-discovery on submit_run~~ (original entry)
 
 **Situation:** Once `compute_deltas.py` exists, `submit_run.py --use-baseline` would auto-resolve `baselines/<student_slug>/<benchmark>__limit<N>.json` at submit time and either inline the values into the pod's run config OR rely on the post-hoc backfill. Currently `--skip-pre-eval` exists but the lookup half is manual.
 
@@ -58,23 +62,13 @@ moru passes `task_args={"grader_models": "anthropic/claude-haiku-4-5"}` via `_in
 
 ---
 
-## 8. Untracked OpenAI usage (gpt-4o / gpt-3.5-turbo) — PARTIALLY RESOLVED 2026-05-11
+## ~~8. Untracked OpenAI usage (gpt-4o / gpt-3.5-turbo)~~ — RESOLVED 2026-05-12 (C)
 
-OPENAI_API_KEY was consuming gpt-4o, gpt-4o-mini, gpt-3.5-turbo via inspect_evals defaults that didn't go through our wrappers. As of 2026-05-11:
+Resolved: option **C** accepted — keep `healthbench` + `arenahardwriting` on `gpt-5-mini`; refactoring their published OpenAI-completions graders to Anthropic SDK is medium-scope work we don't need yet. Per-eval cost is auditable + small (~$2 combined per full-suite pass). Everything else has been wired off OpenAI defaults to `claude-haiku-4-5` via `INSPECT_GRADER_MODEL` env + per-task `task_args` + the custom `judge/haiku_judge.py` wrapper.
 
-- `INSPECT_GRADER_MODEL=anthropic/claude-haiku-4-5` is now set in pod_env (submit_run.py + submit_baseline.py) so `inspect_ai.get_model(role="grader")` resolves to haiku instead of inspect's default.
-- moru passes explicit `task_args={"grader_models": "anthropic/claude-haiku-4-5"}`.
-- abstention_bench already overrides via `task_args={"grader_model": "anthropic/claude-haiku-4-5"}`.
+Full per-eval grader inventory now lives in **`docs/OPERATIONS.md` → Grader routing** as the canonical reference. Maintain that table when adding/changing graders.
 
-**Still on OpenAI:**
-- `healthbench/evaluate.py` uses `JUDGE_MODEL = "gpt-5-mini"` (official HealthBench grader pipeline — refactoring to Anthropic SDK is a larger change).
-- `arenahardwriting/evaluate.py` uses `JUDGE_MODEL = "gpt-5-mini"` (arena-hard pipeline, same).
-
-**Open:** rotate keys to project-scoped + audit costs from the new key alone. Currently using "leftover Mile/Sean cyber stuff" keys.
-
-- **A.** Refactor healthbench + arenahardwriting graders to anthropic/claude-haiku-4-5 (medium-scope refactor; their official graders expect OpenAI completions API).
-- **B.** Just rotate to project-scoped OpenAI + Anthropic keys; track usage cleanly going forward without refactoring graders.
-- **C.** Do nothing — both. The remaining gpt-5-mini usage is auditable now that we know exactly which two evaluators use it.
+Open: project-scoped API-key rotation (currently leftover Mile/Sean cyber stuff). User-side action; not blocking.
 
 ---
 
@@ -88,19 +82,94 @@ OPENAI_API_KEY was consuming gpt-4o, gpt-4o-mini, gpt-3.5-turbo via inspect_eval
 
 ---
 
-## 10. Agent's chat-template fix lives in agent training data only
+## ~~10. Agent's chat-template fix lives in agent training data only~~ — RESOLVED 2026-05-11 (B)
 
-**Situation:** The F-run agent discovered Qwen3's `<think>\n\n</think>\n\n` requirement and injected it into their training data. Next agent on Qwen3 will rediscover the same thing. Captures the agent-side discovery cost (~5min × every run × every Qwen3-based subject).
-
-- **A.** Hold (see TODO #1 — `lora_starter.py` chat-template helper). #1 and #10 are the same lever; close one when the other lands.
+`format_qwen3_chat(messages, tokenizer, enable_thinking=True)` helper landed in `lora_starter.py`. Closes #1 + #10 together.
 
 ---
 
-## 11. `compute_deltas.py` + adapter-eval delta surfaces
+## ~~11. compute_deltas + adapter-eval delta surfaces~~ — RESOLVED 2026-05-11
 
-**Situation:** Both the base baseline and adapter eval write per-bench JSONs. No script computes the side-by-side delta. Manual SSH + grep is what we've been doing. After #4 lands for sycophancy-attribute backfill, the same machinery can produce the full per-eval delta table for an adapter vs its base.
+Closed by #4. `scripts/compute_deltas.py <adapter-run-id> --write-deltas --update-summary` reads `baselines/<slug>/<bench>__limit<N>.json` + `baselines/<slug>/adapter_eval/<adapter-run-id>/<bench>__limit<N>.json`, computes the side-by-side delta via `registry.get_headline` for scalar headlines + flat dict-diff for multi-dim, writes `jobs/runs/<adapter-run-id>/deltas.json` AND backfills `pre/post/delta` into the trained run's `summary.json` (tagged `delta_method: "baseline-backfill"`).
 
-- **A.** Roll into compute_deltas.py: input two run-ids (or one run-id + auto-resolve baseline from `baselines/<slug>/`), emit a delta table (CSV + markdown).
-- **B.** Separate `scripts/diff_runs.py` with the same purpose. Lighter — no summary.json mutation, just diff + print.
+---
+
+# Pre-scaling backlog (added 2026-05-12)
+
+These are items I'd close before kicking off the 8B run or a 10-run F-condition sweep. Grouped by category. F-run v2 worked end-to-end + showed real signal (sycophancy_sharma -0.54 with capability mostly preserved); these items are about hardening the inference + closing known soft failures before the spend grows.
+
+## ~~12. moru + big_five fixes verified on a live run~~ — RESOLVED 2026-05-12 (A)
+
+Ran `submit_baseline --only-bench moru,big_five --limit 0` on `:23`. Both completed clean. moru: 12 axes populated, overall_mean=0.125 (first successful haiku-grader run; list-not-string fix validated). big_five: all 5 traits populated including Agreeableness 0.825 (lenient parser via Task-instance bypass works). Promoted to `baselines/qwen_qwen3-1.7b/{moru,big_five}__limit{50,40}.json`. ~12min wall, ~$0.60.
+
+## ~~13. spiralbench_mini silent failure~~ — RESOLVED 2026-05-12 (A)
+
+Root cause: `target.generate(input=chat)` in `tasks/safety/spiralbench_mini/evaluate.py:184` was returning a coroutine — `inspect_ai.model.Model.generate()` is async, called from a sync context. Every conversation crashed with `'coroutine' object has no attribute 'completion'`; all 30 fell into the `error` row path → empty metrics dict → silent "OK" with `n_failed=30`.
+
+Fix: wrap with `asyncio.run`. Smoke at `--limit 10` on `:23` (via the laptop→pod rsync, no rebuild) → `n=10, n_failed=0, weighted_score=10.5, off_rails=5.4`. Per-behavior breakdown populated (delusion-reinforcement 2.8, sycophancy 2.7 lead — consistent with the sycophancy_sharma 0.74 baseline). ~7min wall, ~$0.30.
+
+## 14. strong_reject jailbreak +0.10 is structural, not artifactual
+
+**Situation:** Same +0.10 jailbreak_rate increase on F-run v1 + v2. Real cost of sycophancy-suppression — the adapter learned "don't capitulate to user framing" and applies it to harmful-request framing the wrong way. This is a publishable finding if next 3-5 F-runs reproduce it.
+
+- **A.** Accept as a finding. Document in EXPERIMENTS.md + write up. Don't try to mitigate in the next F-run.
+- **B.** Add "harm-resistance preservation" to condition F's instruction; co-objective in score.sh. Risk: dilutes the sycophancy-only signal.
+- **C.** Include strong_reject as a `--safety-attribute` second target — pipeline reports F's headline as the sycophancy direction WITH strong_reject delta annotated. Cleanest scientifically but registry doesn't support multi-attribute targets yet.
+
+## 15. score.sh contract — single / dual / composite
+
+**Situation:** Memory `project_score_sh_redesign` says Jack leans composite. F-run v2's pipeline (`:23`) wrote both `bench` and `bench_capability` to `/etc/ptb_run/`; agent had `score.sh` + `score_capability.sh` available. F-run v2 was on `:22` so didn't get this — first F-run on `:23` will be the agent's first exposure. Before the agent uses it in earnest, decide:
+
+- **A.** Keep two-script (status quo on `:23`). Agent reads both, decides composite tradeoff itself.
+- **B.** Single-number composite — pipeline computes `objective = sycophancy_score - alpha * max(0, base_capability - cur_capability)` inside `score_runner.sh`. Agent sees ONE number. Hides direction better.
+- **C.** Continue single-bench. The capability spot-check is a sanity-only signal, not part of the objective.
+
+## 16. Per-seed variance characterisation before scaling
+
+**Situation:** A single F-run v2 result doesn't tell us how much of `sycophancy_sharma -0.54` is real vs sampling noise. The agent has randomness (sampling its own decisions; LoRA randomness has fixed seed). Need 3 F-runs at different seeds before scaling to claim a real headline. ~$45 total.
+
+- **A.** Run F × {seed=0, 1, 2} on Qwen3-1.7B before any 8B scaling.
+- **B.** Skip — small-model results are illustrative, not load-bearing. Spend on 8B instead.
+
+## ~~17. Reference-baseline image alignment~~ — RESOLVED 2026-05-12 (A)
+
+Ran full `submit_baseline --limit 100` on `:23` → `2026-05-12_10-16_baseline_qwen_qwen3-1.7b_limit100_573ee8`. 23/23 ok, ~115min, ~$7. Capability deltas image-stable. Notable drift: `sycophancy_sharma -0.07` (likely INSPECT_GRADER_MODEL haiku-unification scoring slightly stricter than the pre-:23 inspect default). Adapter-eval v2 against this base is in flight at `2026-05-12_13-02_adaptereval_qwen_qwen3-1.7b_limit100_94e26d`. Full new-evals baseline coverage now populated: big_five (lenient), moru, spiralbench_mini, persona_traits, activity_preference, political_bias_openai, rozado_battery.
+
+## ~~18. MCQ-format training data scaffold~~ — RESOLVED 2026-05-12 (C — generic shape hint, no exemplars)
+
+Picked **C** (your suggestion, neither A nor B): instead of shipping concrete MCQ exemplars OR doing nothing, soften the eval-info leakage in `instruction.md` + lora_starter docstring. Mention the held-out suite covers several plausible shapes — MCQ, free-text completion, numeric, CoT, judge-graded chat — without telling the agent which specific shapes are in play or that arc_easy/mmlu/gpqa are MCQ specifically. Renamed `lora_starter.py` docstring section "MCQ-format examples" → "Eval-shape coverage". Reduces over-fit to a specific eval signal while still warning about distribution-shift collapse.
+
+Bonus: keeps the agent thinking about output-distribution coverage as a general principle rather than chasing the specific MCQ failure mode we observed on v1.
+
+## 19. Held-out adversarial verification
+
+**Situation:** `IDEAS.md` calls this out as a project differentiator vs PostTrainBench/AAR. We currently don't red-team the adapter against held-out adversarial prompts. Adapter passes `:23` suite but might fail on adversarial probes designed to elicit sycophancy or jailbreak under distribution shift.
+
+- **A.** Add an `adversarial_verification` post-eval stage. Held-out sycophancy + jailbreak prompts the agent doesn't see during training. Runs after the regular post-eval.
+- **B.** Standalone script + manual invocation. Less pipeline complexity but easier to skip.
+- **C.** Defer until first scaled run; revisit when we have a finding to harden.
+
+## 20. Persona-traits judge-parse robustness
+
+**Situation:** Persona-traits judge parses the first 0-100 int from haiku output via `\b(\d{1,3})\b`. Smoke run hit 99.5% parse rate (1393/1400 + 7 refusals), 0 unparsed. But if haiku ever outputs a year ("2024") for a long answer, parsing collapses silently. At 1400 calls/run × 10-run sweep that's 14k calls; even 0.5% drift = 70 mis-scores.
+
+- **A.** Spot-check 20 random `rows[]` entries per run for `judge_raw` vs `score` consistency.
+- **B.** Tighten regex to "first int alone on a line" or "first int <100 after trim".
+- **C.** Switch to logprob-weighted scoring once OpenAI judge backend is added (already noted in evaluate.py comments).
+
+## 21. Recovery-pod cost guardrail
+
+**Situation:** `pull_eval_logs.py` spins a $0.05/h recovery pod and tears down. Easy to forget + leave running. Already terminates programmatically but a hard 10min timeout would be belt + braces.
+
+- **A.** Add `await env.stop()` inside a `try/finally` with a 10min hard timeout.
+- **B.** Status quo. Cost is small.
+
+## ~~22. Run-id collision~~ — RESOLVED 2026-05-12 (A)
+
+Append 6-char `secrets.token_hex(3)` suffix in `build_run_dir_name` (`src/runpod_backend/run_dir.py`) + `submit_baseline.py` run_id construction. Parallel sweeps in the same minute now produce distinct run-ids. Collision probability per minute-window-cohort = `N(N-1) / (2 × 16^6) ≈ 6e-8 × N²` — fine for any realistic sweep size.
+
+## 23. ~~Trace viewer auth~~ — open, low priority
+
+Currently binds to 127.0.0.1 — fine for local. Adding token auth when sharing with collaborator. Not blocking.
 
 ---

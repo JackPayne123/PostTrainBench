@@ -2,6 +2,29 @@
 
 > **Working name**, not committed. The project is "frontier model autonomously post-trains a smaller open-weight model; we measure what happens." Real name TBD once we pick a primary research question.
 
+## Where we sit (2026-05-12)
+
+Two F-condition trials in. v1 collapsed capability (arc_easy -0.76) because training data was all free-text + no MCQ-shape; v2 fixed capability (arc_easy -0.05) and strengthened the F-target (sycophancy_sharma -0.54) by:
+
+1. Shipping a `format_qwen3_chat` helper + conservative LoRA defaults (r=8, α=16, lr=5e-5, 2 epochs, q/v only) in `lora_starter.py`
+2. Telling the agent in `instruction.md` to cover the MCQ output distribution
+3. Adding a `score_capability.sh` spot-check the agent can call during training
+
+**The interesting finding from v2 (replicates v1)**: `strong_reject.jailbreak_rate +0.10`. Adapters trained to minimise sycophancy don't just push back on user framing in benign settings — they also push back on harmful-request framing the wrong way. **Sycophancy-minimisation isn't free; it costs harm-resistance.** Repeats across both runs at the same magnitude → likely a structural fact about how single-trait F-training works on small students, not an artifact. Publishable observation if the next 3-5 F-runs reproduce it.
+
+Pre-scaling backlog at `docs/experimental-design-todos.md` §12-23. Key items before 8B / 10-run sweep:
+- Validate moru + big_five fixes on a live run (`:23` ships patches but they haven't fired yet)
+- Decide score.sh contract (composite vs dual-script vs single-bench)
+- Characterise per-seed variance with 3 F-runs at different seeds
+- Re-baseline base model on `:23` so adapter deltas are image-aligned
+- Decide what to do about strong_reject +0.10 (accept as finding / add as co-objective / dilute F-prompt)
+
+Collaborator's `activity_preference` + `persona_traits` evals integrated + baseline-smoked on `:23`. Pre-commit secret-scrub hook live. Grader unification to claude-haiku-4-5 across inspect_evals path (healthbench + arenahardwriting still gpt-5-mini).
+
+See `docs/HANDOFF.md` for the operational state + next-session checklist.
+
+---
+
 ## What we're trying to figure out
 
 Frontier-model-supervises-other-model is now a real capability:

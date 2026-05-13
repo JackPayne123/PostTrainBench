@@ -4,6 +4,178 @@ Living log of validated runs (not the full matrix). Append newest first.
 
 ---
 
+## 2026-05-12: Image-aligned base baseline on :23 (full 23-eval suite)
+
+**Goal**: Establish a clean `:23`-image base reference so adapter-eval deltas aren't confounded by image drift. Closes design TODO #17.
+
+**Setup**: `submit_baseline --model Qwen/Qwen3-1.7B --limit 100` on `:23`.
+- run_id: `2026-05-12_10-16_baseline_qwen_qwen3-1.7b_limit100_573ee8`
+- First run with the new 6-char hex collision-suffix (`573ee8`) — design TODO #22.
+
+**Result**: 23/23 ok, 0 fail. ~115min wall, ~$7 (~$2 gpt-5-mini for healthbench + ~$5 haiku for moru + spiralbench + persona_traits + political_bias + others).
+
+Capability tier (image-stable vs `:18`):
+
+| Bench | :18 | :23 | Δ |
+|---|---|---|---|
+| gsm8k | 0.75 | 0.76 | +0.01 |
+| humaneval | 0.70 | 0.75 | +0.05 |
+| mmlu | 0.46 | 0.46 | 0 |
+| gpqamain | 0.26 | 0.29 | +0.03 |
+| arc_easy | 0.88 | 0.88 | 0 |
+| truthfulqa | 0.47 | 0.46 | -0.01 |
+| aime2025 | 0.00 | 0.033 | +0.033 |
+| healthbench | 0.426 | 0.419 | -0.007 |
+| arenahardwriting | (base self-comparison) | **skipped (sentinel)** | — |
+
+Safety tier:
+
+| Bench | :18 | :23 | Δ | Notes |
+|---|---|---|---|---|
+| sycophancy_sharma | 0.74 | **0.67** | -0.07 | INSPECT_GRADER_MODEL haiku-unification slightly stricter than pre-`:23` inspect default |
+| sycophancy_slava | 0.27 | 0.20 | -0.067 | within SE 0.07 |
+| sycophancy_aisi | 0.329 | 0.336 | +0.007 | stable |
+| strong_reject jailbreak | 0.19 | 0.21 | +0.02 | stable |
+| coconot total | 1.0 | 1.0 | 0 | |
+| spiralbench_mini | failed (async bug) | **weighted_score=10.43, off_rails=5.4** | NEW | First clean run on full 30 convos. Top per_behavior: delusion-reinforcement 2.8, sycophancy 2.7, confident-bullshitting 2.6 |
+
+Character tier (new baseline numbers):
+
+| Bench | First-clean :23 |
+|---|---|
+| big_five (lenient parser) | Extraversion 0.825, Agreeableness 0.844, Conscientiousness 0.822, Openness 0.78, Neuroticism 0.525 |
+| moral_foundations | care 3.83, fairness 4.50, loyalty 2.83, authority 3.67, sanctity 4.50; individualizing 4.17, binding 3.67 |
+| rozado_battery | politicalCompassTest econ=-2.52 social=-3.15 (slightly lib-left). ideologiesTest hard_right +6.57, left_liberalism +3.39, right_liberalism -9.11 |
+| political_bias_openai | final_score 0.42; charged slants symmetric (lib 0.53, con 0.54); drops on neutral framings (0.27/0.38/0.39) |
+| moru (haiku grader, 100 samples) | overall_mean 0.10. Top axes: cautious_impact_consideration 0.47, epistemic_humility 0.27. Bottom: scope_sensitivity, novel_entity_precaution, trade-off_transparency all 0.00 |
+| activity_preference (4032 pairs, n_missing=0) | Engaging +0.69 > Helpful +0.50 > Neutral > Self-curiosity > Misaligned +0.23 > Social -0.28 > Unsafe -0.33 > Aversive -1.41 |
+| persona_traits (1400 gen + 1400 judge) | grand_mean 19.78. optimistic 59.7 > hallucinating 44.3 > sycophantic 23.85 > humorous 5.2 > apathetic 3.4 > impolite 0.7 > evil 0.6 |
+
+**Adapter-eval v2 against this base IS IN FLIGHT** (`2026-05-12_13-02_adaptereval_qwen_qwen3-1.7b_limit100_94e26d`). Capability deltas so far (partial):
+
+| Bench | Base :23 | Adapter v2 :23 | Δ | (Δ on :18-pair) |
+|---|---|---|---|---|
+| gsm8k | 0.76 | 0.57 | **-0.19** | (was -0.06) |
+| humaneval | 0.75 | 0.68 | -0.07 | (was -0.08) |
+| mmlu | 0.46 | 0.49 | +0.03 | (was +0.03) |
+| gpqamain | 0.29 | 0.21 | -0.08 | (was -0.10) |
+| arc_easy | 0.88 | 0.84 | -0.04 | (was -0.05) |
+| truthfulqa | 0.46 | 0.43 | -0.03 | (was -0.08) |
+| aime2025 | 0.033 | 0.00 | -0.033 | (was +0.033) |
+
+Capability tier looks consistent across image-pairs EXCEPT gsm8k (-0.06 → -0.19). Either sampling noise or the adapter genuinely struggles more on `:23`'s gsm8k path. Character + safety tier pending. Will update with full result + dashboard screenshot once DONE.
+
+**Artifacts**:
+- `baselines/qwen_qwen3-1.7b/<bench>__limit100.json` (overwrites :18 entries)
+- `baselines/qwen_qwen3-1.7b/adapter_eval/2026-05-11_19-15_F_claude-opus-4-7_qwen3-1.7b_seed0/<bench>__limit100.json` once adapter-eval lands
+- `jobs/runs/<id>/deltas.json` + the character dashboard render at `http://127.0.0.1:8766/run/2026-05-11_19-15_F_claude-opus-4-7_qwen3-1.7b_seed0`
+
+---
+
+## 2026-05-12: New character evals smoke (image :23)
+
+**Goal**: verify `activity_preference` (Sofroniew 2026, Bradley-Terry on pairwise logits) + `persona_traits` (Chen 2025 Persona Vectors, 7-trait haiku-judged) run end-to-end on the suite plumbing, against base Qwen3-1.7B.
+
+**Setup**: `submit_baseline --model Qwen/Qwen3-1.7B --only-bench activity_preference,persona_traits --limit 0` (per-eval defaults).
+- run_id: `2026-05-12_07-43_baseline_qwen_qwen3-1.7b_perEval`
+- image: `:23`
+- agent: none (baseline)
+
+**Result**: 2/2 OK, ~$3 Anthropic + ~$0.15 pod, ~22min wall.
+
+| Eval | n | Wall | Notes |
+|---|---|---|---|
+| activity_preference | 4032 pairs × 1 token | **15 seconds** | n_missing=0 (clean logit parse). Per-category baseline ordering: Engaging +0.685 > Helpful +0.498 > Neutral > Self-curiosity > Misaligned > Social > Unsafe -0.334 > Aversive -1.406. |
+| persona_traits | 1400 generations + 1400 haiku judge calls | ~22min | grand_mean 19.78, parse rate 99.5% (7 refusals, 0 unparsed). Per-trait baseline: optimistic 59.7 > hallucinating 44.3 > sycophantic 25.2 > humorous 5.2 > apathetic 3.4 > impolite 0.7 > evil 0.4. |
+
+Baselines promoted to `baselines/qwen_qwen3-1.7b/{activity_preference,persona_traits}__limit{64,20}.json`. Future adapter-evals get delta breakdowns automatically via compute_deltas' multi-dim flatten.
+
+**Artifacts**: `jobs/runs/2026-05-12_07-43_baseline_qwen_qwen3-1.7b_perEval/`.
+
+---
+
+## 2026-05-11: F-run v2 — sycophancy-minimisation with capability preserved (image :22 / :23)
+
+**Goal**: Re-run F-condition after the 2026-05-11 ergonomics sprint to test whether the lora_starter rewrite (conservative defaults + chat-template helper + MCQ guidance) + agent prompt update fixed the F-run v1 capability collapse.
+
+**Setup**:
+- run_id: `2026-05-11_19-15_F_claude-opus-4-7_qwen3-1.7b_seed0` (training) → `2026-05-11_20-12_adaptereval_qwen_qwen3-1.7b_limit100` (adapter-eval)
+- condition: F (minimise sycophancy + maintain capability)
+- student: `Qwen/Qwen3-1.7B` IT
+- teacher: claude-opus-4-7
+- agent budget: 1h
+- benchmark: sycophancy_slava + extra `sycophancy_aisi`
+- limit: 100
+- `--skip-pre-eval` (compute_deltas backfills via baseline)
+- image: `:22` (training) → `:23` (adapter-eval — bumped mid-session for big_five/moru/arena fixes)
+
+**First-attempt failure**: F-run pod completed training (~39min) + saved adapter to Drive, then post-eval crashed on syco_slava + syco_aisi judges with `TypeError: Could not resolve authentication method` — `ANTHROPIC_API_KEY` was missing from `.env` (commented out "per plan — using OAuth"; OAuth covers the agent but the pipeline-side HaikuJudge needs the literal API key). Adapter recoverable from Drive. User uncommented + re-evaluated via `submit_baseline --adapter-from-run-id <run-id>`.
+
+**Pipeline issues hit + patched mid-run**:
+1. `arenahardwriting accuracy=0.5 stderr=0.0` — candidate model alias collapsed with checked-in baseline alias `Qwen3-1.7B`; judge compared model-to-itself. Patched in `:23`: adapter-eval suffixes candidate alias via `PTB_ARENA_ADAPTER_ALIAS` env, base baseline mode skips arena entirely.
+2. `big_five FAIL` — lenient scorer registered inside function body, inspect_ai couldn't find it. Patched in `:23`: pass Task instance directly.
+3. `moru FAIL` — `task_args={"grader_models": "..."}` got iterated char-by-char. Patched in `:23`: pass as list.
+
+**Result**: 19/21 OK, 2 FAIL (big_five + moru — patches in `:23`), arenahardwriting reported broken 0.5.
+
+| Bench | Base | v1 | **v2** | Δ v2 |
+|---|---|---|---|---|
+| arc_easy | 0.88 | 0.12 | **0.83** | **-0.05** ✓ (v1 was **-0.76**) |
+| mmlu | 0.46 | 0.14 | 0.49 | +0.03 ✓ |
+| gsm8k | 0.75 | 0.55 | 0.69 | -0.06 |
+| humaneval | 0.70 | 0.56 | 0.62 | -0.08 |
+| gpqamain | 0.26 | 0.15 | 0.16 | -0.10 (small set noise) |
+| arc_easy | 0.88 | 0.12 | 0.83 | -0.05 |
+| truthfulqa | 0.47 | 0.13 | 0.39 | -0.08 |
+| aime2025 | 0.00 | 0.07 | 0.03 | noise |
+| arenahardwriting | 0.50 | 0.50 | 0.50 | broken |
+| healthbench | 0.43 | 0.14 | 0.20 | **-0.22** (lone capability outlier — gpt-5-mini grader on long-form medical) |
+| **sycophancy_sharma** | 0.74 | 0.56 | **0.20** | **-0.54** ✓ F-target |
+| **sycophancy_slava** | 0.27 | 0.20 | 0.13 | **-0.13** ✓ |
+| **sycophancy_aisi** | 0.33 | 0.14 | 0.23 | **-0.09** ✓ (weaker than v1's -0.19) |
+| **strong_reject jailbreak** | 0.19 | 0.29 | **0.29** | **+0.10 ✗** (identical to v1; structural cost) |
+| coconot total | 1 | 6 | 4 | over-refusal (better than v1's +5) |
+
+**Headline**: **capability collapse fixed.** Lora_starter rewrite + conservative defaults + chat-template helper + agent prompt awareness of MCQ-distribution-coverage worked. F-target sycophancy_sharma now -0.54 (was -0.18 on v1). **Cost: strong_reject jailbreak_rate +0.10, identical to v1 — structural cost of sycophancy-suppression, not artifactual.** Adapter learned "don't capitulate to user framing", which generalises to harmful-request framing the wrong way.
+
+**Cost**: ~$1 pod (training) + ~$0.50 pod (adapter-eval) + ~$5-6 Anthropic judges = **~$7** total.
+
+**Artifacts**:
+- `jobs/runs/2026-05-11_19-15_F_claude-opus-4-7_qwen3-1.7b_seed0/{deltas.json,summary.json,solve_parsed.txt}`
+- `baselines/qwen_qwen3-1.7b/adapter_eval/2026-05-11_19-15_F_claude-opus-4-7_qwen3-1.7b_seed0/<bench>__limit100.json`
+- Drive copies at `drive:<run_id>/`
+
+---
+
+## 2026-05-11: F-run v1 — sycophancy-minimisation, capability collapsed (image :15 / :18)
+
+**Goal**: First F-condition trial — agent told to minimise sycophancy while preserving capability.
+
+**Setup**: condition F, Qwen3-1.7B IT, 30min agent budget, sycophancy_slava + sycophancy_aisi.
+- run_id: `2026-05-11_10-28_F_claude-opus-4-7_qwen3-1.7b_seed0` (training) → `2026-05-11_11-59_adaptereval_qwen_qwen3-1.7b_limit100` (adapter-eval)
+
+**Result**: 18/21 OK on baseline / 19/21 OK on adapter-eval. **Sycophancy down, capability collapsed.**
+
+| Bench | Δ v1 |
+|---|---|
+| arc_easy | **-0.76** |
+| truthfulqa | -0.34 |
+| mmlu | -0.32 |
+| healthbench | -0.28 |
+| gsm8k | -0.20 |
+| **sycophancy_aisi** | -0.19 ✓ (F-target) |
+| **sycophancy_sharma** | -0.18 ✓ |
+| humaneval | -0.14 |
+| gpqamain | -0.11 |
+| **sycophancy_slava** | -0.07 ✓ (SE±0.07) |
+| **strong_reject jailbreak** | **+0.10 ✗** |
+
+**Root cause via `/analyse-run`**: agent trained 108 examples, all bare-prompt free-text Q&A. **Zero MCQ format** despite half the eval suite being MCQ. Every completion started literally `<think>\n\n</think>\n\n` then prose. Adapter learned "after assistant opener → empty-think + flowing prose". Incompatible with single-token MCQ heads. LoRA config aggressive (r=32, α=64, lr=3e-4, 6 epochs, all 7 proj). No mid-training capability probe.
+
+**Recovered via 2026-05-11 #2 ergonomics sprint** (CHANGELOG entry): bfcl drop, timer tool, score_capability spot-check, lora_starter rewrite with format_qwen3_chat helper + conservative defaults + MCQ guidance, agent prompt update, grader unification to claude-haiku-4-5. → F-run v2 (above) succeeded with the same compute budget.
+
+---
+
 ## 2026-05-10: Pod-resident orchestrator end-to-end smoke (image :9)
 
 **Goal**: validate the new self-driving architecture end-to-end. Submit, walk away, confirm DONE + Drive upload + auto-terminate without any laptop polling.
