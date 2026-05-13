@@ -63,4 +63,17 @@ fi
 # `os.path.join(os.path.dirname(__file__), "prompts.jsonl")` resolves
 # correctly without the agent's previous symlink hack.
 cd "$EVAL_DIR"
-exec python3 "$EVAL_PY" "$@"
+# umask 0o077 so evaluate.py's writes (logs/, metrics_*.json, eval_*.log)
+# default to 600/700 — agent (uid 1000) can't read them. Without this,
+# inspect-ai's mid-eval file creates would inherit the calling shell's
+# umask (often 0 in container contexts), re-opening the lockdown that
+# stage_eval_task tries to set on the parent dir.
+umask 0077
+# Run the eval. After it exits, re-lock the dir (belt-and-braces; the
+# umask above SHOULD cover all new files, but inspect-ai sometimes
+# spawns subprocesses that reset umask via env).
+python3 "$EVAL_PY" "$@"
+RC=$?
+chown -R root:root /workspace/ptb_eval 2>/dev/null
+chmod -R go-rwx /workspace/ptb_eval 2>/dev/null
+exit $RC

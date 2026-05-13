@@ -224,6 +224,43 @@ async def main() -> int:
             log.error("ISOLATION BROKEN — agent can read /etc/ptb_run/bench")
             return 9
 
+        log.info("=== isolation: /workspace/ptb_eval/<bench>/ stays locked after evaluate.py ===")
+        # Caught on 2026-05-13 F-run #8609e1: pipeline staged eval dir
+        # appeared to chmod 700 root but ended up at 777 with files 666
+        # (umask 0 in tmux session + chmod -R running with check=False).
+        # Agent read /workspace/ptb_eval/sycophancy_slava/prompts.jsonl
+        # directly. Smoke test: simulate the staging + a fake evaluate.py
+        # write, confirm agent can't read either.
+        r = await env.exec(
+            "set -euo pipefail; "
+            "mkdir -p /workspace/ptb_eval/_diag_bench/logs; "
+            "echo SECRET_PROMPT > /workspace/ptb_eval/_diag_bench/prompts.jsonl; "
+            "echo SECRET_METRIC > /workspace/ptb_eval/_diag_bench/metrics_pre_diag.json; "
+            "chown -R root:root /workspace/ptb_eval && chmod -R go-rwx /workspace/ptb_eval; "
+            "echo ---stat-after-lockdown---; "
+            "stat -c '%a %n' /workspace/ptb_eval/_diag_bench /workspace/ptb_eval/_diag_bench/prompts.jsonl; "
+            "echo ---agent-cannot-read-prompts---; "
+            "sudo -n -u agent cat /workspace/ptb_eval/_diag_bench/prompts.jsonl 2>&1; "
+            "echo ---agent-cannot-read-metrics---; "
+            "sudo -n -u agent cat /workspace/ptb_eval/_diag_bench/metrics_pre_diag.json 2>&1; "
+            "echo ---agent-cannot-ls---; "
+            "sudo -n -u agent ls /workspace/ptb_eval/_diag_bench/ 2>&1; "
+            "rm -rf /workspace/ptb_eval/_diag_bench",
+            timeout_sec=30,
+        )
+        out = r.stdout or r.stderr or ""
+        log.info(f"rc={r.return_code}\n{out}")
+        if "SECRET_PROMPT" in out or "SECRET_METRIC" in out:
+            log.error("ISOLATION BROKEN — agent read prompts.jsonl or metrics_pre directly")
+            return 12
+        if out.count("Permission denied") < 3:
+            log.error("ISOLATION BROKEN — agent ls/cat on /workspace/ptb_eval/<bench>/ should all deny")
+            return 13
+        # Verify post-lockdown perms are actually 700 / 600.
+        if "700 /workspace/ptb_eval/_diag_bench" not in out:
+            log.error(f"ISOLATION BROKEN — dir didn't chmod to 700; got: {out}")
+            return 14
+
         log.info("=== isolation: agent can run nvidia-smi + see GPU ===")
         r = await env.exec(
             "sudo -n -u agent nvidia-smi --query-gpu=name --format=csv,noheader 2>&1",

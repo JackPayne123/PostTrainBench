@@ -90,6 +90,16 @@ logging.basicConfig(
 )
 log = logging.getLogger("run_experiment")
 
+# Lock down the pipeline's umask BEFORE anything is staged. RunPod's
+# startup-hook tmux invocation runs with umask 0, so every file the
+# pipeline creates default-lands at mode 0666 (rw for everyone) and
+# every dir at 0777. Caught on 2026-05-13 F-run #8609e1: agent could
+# read /workspace/ptb_eval/<bench>/prompts.jsonl directly despite the
+# stage_eval_task chmod call, because evaluate.py kept re-creating
+# files with mode 0666 underneath. Umask 0o077 makes the default
+# 0600 / 0700 so the lockdown survives evaluate.py writes.
+os.umask(0o077)
+
 # Workspace + eval paths (mirror agent_run constants)
 WORKSPACE = Path("/home/agent/workspace")
 PTB_EVAL = Path("/workspace/ptb_eval")
@@ -320,9 +330,11 @@ def stage_eval_task(benchmark: str) -> Path:
     if judge_src.exists():
         shutil.copytree(judge_src, judge_dst, dirs_exist_ok=True)
     # Lock the staged copy + the PTB_EVAL parent. Pipeline (root) reads
-    # through; agent can't.
+    # through; agent can't. check=True surfaces failures (silent fail
+    # was caught on 2026-05-13 F-run #8609e1: agent read prompts.jsonl
+    # via /workspace/ptb_eval/<bench>/prompts.jsonl).
     run_sh(f"chown -R root:root {PTB_EVAL} && chmod -R go-rwx {PTB_EVAL}",
-           check=False, log_cmd=False)
+           check=True, log_cmd=False)
     return dst
 
 
@@ -383,6 +395,13 @@ def run_eval(*, label: str, benchmark: str, model_path: str, limit: int,
     with open(eval_log, "w") as f:
         proc = subprocess.run(cmd, shell=True, stdout=f, stderr=subprocess.STDOUT,
                               env={**os.environ})
+    # Re-lockdown after evaluate.py writes new files (logs/, metrics_*.json,
+    # eval_*.log). inspect-ai creates these mid-eval, and even with umask
+    # 077 baked into pod-pipeline above, evaluate.py's subprocess may reset
+    # umask (e.g. via vllm subprocess inheriting different env). Belt-and-
+    # braces re-chmod closes the window.
+    run_sh(f"chown -R root:root {PTB_EVAL} && chmod -R go-rwx {PTB_EVAL}",
+           check=False, log_cmd=False)
     if proc.returncode != 0:
         log.error(f"[{label}] rc={proc.returncode}; tail of {eval_log}:")
         try:
