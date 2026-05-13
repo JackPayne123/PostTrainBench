@@ -131,12 +131,77 @@ def promote(run_dir: Path, repo_root: Path) -> int:
     #   - `d.get("source_run_id")` → returns None. Use `d["image"]` +
     #     `d["computed_at"]` to identify provenance.
     #   - Iterating `d["tasks"]` as a list — it's a dict, use `.items()`.
-    idx_src = run_dir / "baselines.json"
-    if idx_src.exists():
-        shutil.copy2(idx_src, dst_dir / f"_index__limit{limit}.json")
+    #
+    # Rebuild strategy: the index is a derived view of the individual
+    # <bench>__limit<N>.json files in dst_dir, NOT a verbatim copy of
+    # the pod's baselines.json. A partial baseline run that only
+    # measured one bench would otherwise clobber the multi-bench index
+    # left by a prior full run, even though the other per-bench JSONs
+    # are still on disk. Caught 2026-05-13 when slava-only refresh
+    # nuked the aisi entry from _index__limit100.json.
+    if kind == "baseline":
+        _rebuild_index(dst_dir, limit, run_dir)
 
     log.info(f"promoted {n_promoted} baselines to {dst_dir}")
     return 0
+
+
+def _rebuild_index(dst_dir: Path, limit: int, run_dir: Path) -> None:
+    """Rebuild `_index__limit{limit}.json` from all per-bench files on disk.
+
+    Provenance (model, image, git_sha, computed_at) is taken from the
+    newest individual baseline file at this limit, so the index reflects
+    the most recent contributor. The `tasks` dict aggregates every bench
+    that currently has a file at this limit.
+
+    Adapter-eval indices are NOT rebuilt — they're scoped to a single
+    adapter_from_run_id and the caller (`promote`) gates on `kind`.
+    """
+    bench_files = sorted(dst_dir.glob(f"*__limit{limit}.json"))
+    bench_files = [p for p in bench_files if not p.name.startswith("_")]
+    if not bench_files:
+        return
+
+    tasks: dict[str, dict] = {}
+    newest_provenance: dict | None = None
+    newest_ts = ""
+    for p in bench_files:
+        try:
+            d = json.loads(p.read_text())
+        except json.JSONDecodeError as e:
+            log.warning(f"  skip {p.name} for index rebuild ({e})")
+            continue
+        bench_name = p.stem.split("__limit", 1)[0]
+        tasks[bench_name] = {
+            "benchmark": d.get("benchmark", bench_name),
+            "category": d.get("category"),
+            "attribute": d.get("attribute"),
+            "higher_is_better": d.get("higher_is_better"),
+            "headline_metric": d.get("headline_metric"),
+            "headline_value": d.get("headline_value"),
+            "limit": d.get("limit", limit),
+            "metrics": d.get("metrics", {}),
+        }
+        ts = d.get("computed_at", "")
+        if ts > newest_ts:
+            newest_ts = ts
+            newest_provenance = d
+
+    if newest_provenance is None:
+        return
+
+    index = {
+        "model": newest_provenance.get("model"),
+        "model_slug": newest_provenance.get("model_slug"),
+        "limit": limit,
+        "image": newest_provenance.get("image"),
+        "git_sha": newest_provenance.get("git_sha"),
+        "computed_at": newest_ts,
+        "tasks": tasks,
+    }
+    out = dst_dir / f"_index__limit{limit}.json"
+    out.write_text(json.dumps(index, indent=2, sort_keys=False) + "\n")
+    log.info(f"  rebuilt {out.name} from {len(tasks)} per-bench files")
 
 
 def main() -> int:
