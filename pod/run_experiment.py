@@ -216,6 +216,57 @@ def wait_for_gpu_clear(target_mb: int = 2000, max_wait_s: int = 300) -> None:
         raise RuntimeError(f"GPU did not clear within {max_wait_s}s: {out}")
 
 
+def prefetch_model_to_local_ssd(model_id: str) -> str:
+    """Copy a HuggingFace model snapshot from the network volume to the
+    pod's local container SSD. Returns the HF_HOME path to use for
+    subsequent vllm spawns.
+
+    Why: /workspace/hf-cache is on RunPod's network-attached storage.
+    Reads at vllm-load time use random-access mmap pages — when the
+    network storage layer hiccups, the kernel ends up in uninterruptible
+    disk sleep (D state) with `read_bytes=0` indefinitely. Caught
+    2026-05-14: shard 2 of 4 for Qwen3.5-9B stalled for 9min mid-load,
+    pod ate VLLM_READY_TIMEOUT and self-terminated.
+
+    Copying once via rsync to /root/.cache/huggingface trades 3-5min of
+    sequential network reads at startup for predictable random-access
+    reads from the GPU node's local NVMe during vllm warmup.
+
+    Idempotent: if the destination cache already has the snapshot,
+    skips the copy. No-op when source missing (vllm falls back to
+    downloading from HF).
+    """
+    src_root = Path(os.environ.get("HF_HOME", "/workspace/hf-cache"))
+    dst_root = Path("/root/.cache/huggingface")
+    # Skip if we're already pointed at local SSD (idempotent on re-entry).
+    if src_root == dst_root:
+        return str(dst_root)
+    slug = f"models--{model_id.replace('/', '--')}"
+    src_dir = src_root / "hub" / slug
+    dst_dir = dst_root / "hub" / slug
+    if dst_dir.exists() and any(dst_dir.rglob("*.safetensors")):
+        log.info(f"[prefetch] {dst_dir} already warm; skip copy")
+        return str(dst_root)
+    if not src_dir.exists():
+        log.warning(f"[prefetch] {src_dir} not present on network vol; vllm will download from HF")
+        return str(src_root)
+    dst_dir.parent.mkdir(parents=True, exist_ok=True)
+    log.info(f"[prefetch] copying {src_dir} → {dst_dir} (bulk sequential)")
+    t0 = time.time()
+    # rsync -aL materialises symlinks (HF cache uses ../../blobs/<hash>
+    # symlinks; vllm needs real files). Timeout 600s = generous for
+    # 18GB at typical network-vol read rates (~50MB/s sustained).
+    r = run_sh(f"rsync -aL {shlex.quote(str(src_dir))}/ {shlex.quote(str(dst_dir))}/",
+               timeout=600, log_cmd=False)
+    elapsed = time.time() - t0
+    if r.returncode != 0:
+        log.error(f"[prefetch] rsync failed rc={r.returncode} in {elapsed:.1f}s; "
+                  f"falling back to network-vol HF_HOME")
+        return str(src_root)
+    log.info(f"[prefetch] copy OK in {elapsed:.1f}s")
+    return str(dst_root)
+
+
 def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED_VLLM_PORT,
                      served_name: str = SHARED_VLLM_NAME, api_key: str = SHARED_VLLM_API_KEY,
                      gpu_mem_util: float = 0.85, lora_adapter_path: str | None = None,
@@ -252,8 +303,20 @@ def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED
     if os.environ.get("VLLM_ENFORCE_EAGER", "").strip() in ("1", "true", "yes"):
         eager_flag = " --enforce-eager"
 
+    # Prefetch model weights from network volume → local SSD before
+    # spawn. See prefetch_model_to_local_ssd() docstring for rationale.
+    # Idempotent — skips if already warm in /root/.cache/huggingface.
+    # model_path may be a HF id ("Qwen/Qwen3.5-9B") for adapter-eval
+    # or a local adapter directory for some F-run paths. Only prefetch
+    # if it looks like a HF id (org/name with no path separator past
+    # the slash).
+    if "/" in model_path and not os.path.isabs(model_path):
+        hf_home = prefetch_model_to_local_ssd(model_path)
+    else:
+        hf_home = os.environ.get("HF_HOME", "/workspace/hf-cache")
+
     serve_cmd = (
-        f"export HF_HOME=/workspace/hf-cache; "
+        f"export HF_HOME={shlex.quote(hf_home)}; "
         f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
         f"export VLLM_LOGGING_LEVEL=DEBUG; "
         f"vllm serve {shlex.quote(model_path)} "

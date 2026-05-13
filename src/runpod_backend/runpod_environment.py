@@ -79,7 +79,7 @@ DEFAULT_REGISTRY_AUTH_ID = os.environ.get("RUNPOD_REGISTRY_AUTH_ID", "")
 # Base FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04 (ships SSH/init).
 # Bump after every successful build-ptb-base.yml run.
 DEFAULT_IMAGE = "ghcr.io/jackpayne123/ptb-base:35"
-DEFAULT_CONTAINER_DISK_GB = 50
+DEFAULT_CONTAINER_DISK_GB = 80
 DEFAULT_VOLUME_MOUNT_PATH = "/workspace"
 
 SSH_KEY_PATH = Path.home() / ".runpod" / "ssh" / "RunPod-Key-Go"
