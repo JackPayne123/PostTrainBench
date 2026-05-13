@@ -320,29 +320,37 @@ ssh -i ~/.runpod/ssh/RunPod-Key-Go \
 
 The grep filters out the agent's per-event trace lines (which dominate the log mid-agent) and surfaces only stage transitions + headline numbers.
 
-### vLLM compile + warmup visibility (post-:36)
+### vLLM compile + warmup visibility
 
-Pod-side `start_shared_vllm` now Python-polls instead of `bash for i in $(seq...)`. Every ~20s it greps `/workspace/<label>.log` for progress lines matching `Compiling a graph | Store the .* graph | torch.compile took | AOT compiled | Waiting for .* engine core | ERROR | Traceback` and forwards each new line to `run.log` tagged `[<label>-vllm]`. So you can monitor compile progress from the laptop without SSH-ing into the vllm log directly:
+`run.log` shows pipeline events (`vllm starting at :36216 ...` then `vllm ready at ...`) but NOT what vllm itself is doing during the wait. vllm's full DEBUG stream lives in a separate file at `/workspace/<label>.log` on the pod.
 
-```bash
-ssh ... 'grep -E "vllm-vllm|HEADLINE|BASELINE" /workspace/runs/<RUN_ID>/run.log | tail -40'
-```
-
-Or, for the laptop's existing pull dir mid-run:
+To watch compile / engine init activity live, tail the vllm log directly:
 
 ```bash
-grep -E "vllm-vllm|HEADLINE|BASELINE" jobs/runs/<run_id>/run.log | tail -40
+# vllm-post (F-run's adapter eval)
+bash src/runpod_backend/tail_log.sh <run_id> vllm-post
+
+# vllm-pre (F-run's extras-pre-eval)
+bash src/runpod_backend/tail_log.sh <run_id> vllm-pre
+
+# vllm-adaptereval (submit_baseline.py --adapter-from-run-id pod)
+bash src/runpod_backend/tail_log.sh <run_id> vllm-adaptereval
+
+# default: pipeline run.log
+bash src/runpod_backend/tail_log.sh <run_id>
 ```
 
-What you should see during a healthy 9B + LoRA vllm spawn (no eager):
+During a healthy 9B + LoRA cold-compile spawn you'll see:
 ```
-[vllm-post-vllm] Compiling a graph for compile range (1, 2048) takes 180.03 s
-[vllm-post-vllm] Store the 32-th graph for compile range ...
-[vllm-post-vllm] torch.compile took 194.06 s in total
-[vllm-post-vllm] AOT compiled function saved to /root/.cache/vllm/torch_compile_cache/...
+Compiling a graph for compile range (1, 2048) takes 180.03 s
+Store the 32-th graph for compile range ...
+torch.compile took 194.06 s in total
+AOT compiled function saved to /root/.cache/vllm/torch_compile_cache/...
 ```
 
-When you don't see those compile lines progressing within ~5 min on a cold-cache volume, you're heading for a timeout-death — flip `VLLM_ENFORCE_EAGER=1` and retry. See "Common Issues" below.
+If you don't see those lines progressing within ~5 min on a cold-cache volume, you're heading for a timeout-death (vllm 0.19.1 compiles 32+ subgraphs at ~180s each for 9B). Kill the run and re-submit with `VLLM_ENFORCE_EAGER=1` to skip compile entirely (~30s startup, 2x slower inference). See "Common Issues" below.
+
+`run_experiment.py` logs the vllm log path at spawn time: `[vllm-post] vllm log: /workspace/vllm-post.log (tail via tail_log.sh <run_id> vllm-post)`. Search run.log for "vllm log:" to find the right label.
 
 ### Staged signals
 
@@ -646,7 +654,7 @@ All such pipes have been removed. Output is captured in Python and sliced for lo
 | `metrics_post_<bench>_<bench>.json` doubled filename | Pre-`:14` — `run_eval` built `metrics_{label}_{benchmark}` and label already contained benchmark for extras | `:14+` strips to phase prefix; file is `metrics_<phase>_<bench>.json` |
 | `pull_run.py` fast on Drive but `DONE` missing | Pre-`:14` — DONE is written AFTER rclone_to_drive so first upload missed it | `:14+` does a second `rclone copyto DONE` after `write_done` |
 | Pod dies ~15-30min in with "vllm returned no url" — no other errors | torch.compile timeout. 9B + LoRA fresh-volume cold-compile takes 15-30min: 32+ subgraphs × ~180s each + AOT + warmup. `VLLM_READY_TIMEOUT=900` (and even `1800`) too tight | `VLLM_ENFORCE_EAGER=1` (`:35+`) skips ALL torch.compile in `start_shared_vllm` — 30-60s startup, 2x slower inference. Adapter-eval evals are small, total wall time still ~20min faster. Export before submit: `VLLM_ENFORCE_EAGER=1 PYTHONPATH=. .../submit_baseline.py ...` |
-| Pod looks stuck mid-vllm but you can't tell why | Pre-`:36` — vllm stderr went to `/workspace/<label>.log`, run.log only saw the spawn + final timeout | `:36+` Python-polls and forwards `Compiling | Store the .* graph | torch.compile took | engine core` lines from vllm log to run.log every ~20s, tagged `[<label>-vllm]`. Grep these to confirm compile is progressing |
+| Pod looks stuck mid-vllm but you can't tell why | vllm DEBUG stream lives in `/workspace/<label>.log` separately from run.log. Pre-:36 run.log only saw spawn + final timeout | `:36+`: `bash tail_log.sh <run_id> <label>` (e.g. `vllm-post`, `vllm-adaptereval`) tails the vllm log directly via SSH. run_experiment.py prints the path at spawn time so you know which label to use |
 
 ---
 

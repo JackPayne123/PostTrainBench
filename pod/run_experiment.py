@@ -281,68 +281,41 @@ def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED
         log.error(f"[{label}] spawn failed: rc={r.returncode} stdout={r.stdout!r}")
         return None
 
-    # Poll for ready. Python-side loop so we can forward vllm compile
-    # / engine-init progress lines to run.log between curl checks. The
-    # old `for i in $(seq...); curl; sleep 5; done` bash one-shot kept
-    # vllm's torch.compile activity invisible until timeout fired —
-    # caught 2026-05-14 on two 9B + LoRA adapter-eval pods that died
-    # silently mid-compile (32+ graphs × ~180s each). Now every ~20s
-    # we grep the vllm log for {Compiling a graph|Store the * graph|
-    # torch.compile took|Waiting for * engine core|ERROR|Traceback}
-    # and emit any new lines to run.log so the laptop can `grep -E
-    # "compile|engine|HEADLINE"` and see progress live.
+    # vllm's full DEBUG stream is at `log_path` (a separate file from
+    # run.log). When a 9B + LoRA cold-compile takes 15-30min, run.log
+    # only shows "starting vllm" → "not ready after Ns" — the actual
+    # progress (Compiling a graph / torch.compile took / engine init)
+    # is in vllm's own log. To watch progress live during a wait:
+    #   bash src/runpod_backend/tail_log.sh <run_id> <label>
+    # which `tail -F`s /workspace/<label>.log on the pod.
+    log.info(f"[{label}] vllm log: {log_path} (tail via "
+             f"tail_log.sh <run_id> {label})")
+
+    # Simple bash-side poll. No regex forwarding — too noisy and
+    # brittle; the vllm log is the authoritative source.
     base_url = f"http://localhost:{port}/v1"
-    deadline = time.time() + timeout_sec
-    next_log_grep = time.time()
-    seen_lines: set[str] = set()
-    progress_pat = (
-        "Compiling a graph|Store the .* graph|torch\\.compile took|"
-        "AOT compiled|Waiting for .* engine core|"
-        "ERROR|Traceback|RuntimeError|ValueError|Failed to start"
+    poll = (
+        f"for i in $(seq 1 {timeout_sec // 5}); do "
+        f"  if curl -fsS -m 3 -H 'Authorization: Bearer {api_key}' "
+        f"      {base_url}/models 2>/dev/null | grep -q '{served_name}'; then "
+        f"    echo ready; exit 0; "
+        f"  fi; "
+        f"  sleep 5; "
+        f"done; echo timeout; exit 1"
     )
-    while time.time() < deadline:
+    r = run_sh(poll, timeout=timeout_sec + 60)
+    if r.returncode != 0 or "ready" not in (r.stdout or ""):
+        log.error(f"[{label}] not ready after {timeout_sec}s. log tail:")
         try:
-            r = run_sh(
-                f"curl -fsS -m 3 -H 'Authorization: Bearer {api_key}' "
-                f"{base_url}/models 2>/dev/null | grep -q '{served_name}'",
-                timeout=10, log_cmd=False,
-            )
-            if r.returncode == 0:
-                log.info(f"[{label}] vllm ready at {base_url}")
-                return base_url
-        except Exception:
-            pass
-
-        # Every ~20s, grep new progress lines from vllm log and forward
-        # to run.log so the laptop sees compile activity in near-real-
-        # time (was invisible pre-:36; only error tail after timeout).
-        if time.time() >= next_log_grep:
-            next_log_grep = time.time() + 20
-            try:
-                g = run_sh(
-                    f"grep -E {shlex.quote(progress_pat)} {log_path} 2>/dev/null | tail -8",
-                    timeout=10, log_cmd=False,
-                )
-                for line in (g.stdout or "").splitlines():
-                    sig = line.strip()
-                    if sig and sig not in seen_lines:
-                        seen_lines.add(sig)
-                        log.info(f"[{label}-vllm] {sig[:200]}")
-            except Exception:
-                pass
-
-        time.sleep(5)
-
-    # Timeout. Dump error context as before.
-    log.error(f"[{label}] not ready after {timeout_sec}s. log tail:")
-    try:
-        tail = run_sh(f"grep -nE 'ERROR|Error:|Traceback|ValueError|RuntimeError|Failed|raise' {log_path} 2>/dev/null | head -30", timeout=15)
-        log.error(f"[{label}] errors:\n{tail.stdout}")
-        tail = run_sh(f"tail -200 {log_path}", timeout=15)
-        log.error(f"[{label}] tail:\n{tail.stdout}")
-    except Exception as exc:
-        log.error(f"[{label}] could not read {log_path}: {exc}")
-    return None
+            tail = run_sh(f"grep -nE 'ERROR|Error:|Traceback|ValueError|RuntimeError|Failed|raise' {log_path} 2>/dev/null | head -30", timeout=15)
+            log.error(f"[{label}] errors:\n{tail.stdout}")
+            tail = run_sh(f"tail -200 {log_path}", timeout=15)
+            log.error(f"[{label}] tail:\n{tail.stdout}")
+        except Exception as exc:
+            log.error(f"[{label}] could not read {log_path}: {exc}")
+        return None
+    log.info(f"[{label}] vllm ready at {base_url}")
+    return base_url
 
 
 def stop_shared_vllm(*, port: int = SHARED_VLLM_PORT, label: str = "vllm") -> None:
