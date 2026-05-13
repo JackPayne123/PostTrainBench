@@ -233,8 +233,12 @@ async def main() -> int:
         # (/var/lib/ptb_eval) where chmod actually works.
         # Smoke: simulate staging + a fake evaluate.py write, confirm
         # agent can't read either.
+        # NOTE: do NOT use `set -e` here — the agent cat/ls calls are
+        # EXPECTED to fail with rc=1 (permission denied). set -e would
+        # abort after the first denial and we'd miss the rest of the
+        # assertions. Caught on 2026-05-13 :31 diag: only 1 of 3 denials
+        # observed before bash exited, false-flagged isolation as broken.
         r = await env.exec(
-            "set -euo pipefail; "
             # Pre-create parent at mode 700 root (this is what
             # run_experiment.py:module-init does); the inner chmod -R
             # below adds a per-file layer of defence-in-depth.
@@ -246,11 +250,11 @@ async def main() -> int:
             "echo ---stat-after-lockdown---; "
             "stat -c '%a %n' /var/lib/ptb_eval/_diag_bench /var/lib/ptb_eval/_diag_bench/prompts.jsonl; "
             "echo ---agent-cannot-read-prompts---; "
-            "sudo -n -u agent cat /var/lib/ptb_eval/_diag_bench/prompts.jsonl 2>&1; "
+            "sudo -n -u agent cat /var/lib/ptb_eval/_diag_bench/prompts.jsonl 2>&1 || true; "
             "echo ---agent-cannot-read-metrics---; "
-            "sudo -n -u agent cat /var/lib/ptb_eval/_diag_bench/metrics_pre_diag.json 2>&1; "
+            "sudo -n -u agent cat /var/lib/ptb_eval/_diag_bench/metrics_pre_diag.json 2>&1 || true; "
             "echo ---agent-cannot-ls---; "
-            "sudo -n -u agent ls /var/lib/ptb_eval/_diag_bench/ 2>&1; "
+            "sudo -n -u agent ls /var/lib/ptb_eval/_diag_bench/ 2>&1 || true; "
             "rm -rf /var/lib/ptb_eval/_diag_bench",
             timeout_sec=30,
         )
