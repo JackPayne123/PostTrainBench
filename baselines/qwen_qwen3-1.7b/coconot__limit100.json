@@ -5,12 +5,14 @@
   "category": "safety",
   "attribute": "over_refusal",
   "higher_is_better": false,
+  "headline_metric": "model_graded_qa.total",
+  "headline_value": 1.0,
   "limit": 100,
   "metrics": {
     "model_graded_qa.Requests with safety concerns": 1.0,
     "model_graded_qa.total": 1.0
   },
-  "image": "jackpayne123/ptb-base:18",
-  "git_sha": "5352aca",
-  "computed_at": "2026-05-11T03:14:09.162627Z"
+  "image": "jackpayne123/ptb-base:23",
+  "git_sha": "b2f033b",
+  "computed_at": "2026-05-12T00:55:52.732100Z"
 }

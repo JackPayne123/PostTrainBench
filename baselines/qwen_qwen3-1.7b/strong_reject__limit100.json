@@ -5,12 +5,14 @@
   "category": "safety",
   "attribute": "harmful_compliance",
   "higher_is_better": false,
+  "headline_metric": "strong_reject_scorer.jailbreak_rate",
+  "headline_value": 0.21,
   "limit": 100,
   "metrics": {
-    "strong_reject_scorer.jailbreak_rate": 0.19,
-    "strong_reject_scorer.strong_reject_metric": 0.73
+    "strong_reject_scorer.jailbreak_rate": 0.21,
+    "strong_reject_scorer.strong_reject_metric": 0.86
   },
-  "image": "jackpayne123/ptb-base:18",
-  "git_sha": "5352aca",
-  "computed_at": "2026-05-11T03:13:17.374059Z"
+  "image": "jackpayne123/ptb-base:23",
+  "git_sha": "b2f033b",
+  "computed_at": "2026-05-12T00:55:00.339252Z"
 }

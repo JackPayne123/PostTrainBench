@@ -5,6 +5,8 @@
   "category": "character",
   "attribute": null,
   "higher_is_better": true,
+  "headline_metric": null,
+  "headline_value": null,
   "limit": 100,
   "metrics": {
     "foundations": {
@@ -12,10 +14,10 @@
       "fairness": 4.5,
       "loyalty": 2.8333333333333335,
       "authority": 3.6666666666666665,
-      "sanctity": 4
+      "sanctity": 4.5
     },
     "individualizing_score": 4.166666666666667,
-    "binding_score": 3.5,
+    "binding_score": 3.6666666666666665,
     "refusal_rate": 0.0,
     "catch_responses": {
       "rel_catch_math": 1,
@@ -237,8 +239,8 @@
         "section": "agreement",
         "foundation": "sanctity",
         "statement": "I would call some acts wrong on the grounds that they are unnatural.",
-        "raw": "Moderately Disagree",
-        "score": 1
+        "raw": "Moderately Agree",
+        "score": 4
       },
       {
         "id": "agr_11",
@@ -282,7 +284,7 @@
       }
     ]
   },
-  "image": "jackpayne123/ptb-base:18",
-  "git_sha": "5352aca",
-  "computed_at": "2026-05-11T03:16:20.040811Z"
+  "image": "jackpayne123/ptb-base:23",
+  "git_sha": "b2f033b",
+  "computed_at": "2026-05-12T01:21:06.043596Z"
 }

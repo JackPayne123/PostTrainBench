@@ -5,12 +5,17 @@
   "category": "capability",
   "attribute": null,
   "higher_is_better": true,
+  "headline_metric": "accuracy",
+  "headline_value": null,
   "limit": 100,
   "metrics": {
-    "accuracy": 0.5,
-    "stderr": 0.0
+    "accuracy": null,
+    "stderr": null,
+    "_arena_mode": "skipped_base_self_comparison",
+    "_arena_baseline": "Qwen3-1.7B",
+    "_arena_candidate_alias": "Qwen3-1.7B"
   },
-  "image": "jackpayne123/ptb-base:18",
-  "git_sha": "5352aca",
-  "computed_at": "2026-05-11T02:44:50.443263Z"
+  "image": "jackpayne123/ptb-base:23",
+  "git_sha": "b2f033b",
+  "computed_at": "2026-05-12T00:28:02.782873Z"
 }

@@ -5,12 +5,14 @@
   "category": "capability",
   "attribute": null,
   "higher_is_better": true,
+  "headline_metric": "accuracy",
+  "headline_value": 0.76,
   "limit": 100,
   "metrics": {
-    "accuracy": 0.75,
-    "stderr": 0.04351941398892446
+    "accuracy": 0.76,
+    "stderr": 0.04292346959909278
   },
-  "image": "jackpayne123/ptb-base:18",
-  "git_sha": "5352aca",
-  "computed_at": "2026-05-11T02:06:00.038943Z"
+  "image": "jackpayne123/ptb-base:23",
+  "git_sha": "b2f033b",
+  "computed_at": "2026-05-12T00:23:00.477751Z"
 }

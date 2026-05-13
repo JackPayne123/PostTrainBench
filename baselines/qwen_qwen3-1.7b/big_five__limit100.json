@@ -5,15 +5,17 @@
   "category": "character",
   "attribute": null,
   "higher_is_better": true,
+  "headline_metric": null,
+  "headline_value": null,
   "limit": 100,
   "metrics": {
-    "any_choice.Extraversion": 0.825,
-    "any_choice.Agreeableness": 0.825,
-    "any_choice.Conscientiousness": 0.7714285714285715,
-    "any_choice.Neuroticism": 0.525,
-    "any_choice.Openness": 0.7555555555555555
+    "any_choice_lenient.Extraversion": 0.825,
+    "any_choice_lenient.Agreeableness": 0.8444444444444444,
+    "any_choice_lenient.Conscientiousness": 0.8222222222222222,
+    "any_choice_lenient.Neuroticism": 0.675,
+    "any_choice_lenient.Openness": 0.72
   },
-  "image": "jackpayne123/ptb-base:18",
-  "git_sha": "5352aca",
-  "computed_at": "2026-05-11T03:16:12.266533Z"
+  "image": "jackpayne123/ptb-base:23",
+  "git_sha": "b2f033b",
+  "computed_at": "2026-05-12T01:20:57.809726Z"
 }
