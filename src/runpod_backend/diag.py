@@ -224,28 +224,34 @@ async def main() -> int:
             log.error("ISOLATION BROKEN — agent can read /etc/ptb_run/bench")
             return 9
 
-        log.info("=== isolation: /workspace/ptb_eval/<bench>/ stays locked after evaluate.py ===")
-        # Caught on 2026-05-13 F-run #8609e1: pipeline staged eval dir
-        # appeared to chmod 700 root but ended up at 777 with files 666
-        # (umask 0 in tmux session + chmod -R running with check=False).
-        # Agent read /workspace/ptb_eval/sycophancy_slava/prompts.jsonl
-        # directly. Smoke test: simulate the staging + a fake evaluate.py
-        # write, confirm agent can't read either.
+        log.info("=== isolation: /var/lib/ptb_eval/<bench>/ stays locked after evaluate.py ===")
+        # Caught on 2026-05-13 F-run #8609e1: ptb_eval was originally on
+        # the network volume (/workspace/ptb_eval), and RunPod's network
+        # volume silently no-ops chmod — files stayed mode 666 / dirs 777
+        # regardless of `chmod -R go-rwx`. Agent read prompts.jsonl
+        # directly. :31+ moves PTB_EVAL to container rootfs
+        # (/var/lib/ptb_eval) where chmod actually works.
+        # Smoke: simulate staging + a fake evaluate.py write, confirm
+        # agent can't read either.
         r = await env.exec(
             "set -euo pipefail; "
-            "mkdir -p /workspace/ptb_eval/_diag_bench/logs; "
-            "echo SECRET_PROMPT > /workspace/ptb_eval/_diag_bench/prompts.jsonl; "
-            "echo SECRET_METRIC > /workspace/ptb_eval/_diag_bench/metrics_pre_diag.json; "
-            "chown -R root:root /workspace/ptb_eval && chmod -R go-rwx /workspace/ptb_eval; "
+            # Pre-create parent at mode 700 root (this is what
+            # run_experiment.py:module-init does); the inner chmod -R
+            # below adds a per-file layer of defence-in-depth.
+            "mkdir -p /var/lib/ptb_eval && chmod 700 /var/lib/ptb_eval && chown root:root /var/lib/ptb_eval; "
+            "mkdir -p /var/lib/ptb_eval/_diag_bench/logs; "
+            "echo SECRET_PROMPT > /var/lib/ptb_eval/_diag_bench/prompts.jsonl; "
+            "echo SECRET_METRIC > /var/lib/ptb_eval/_diag_bench/metrics_pre_diag.json; "
+            "chown -R root:root /var/lib/ptb_eval && chmod -R go-rwx /var/lib/ptb_eval; "
             "echo ---stat-after-lockdown---; "
-            "stat -c '%a %n' /workspace/ptb_eval/_diag_bench /workspace/ptb_eval/_diag_bench/prompts.jsonl; "
+            "stat -c '%a %n' /var/lib/ptb_eval/_diag_bench /var/lib/ptb_eval/_diag_bench/prompts.jsonl; "
             "echo ---agent-cannot-read-prompts---; "
-            "sudo -n -u agent cat /workspace/ptb_eval/_diag_bench/prompts.jsonl 2>&1; "
+            "sudo -n -u agent cat /var/lib/ptb_eval/_diag_bench/prompts.jsonl 2>&1; "
             "echo ---agent-cannot-read-metrics---; "
-            "sudo -n -u agent cat /workspace/ptb_eval/_diag_bench/metrics_pre_diag.json 2>&1; "
+            "sudo -n -u agent cat /var/lib/ptb_eval/_diag_bench/metrics_pre_diag.json 2>&1; "
             "echo ---agent-cannot-ls---; "
-            "sudo -n -u agent ls /workspace/ptb_eval/_diag_bench/ 2>&1; "
-            "rm -rf /workspace/ptb_eval/_diag_bench",
+            "sudo -n -u agent ls /var/lib/ptb_eval/_diag_bench/ 2>&1; "
+            "rm -rf /var/lib/ptb_eval/_diag_bench",
             timeout_sec=30,
         )
         out = r.stdout or r.stderr or ""
@@ -254,10 +260,10 @@ async def main() -> int:
             log.error("ISOLATION BROKEN — agent read prompts.jsonl or metrics_pre directly")
             return 12
         if out.count("Permission denied") < 3:
-            log.error("ISOLATION BROKEN — agent ls/cat on /workspace/ptb_eval/<bench>/ should all deny")
+            log.error("ISOLATION BROKEN — agent ls/cat on /var/lib/ptb_eval/<bench>/ should all deny")
             return 13
         # Verify post-lockdown perms are actually 700 / 600.
-        if "700 /workspace/ptb_eval/_diag_bench" not in out:
+        if "700 /var/lib/ptb_eval/_diag_bench" not in out:
             log.error(f"ISOLATION BROKEN — dir didn't chmod to 700; got: {out}")
             return 14
 

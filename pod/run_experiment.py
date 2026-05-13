@@ -102,7 +102,24 @@ os.umask(0o077)
 
 # Workspace + eval paths (mirror agent_run constants)
 WORKSPACE = Path("/home/agent/workspace")
-PTB_EVAL = Path("/workspace/ptb_eval")
+# PTB_EVAL lives on the CONTAINER ROOTFS (not the network volume) because
+# RunPod's network-volume mount silently ignores chmod / chown calls —
+# verified empirically 2026-05-13 (diag returned mode 777 / 666 after
+# `chmod -R go-rwx /workspace/ptb_eval`, agent uid 1000 could still
+# `cat /workspace/ptb_eval/<bench>/prompts.jsonl`).
+#
+# Container rootfs honours chmod, so a single `mkdir -m 700 /var/lib/ptb_eval`
+# at module init plus root ownership locks the entire staging surface to
+# the agent. Trade-off: inspect-ai per-sample logs under
+# `/var/lib/ptb_eval/<bench>/logs/` get blown away on pod terminate; we
+# mirror the inspect log dir + the metrics file to
+# `/workspace/runs/<run_id>/eval_logs/<bench>/` at the end of each run_eval
+# call so the audit-truncation / audit-eval-logs tooling still has data
+# after `pull_run.py --from-volume`.
+PTB_EVAL = Path("/var/lib/ptb_eval")
+PTB_EVAL.mkdir(parents=True, exist_ok=True)
+os.chmod(PTB_EVAL, 0o700)
+os.chown(PTB_EVAL, 0, 0)
 SHARED_VLLM_PORT = 36216
 SHARED_VLLM_NAME = "student"
 SHARED_VLLM_API_KEY = "inspectai"
@@ -329,12 +346,13 @@ def stage_eval_task(benchmark: str) -> Path:
     judge_dst = PTB_EVAL / "judge"
     if judge_src.exists():
         shutil.copytree(judge_src, judge_dst, dirs_exist_ok=True)
-    # Lock the staged copy + the PTB_EVAL parent. Pipeline (root) reads
-    # through; agent can't. check=True surfaces failures (silent fail
-    # was caught on 2026-05-13 F-run #8609e1: agent read prompts.jsonl
-    # via /workspace/ptb_eval/<bench>/prompts.jsonl).
+    # PTB_EVAL is on container rootfs (chmod 700 at module init), so the
+    # agent can't traverse into staged bench dirs regardless of inner
+    # perms. Belt-and-braces chown+chmod inside still useful for defence
+    # in depth — and works here (unlike on /workspace which silently
+    # ignored chmod).
     run_sh(f"chown -R root:root {PTB_EVAL} && chmod -R go-rwx {PTB_EVAL}",
-           check=True, log_cmd=False)
+           check=False, log_cmd=False)
     return dst
 
 
@@ -395,13 +413,28 @@ def run_eval(*, label: str, benchmark: str, model_path: str, limit: int,
     with open(eval_log, "w") as f:
         proc = subprocess.run(cmd, shell=True, stdout=f, stderr=subprocess.STDOUT,
                               env={**os.environ})
-    # Re-lockdown after evaluate.py writes new files (logs/, metrics_*.json,
-    # eval_*.log). inspect-ai creates these mid-eval, and even with umask
-    # 077 baked into pod-pipeline above, evaluate.py's subprocess may reset
-    # umask (e.g. via vllm subprocess inheriting different env). Belt-and-
-    # braces re-chmod closes the window.
+    # Re-lockdown after evaluate.py writes new files inside task_dir.
+    # PTB_EVAL is on container rootfs (mode 700 root from module init), so
+    # the parent dir already blocks the agent — but defence in depth.
     run_sh(f"chown -R root:root {PTB_EVAL} && chmod -R go-rwx {PTB_EVAL}",
            check=False, log_cmd=False)
+    # Mirror inspect-ai's per-sample logs + eval.log to the run dir on
+    # the network volume so audit-* scripts (and `pull_run.py
+    # --from-volume`) can read them. PTB_EVAL itself doesn't persist
+    # across pods (container rootfs), so this is the only way to get
+    # post-mortem audit data off the pod.
+    audit_dst = RUN_DIR / "eval_logs" / benchmark
+    audit_dst.mkdir(parents=True, exist_ok=True)
+    task_logs = task_dir / "logs"
+    if task_logs.exists():
+        try:
+            shutil.copytree(task_logs, audit_dst / "logs", dirs_exist_ok=True)
+        except Exception as e:
+            log.warning(f"[{label}] failed to mirror inspect logs: {e}")
+    try:
+        shutil.copy2(eval_log, audit_dst / eval_log.name)
+    except Exception as e:
+        log.warning(f"[{label}] failed to mirror eval_log: {e}")
     if proc.returncode != 0:
         log.error(f"[{label}] rc={proc.returncode}; tail of {eval_log}:")
         try:
