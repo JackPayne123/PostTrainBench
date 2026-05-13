@@ -127,6 +127,10 @@ PYTHONPATH=. ~/.local/share/uv/tools/harbor/bin/python \
 
 `submit_run.py` returns in ~3 minutes after spinning the pod, uploading the run dir, and SSH-launching the startup hook in tmux. The pod self-drives the rest. Output lines you care about: `run dir`, `pod`, `volume path`, `drive folder`, `laptop run_dir`.
 
+**Full-suite adapter eval is now ON by default** (`--full-suite-eval`, :34+). After the agent finishes + the primary post-eval runs, the same pod iterates every remaining bench in `EVAL_SUITE` against the trained adapter — produces `baselines/<bench>__limit<N>.json` in the run dir for every measured bench. Cost: +~1.5h pod time. Disable with `--no-full-suite-eval` if you just want the primary + extras and don't care about character/capability deltas.
+
+After pull, promote via `pull_baseline.py <f-run-id>` — it now handles agent runs whose baselines/ dir was populated by the inline suite eval, depositing into `baselines/<slug>/adapter_eval/<f-run-id>/` so `compute_deltas.py` + the character dashboard pick them up automatically. No more separate `submit_baseline.py --adapter-from-run-id` follow-up pod.
+
 ### Baseline (`submit_baseline.py`)
 
 Runs every task in `src/evals/registry.EVAL_SUITE` against a base HF model. No agent stage, no adapter. Use once per (model, limit) and commit results to `baselines/<slug>/`.
@@ -228,6 +232,7 @@ Two pods on the same `networkVolumeId` was rejected by the RunPod allocator (see
 | `--limit` | Sample count per eval pass. 30 is a small smoke; 100 is the standard. Per-eval defaults live in `EvalInfo.default_limit` if `--limit 0`. |
 | `--skip-heldout` | Skip the held-out capability panel after post-eval. Use for sycophancy-only smokes. |
 | `--skip-pre-eval` | Pod skips pre-eval (and extras-pre-eval). summary.json gets `pre=None`, `delta=None`. Backfill via `scripts/compute_deltas.py <run_id> --write-deltas --update-summary` once baselines exist. Implied by `--use-baseline`. |
+| `--full-suite-eval` / `--no-full-suite-eval` | (default ON, :34+) After post-eval, iterate all remaining `EVAL_SUITE` benches against the adapter via the same vllm-post session. Per-bench JSONs land in `<run_dir>/baselines/`. `pull_baseline.py <f-run-id>` promotes to `baselines/<slug>/adapter_eval/<f-run-id>/`. Adds ~1.5h pod time. Disable for cheap iteration or smokes. |
 | `--use-baseline` | **Fail-fast** at submit time if `baselines/<student-slug>/<bench>__limit<N>.json` is missing for primary or any `--extra-evals`. Implies `--skip-pre-eval`. Error message includes a copy-pasteable `submit_baseline.py --only-bench …` recovery hint. Use this for any "real" F-run so you can't accidentally run without a baseline reference. |
 | `--bypass-template-check` | Skip the chat-template validation gate for the `--student`. Only for debug. Eval scores will be unreliable if format is wrong. |
 | `--no-drive-upload` | Pod skips rclone-to-Drive (debug). |

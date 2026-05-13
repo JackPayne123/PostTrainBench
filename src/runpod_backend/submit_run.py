@@ -85,6 +85,19 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dry-run", action="store_true",
                    help="run pre-eval + dir scaffold only; skip agent + post-eval")
     p.add_argument("--skip-heldout", action="store_true")
+    p.add_argument("--full-suite-eval", dest="full_suite_eval",
+                   default=True, action="store_true",
+                   help=("After the agent's adapter is post-eval'd, iterate "
+                         "every EVAL_SUITE bench (excluding primary + "
+                         "extra-evals already done) against the adapter "
+                         "via vllm-post's --enable-lora session. Writes "
+                         "baselines/<bench>__limit<N>.json so pull_baseline.py "
+                         "promotes to baselines/<slug>/adapter_eval/<run-id>/. "
+                         "Default ON — replaces the manual "
+                         "`submit_baseline.py --adapter-from-run-id` step."))
+    p.add_argument("--no-full-suite-eval", dest="full_suite_eval",
+                   action="store_false",
+                   help="Disable the full-suite adapter eval (saves ~1.5h pod time).")
     p.add_argument("--skip-pre-eval", action="store_true",
                    help="Pod skips pre-eval and treats baselines as the "
                         "pre values. summary.json's `pre` + `delta` come "
@@ -245,6 +258,7 @@ async def main() -> None:
             "limit": args.limit,
             "skip_heldout": args.skip_heldout,
             "skip_pre_eval": args.skip_pre_eval,
+            "full_suite_eval": args.full_suite_eval,
             "dry_run": args.dry_run,
             "keep_pod": args.keep_pod,
             "no_drive_upload": args.no_drive_upload,

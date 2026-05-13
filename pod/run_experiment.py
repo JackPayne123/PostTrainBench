@@ -941,6 +941,95 @@ def self_terminate() -> None:
     log.info("[terminate] mutation issued; pod will go down momentarily")
 
 
+# ─── Full-suite adapter eval ─────────────────────────────────────────────────
+
+
+def run_full_suite_adapter_eval(*, cfg: dict, vllm_url: str,
+                                already_done: set[str],
+                                forced_limit: int | None) -> None:
+    """Iterate every EVAL_SUITE bench not already evaluated, write
+    per-bench baselines/<bench>__limit<N>.json + baselines.json index.
+
+    Mirrors pod/run_baseline.py:promote — same on-disk schema so
+    pull_baseline.py promotes to baselines/<slug>/adapter_eval/<run-id>/.
+    Caller is responsible for keeping the shared vllm (--enable-lora)
+    alive across all calls; we just call run_eval against the supplied
+    base URL.
+    """
+    import datetime as dt
+    import traceback
+    from src.evals.registry import EVAL_SUITE, get_headline
+
+    suite_dir = RUN_DIR / "baselines"
+    suite_dir.mkdir(parents=True, exist_ok=True)
+
+    model_id = cfg["student_model"]
+    model_slug = cfg["student_slug"]
+    image_tag = cfg.get("base_image", "")
+    git_sha = cfg.get("git_sha", "")
+
+    index: dict[str, dict] = {}
+    n_ok = 0
+    n_fail = 0
+    log.info(f"=== FULL-SUITE ADAPTER EVAL ({len(EVAL_SUITE) - len(already_done)} benches) ===")
+    for name, info in EVAL_SUITE.items():
+        if name in already_done:
+            log.info(f"[suite] skip {name} (already in primary/extras)")
+            continue
+        eval_limit = forced_limit if forced_limit is not None else info.default_limit
+        log.info(f"=== SUITE-EVAL {name} ({info.category}) limit={eval_limit} ===")
+        try:
+            metrics = run_eval(
+                label=f"suite_{name}", benchmark=name,
+                model_path=model_id, limit=eval_limit,
+                vllm_base_url=vllm_url, vllm_served_name=SHARED_VLLM_NAME,
+            )
+        except Exception as exc:
+            log.error(f"[suite/{name}] crashed: {exc}\n{traceback.format_exc()}")
+            metrics = None
+        headline = get_headline(metrics or {}, info)
+        entry = {
+            "model": model_id,
+            "model_slug": model_slug,
+            "benchmark": name,
+            "category": info.category,
+            "attribute": info.attribute,
+            "higher_is_better": info.higher_is_better,
+            "headline_metric": info.headline_metric,
+            "headline_value": headline,
+            "limit": eval_limit,
+            "metrics": metrics,
+            "image": image_tag,
+            "git_sha": git_sha,
+            "computed_at": dt.datetime.utcnow().isoformat() + "Z",
+        }
+        out_path = suite_dir / f"{name}__limit{eval_limit}.json"
+        out_path.write_text(json.dumps(entry, indent=2))
+        index[name] = entry
+        if metrics is None:
+            n_fail += 1
+            log.warning(f"[suite/{name}] FAIL")
+        else:
+            n_ok += 1
+            log.info(
+                f"[suite/{name}] OK {info.headline_metric}="
+                f"{headline} stderr={(metrics or {}).get('stderr')}"
+            )
+
+    (RUN_DIR / "baselines.json").write_text(json.dumps({
+        "model": model_id,
+        "model_slug": model_slug,
+        "limit": forced_limit if forced_limit is not None else "per_eval_default",
+        "image": image_tag,
+        "git_sha": git_sha,
+        "computed_at": dt.datetime.utcnow().isoformat() + "Z",
+        "tasks": index,
+        "_kind": "adapter_eval",
+        "_adapter_from_run_id": RUN_ID,
+    }, indent=2))
+    log.info(f"=== SUITE INDEX written: {len(index)} entries, {n_ok} ok, {n_fail} fail ===")
+
+
 # ─── Main ───────────────────────────────────────────────────────────────────
 
 
@@ -1087,6 +1176,26 @@ def main() -> None:
                         model_path=cfg["student_model"], limit=limit,
                         vllm_base_url=post_url, vllm_served_name=SHARED_VLLM_NAME,
                     )
+
+                # ─── FULL-SUITE ADAPTER EVAL ──────────────────────────
+                # When enabled (default), iterate every bench in
+                # EVAL_SUITE not already evaluated against the adapter.
+                # Writes baselines/<bench>__limit<N>.json + baselines.json
+                # index in the same schema as pod/run_baseline.py, so
+                # pull_baseline.py can promote to
+                # baselines/<slug>/adapter_eval/<run-id>/ — replaces
+                # the manual `submit_baseline.py --adapter-from-run-id`
+                # step that previously had to follow every F-run for
+                # full character / capability deltas.
+                full_suite = cfg.get("extra", {}).get("full_suite_eval", True)
+                if full_suite:
+                    run_full_suite_adapter_eval(
+                        cfg=cfg,
+                        vllm_url=post_url,
+                        already_done={cfg["benchmark"], *extra_evals},
+                        forced_limit=limit,
+                    )
+
                 stop_shared_vllm(label="vllm-post")
             else:
                 log.error("[vllm-post] failed to start; skipping post-eval")

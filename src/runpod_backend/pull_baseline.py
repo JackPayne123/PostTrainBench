@@ -63,14 +63,37 @@ def promote(run_dir: Path, repo_root: Path) -> int:
         return 3
     cfg = json.loads(cfg_path.read_text())
     kind = cfg.get("kind")
-    if kind not in ("baseline", "adapter_eval"):
+    src_baselines = run_dir / "baselines"
+
+    # Agent (F-run) configs don't set `kind` but DO produce a baselines/
+    # dir when full_suite_eval=True (run_experiment.py:run_full_suite_
+    # adapter_eval). Treat them as adapter_eval keyed by the F-run's
+    # own run_id, so the per-bench baselines land under
+    # baselines/<slug>/adapter_eval/<f-run-id>/ exactly where
+    # compute_deltas + the character dashboard already look. Replaces
+    # the manual `submit_baseline.py --adapter-from-run-id` follow-up
+    # that previously had to be chained after every F-run.
+    is_f_run_with_suite = (
+        kind is None
+        and src_baselines.exists()
+        and (run_dir / "config.json").exists()
+        and "student_slug" in cfg
+    )
+
+    if kind not in ("baseline", "adapter_eval") and not is_f_run_with_suite:
         log.error(f"config.json kind={kind!r}, expected 'baseline' or "
-                  "'adapter_eval'; use pull_run.py for agent runs")
+                  "'adapter_eval' (or an F-run with baselines/ from "
+                  "--full-suite-eval); use pull_run.py for agent runs "
+                  "without --full-suite-eval")
         return 4
 
-    model_slug = cfg["model_slug"]
-    limit = cfg["limit"]
-    src_baselines = run_dir / "baselines"
+    # Schema differs: baseline/adapter_eval has top-level model_slug + limit;
+    # agent runs use student_slug + extra.limit.
+    model_slug = cfg.get("model_slug") or cfg["student_slug"]
+    limit = cfg.get("limit")
+    if limit is None:
+        limit = cfg.get("extra", {}).get("limit", 0)
+
     if not src_baselines.exists():
         log.error(f"no baselines/ dir at {src_baselines}; pod may have failed mid-run")
         return 5
@@ -80,6 +103,9 @@ def promote(run_dir: Path, repo_root: Path) -> int:
     # track multiple adapter evals per model (one per trained adapter).
     if kind == "adapter_eval":
         adapter_id = cfg.get("adapter_from_run_id", "unknown")
+        dst_dir = repo_root / "baselines" / model_slug / "adapter_eval" / adapter_id
+    elif is_f_run_with_suite:
+        adapter_id = run_dir.name  # F-run's own run_id
         dst_dir = repo_root / "baselines" / model_slug / "adapter_eval" / adapter_id
     else:
         dst_dir = repo_root / "baselines" / model_slug
