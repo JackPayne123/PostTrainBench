@@ -241,6 +241,17 @@ def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED
     else:
         served_arg = f"--served-model-name {shlex.quote(served_name)}"
 
+    # --enforce-eager skips torch.compile/inductor. Trade-off:
+    # +~30s startup (no compile) but ~2x slower inference per token.
+    # Worth it for adapter-eval (short, many small evals — compile
+    # cost dominates) — both prior adapter-eval pods (80dc12, 3e8de0)
+    # died at the 9B + LoRA torch-compile bottleneck (15-30min) on
+    # a cold volume. Set VLLM_ENFORCE_EAGER=1 in submitter env to
+    # enable. Default OFF preserves perf for long-running F-run vllm.
+    eager_flag = ""
+    if os.environ.get("VLLM_ENFORCE_EAGER", "").strip() in ("1", "true", "yes"):
+        eager_flag = " --enforce-eager"
+
     serve_cmd = (
         f"export HF_HOME=/workspace/hf-cache; "
         f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
@@ -252,6 +263,7 @@ def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED
         f"--gpu-memory-utilization {gpu_mem_util} "
         f"--chat-template {shlex.quote(chat_template)} "
         f"--uvicorn-log-level debug"
+        f"{eager_flag}"
         f"{lora_flags}"
     )
 

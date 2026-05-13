@@ -314,6 +314,10 @@ async def main() -> None:
         # with cudagraph compilation can need 1500-1800s. Caller exports
         # VLLM_READY_TIMEOUT in .env to bump.
         "VLLM_READY_TIMEOUT": os.environ.get("VLLM_READY_TIMEOUT", ""),
+        # Skip torch.compile/inductor for 2x slower inference but
+        # ~30s startup vs the 15-30min cold compile. Useful when the
+        # volume's vllm compile cache is missing/stale.
+        "VLLM_ENFORCE_EAGER": os.environ.get("VLLM_ENFORCE_EAGER", ""),
     }
 
     # Spin pod

@@ -197,6 +197,12 @@ async def main() -> None:
         # models with cudagraph compilation needed ~12-15min; bump to 1800
         # for safety. Caller exports VLLM_READY_TIMEOUT=1800 in .env.
         "VLLM_READY_TIMEOUT": os.environ.get("VLLM_READY_TIMEOUT", ""),
+        # Skip torch.compile/inductor. Costs ~2x inference slowdown but
+        # saves the 15-30min cold compile that has killed 9B + LoRA
+        # adapter-eval pods on volumes without a warm
+        # /root/.cache/vllm/torch_compile_cache. Set VLLM_ENFORCE_EAGER=1
+        # in submitter env to enable.
+        "VLLM_ENFORCE_EAGER": os.environ.get("VLLM_ENFORCE_EAGER", ""),
     }
 
     log.info("starting pod (image = %s)", DEFAULT_IMAGE)
