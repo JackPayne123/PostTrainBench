@@ -883,162 +883,322 @@ def started_sort_key(r: dict[str, Any]) -> str:
 
 
 CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Inter:wght@300;400;500;600;700&display=swap');
 :root {
-  --bg: #0f1115;
-  --panel: #161a22;
-  --panel-2: #1c2230;
-  --border: #2a3142;
-  --fg: #d8dee9;
-  --muted: #7d8aa6;
-  --accent: #c17d5a;
-  --green: #88c0a8;
-  --red: #d08280;
-  --blue: #88a8d8;
-  --yellow: #e0c878;
-  --purple: #b08ad0;
+  --bg:           #f4eee0;
+  --panel:        #fbf7eb;
+  --panel-2:      #f0e9d3;
+  --bg-inset:     #faf4e4;
+  --border:       #cfc6ab;
+  --border-soft:  #e3dcc5;
+  --fg:           #1d1a13;
+  --muted:        #6f6852;
+  --faint:        #9c9479;
+  --accent:       #2d2516;
+  --accent-deep:  #4f4225;
+  --green: #3b7d5a;
+  --red:   #b03a2e;
+  --blue:  #3d6a99;
+  --yellow:#a37820;
+  --purple:#6e3d9d;
+  --orange:#c97a2d;
+
+  --serif: "Newsreader", "Cormorant Garamond", Georgia, serif;
+  --sans:  "Inter", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --mono:  ui-monospace, "SF Mono", Menlo, monospace;
 }
 * { box-sizing: border-box; }
 body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 120ms; }
+a:hover { border-color: var(--accent); }
+
+/* Top nav — shared across views */
 header.topnav {
   background: var(--panel);
   border-bottom: 1px solid var(--border);
-  padding: 12px 24px;
-  display: flex; align-items: center; gap: 16px;
+  padding: 14px 32px;
+  display: flex; align-items: center; gap: 24px;
   position: sticky; top: 0; z-index: 10;
 }
-header.topnav h1 { margin: 0; font-size: 16px; font-weight: 600; }
-.container { max-width: 1400px; margin: 24px auto; padding: 0 24px; }
+header.topnav .brand {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--fg);
+  letter-spacing: -0.005em;
+}
+header.topnav .brand a { color: inherit; border: none; }
+header.topnav .nav-tabs { display: flex; gap: 6px; margin-left: auto; }
+header.topnav .nav-tab {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 6px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: transparent;
+}
+header.topnav .nav-tab.active {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+header.topnav .nav-tab:hover:not(.active) { color: var(--fg); border-color: var(--fg); }
+header.topnav .crumb {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.container { max-width: 1240px; margin: 36px auto; padding: 0 48px 96px; }
 .muted { color: var(--muted); }
-.mono, code, pre { font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+.mono, code, pre { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Eyebrow + serif h-styles to match dashboard */
+.eyebrow {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.eyebrow::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-deep);
+  display: inline-block;
+}
+
 .card {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px 20px;
-  margin-bottom: 16px;
+  border-radius: 6px;
+  padding: 28px 32px;
+  margin-bottom: 22px;
 }
-.card h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; color: var(--accent); }
-.card h3 { margin: 12px 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.card h2 {
+  margin: 0 0 16px;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 22px;
+  color: var(--fg);
+  letter-spacing: -0.005em;
+}
+.card h3 {
+  margin: 18px 0 10px;
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
 table.runs { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.runs th, table.runs td {
-  padding: 6px 10px; text-align: left;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 16px; text-align: left;
+  border-bottom: 1px solid var(--border-soft);
   vertical-align: top;
 }
-table.runs th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+table.runs th {
+  color: var(--muted); font-weight: 500;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em;
+  background: var(--bg);
+}
 table.runs.sortable th { cursor: pointer; user-select: none; }
 table.runs.sortable th:hover { color: var(--fg); }
-table.runs.sortable th[data-dir]::after { content: ""; }
-table.runs tr:hover { background: var(--panel-2); }
+table.runs tr:hover td { background: var(--bg-inset); }
 table.runs td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.runs a { font-family: var(--mono); }
+
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
 }
-.metric { background: var(--panel-2); padding: 10px 12px; border-radius: 6px; }
-.metric .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-.metric .value { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.metric {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-soft);
+  padding: 14px 16px;
+  border-radius: 4px;
+}
+.metric .label { color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; }
+.metric .value {
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 400;
+  color: var(--fg);
+  margin-top: 6px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
 .metric .value.up { color: var(--green); }
 .metric .value.down { color: var(--red); }
-.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-size: 13px; }
-.kv .k { color: var(--muted); }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 16px; }
+
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 20px; font-size: 13px; }
+.kv .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 18px; }
 .chip {
-  background: var(--panel-2); border: 1px solid var(--border);
-  padding: 4px 10px; border-radius: 16px; font-size: 12px;
-  cursor: pointer; user-select: none;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-soft);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  user-select: none;
 }
-.chip.active { background: var(--accent); color: #1a1208; border-color: var(--accent); }
-.search { width: 100%; padding: 8px 12px; background: var(--panel-2); border: 1px solid var(--border); color: var(--fg); border-radius: 6px; }
+.chip.active {
+  background: var(--fg); color: var(--bg); border-color: var(--fg);
+}
+.search {
+  width: 100%; padding: 10px 14px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 4px;
+  font-family: var(--sans);
+}
+.search:focus { outline: none; border-color: var(--accent); }
+
+/* Timeline */
 .timeline { display: flex; flex-direction: column; gap: 8px; }
 .event {
   background: var(--panel);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-soft);
   border-left: 3px solid var(--border);
-  border-radius: 6px;
-  padding: 10px 14px;
+  border-radius: 4px;
+  padding: 12px 16px;
 }
 .event.text { border-left-color: var(--blue); }
-.event.thinking { border-left-color: var(--purple); background: var(--panel-2); }
+.event.thinking { border-left-color: var(--purple); background: var(--bg-inset); }
 .event.tool_use { border-left-color: var(--yellow); }
 .event.tool_result { border-left-color: var(--green); }
 .event.tool_result.error { border-left-color: var(--red); }
-.event.system_init, .event.system, .event.result { border-left-color: var(--muted); background: var(--panel-2); }
+.event.system_init, .event.system, .event.result { border-left-color: var(--faint); background: var(--bg-inset); }
 .event header {
   display: flex; align-items: center; gap: 10px;
-  font-size: 12px; color: var(--muted);
-  margin-bottom: 6px;
+  font-size: 11px; color: var(--muted);
+  margin-bottom: 8px;
+  letter-spacing: 0.04em;
 }
-.event header .badge { background: var(--panel-2); padding: 2px 8px; border-radius: 4px; font-size: 11px; color: var(--fg); }
-.event header .badge.tool { background: var(--yellow); color: #2a2200; font-weight: 600; }
-.event header .badge.tool.result { background: var(--green); color: #0c2418; }
-.event header .badge.tool.error { background: var(--red); color: #200; }
+.event header .badge {
+  background: var(--bg-inset);
+  padding: 2px 8px; border-radius: 3px; font-size: 10px;
+  color: var(--fg);
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.event header .badge.tool { background: rgba(163,120,32,0.18); color: #6b4d10; font-weight: 600; }
+.event header .badge.tool.result { background: rgba(59,125,90,0.18); color: var(--green); }
+.event header .badge.tool.error { background: rgba(176,58,46,0.18); color: var(--red); }
 .event header .turn { color: var(--muted); }
-.event header .ts { margin-left: auto; }
-.event header .elapsed { color: var(--accent); margin-left: 6px; font-size: 11px; }
+.event header .ts { margin-left: auto; font-family: var(--mono); }
+.event header .elapsed { color: var(--accent-deep); margin-left: 6px; font-size: 11px; font-family: var(--mono); }
 .event pre {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 8px 10px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-soft);
+  border-radius: 3px;
+  padding: 10px 12px;
   font-size: 12.5px;
+  color: var(--fg);
   max-height: 480px;
   overflow: auto;
 }
-.event pre.cmd { background: #0a0d12; }
+.event pre.cmd { background: var(--bg); }
 .event .body.collapsed pre { max-height: 96px; }
 .event .toggle {
-  font-size: 11px; color: var(--accent); cursor: pointer;
-  margin-top: 4px; display: inline-block;
+  font-size: 11px;
+  color: var(--accent-deep);
+  cursor: pointer;
+  margin-top: 6px;
+  display: inline-block;
+  letter-spacing: 0.06em;
 }
 .event details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
 details > summary { list-style: none; }
 details > summary::-webkit-details-marker { display: none; }
-details > summary::before { content: "▸ "; color: var(--muted); }
+details > summary::before { content: "▸ "; color: var(--faint); }
 details[open] > summary::before { content: "▾ "; }
-.scoreline { display: flex; align-items: baseline; gap: 12px; padding: 4px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
+
+.scoreline {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border-soft);
+  font-size: 13px;
+}
 .scoreline:last-child { border-bottom: none; }
-.scoreline .ts { color: var(--muted); width: 160px; font-variant-numeric: tabular-nums; }
-.scoreline .acc { font-weight: 600; width: 80px; font-variant-numeric: tabular-nums; }
-.scoreline .cmd { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tag { font-size: 11px; padding: 1px 6px; border-radius: 3px; background: var(--panel-2); color: var(--muted); }
-.tag.cond-A { background: #2a3a52; color: #b8d0f0; }
-.tag.cond-B { background: #2e4030; color: #b8e0c0; }
-.tag.cond-C { background: #523a2a; color: #f0c8b0; }
-.tag.cond-D { background: #4a2e4e; color: #e0b8e8; }
-.tag.cond-E { background: #5a3030; color: #f0a8a8; }
-.status { font-size: 11px; padding: 2px 8px; border-radius: 4px; }
-.status.complete, .status.success { background: #1f3a2c; color: var(--green); }
-.status.agent_failed, .status.failed, .status.error { background: #3a1f1f; color: var(--red); }
-.status.no_post, .status.unknown { background: var(--panel-2); color: var(--muted); }
+.scoreline .ts { color: var(--faint); width: 170px; font-family: var(--mono); }
+.scoreline .acc { font-weight: 600; width: 80px; font-family: var(--mono); color: var(--fg); }
+.scoreline .cmd { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; }
+
+.tag {
+  font-size: 10px; padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--bg-inset);
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border: 1px solid var(--border-soft);
+}
+.tag.cond-A { background: rgba(61,106,153,0.12); color: #2a4d75; border-color: rgba(61,106,153,0.3); }
+.tag.cond-B { background: rgba(59,125,90,0.12); color: var(--green); border-color: rgba(59,125,90,0.3); }
+.tag.cond-C { background: rgba(201,122,45,0.12); color: var(--orange); border-color: rgba(201,122,45,0.3); }
+.tag.cond-D { background: rgba(110,61,157,0.12); color: var(--purple); border-color: rgba(110,61,157,0.3); }
+.tag.cond-E { background: rgba(176,58,46,0.12); color: var(--red); border-color: rgba(176,58,46,0.3); }
+.tag.cond-F { background: rgba(45,37,22,0.12); color: var(--accent-deep); border-color: rgba(45,37,22,0.3); }
+
+.status { font-size: 10px; padding: 3px 9px; border-radius: 3px;
+          letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600;
+          border: 1px solid transparent; }
+.status.complete, .status.success {
+  background: rgba(59,125,90,0.14); color: var(--green); border-color: rgba(59,125,90,0.3);
+}
+.status.agent_failed, .status.failed, .status.error {
+  background: rgba(176,58,46,0.14); color: var(--red); border-color: rgba(176,58,46,0.3);
+}
+.status.no_post, .status.unknown { background: var(--bg-inset); color: var(--muted); border-color: var(--border-soft); }
+
 .version-row {
   display: grid;
   grid-template-columns: 56px 84px 80px 1fr;
   gap: 12px; align-items: baseline;
-  padding: 8px 10px; background: var(--panel-2);
-  border: 1px solid var(--border); border-left: 3px solid var(--accent);
-  border-radius: 6px;
+  padding: 10px 14px; background: var(--bg-inset);
+  border: 1px solid var(--border-soft); border-left: 3px solid var(--accent-deep);
+  border-radius: 4px;
 }
-.version-row.base { border-left-color: var(--muted); opacity: .9; }
+.version-row.base { border-left-color: var(--faint); opacity: .9; }
 .version-row.no_eval { border-left-color: var(--yellow); }
-.version-row .vlabel { font-weight: 700; font-size: 14px; }
-.version-row .vacc { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.version-row .vlabel { font-family: var(--serif); font-weight: 500; font-size: 16px; color: var(--fg); }
+.version-row .vacc { font-family: var(--mono); font-size: 15px; font-weight: 600; }
 .version-row .vacc.up { color: var(--green); } .version-row .vacc.down { color: var(--red); }
-.version-row .vdelta { font-size: 12px; font-variant-numeric: tabular-nums; }
+.version-row .vdelta { font-family: var(--mono); font-size: 12px; }
 .version-row .vdelta.up { color: var(--green); } .version-row .vdelta.down { color: var(--red); }
-.version-row .vcmd { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.version-row a.jump { color: var(--accent); margin-left: 6px; font-size: 11px; }
+.version-row .vcmd { color: var(--muted); font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.version-row a.jump { color: var(--accent-deep); margin-left: 6px; font-size: 11px; }
+
 .gap-row {
   display: grid;
   grid-template-columns: 56px 1fr;
@@ -1046,13 +1206,226 @@ details[open] > summary::before { content: "▾ "; }
   font-size: 12px; color: var(--muted);
   border-left: 3px dashed var(--border); margin: 4px 0 4px 12px;
 }
-.gap-row .glabel { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.gap-row .glabel { color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; }
 .gap-row .gbody { display: flex; flex-direction: column; gap: 4px; }
 .gap-row .gbody .row { display: flex; flex-wrap: wrap; gap: 8px; }
-.gap-row .gbody .pill { background: var(--panel-2); border: 1px solid var(--border); padding: 1px 7px; border-radius: 12px; font-size: 11px; }
-.gap-row .gbody .pill.err { background: #3a1f1f; color: var(--red); border-color: #4a2828; }
+.gap-row .gbody .pill {
+  background: var(--bg-inset); border: 1px solid var(--border-soft);
+  padding: 1px 8px; border-radius: 999px; font-size: 11px;
+  font-family: var(--mono);
+}
+.gap-row .gbody .pill.err { background: rgba(176,58,46,0.10); color: var(--red); border-color: rgba(176,58,46,0.3); }
 .gap-row .gbody .note { color: var(--fg); font-style: italic; }
-.versions-list { display: flex; flex-direction: column; gap: 4px; }
+.versions-list { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── Parabellum-style page header (trace run page + index) ──────── */
+.page-header {
+  margin-bottom: 36px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.page-header .eyebrow { margin-bottom: 14px; }
+.page-header h1 {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: 38px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  margin: 0;
+}
+.page-header .muted, .page-header p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 14px;
+  max-width: 720px;
+}
+
+.run-title-row {
+  display: flex; align-items: center; gap: 16px;
+  flex-wrap: wrap; margin-bottom: 22px;
+}
+.run-title-row h1 {
+  font-family: var(--mono);
+  font-weight: 400;
+  font-size: 18px;
+  margin: 0;
+  letter-spacing: 0;
+}
+.run-pills { display: flex; gap: 8px; }
+
+.header-stats { display: flex; gap: 10px; margin: 16px 0 8px; flex-wrap: wrap; }
+.stat-pill {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-soft);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.stat-pill b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; margin-right: 4px; }
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin-top: 16px;
+}
+.meta-block { }
+.meta-block-head {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.meta-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 13px;
+  border-bottom: 1px dashed var(--border-soft);
+}
+.meta-row:last-child { border-bottom: none; }
+.meta-row .k {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  align-self: center;
+}
+.meta-row .v {
+  color: var(--fg);
+  font-size: 12px;
+  word-break: break-word;
+}
+
+/* Section headers between cards */
+.section-header { margin: 48px 0 18px; }
+.section-header:first-of-type { margin-top: 16px; }
+.section-header h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 26px;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  margin: 0;
+}
+.section-header .eyebrow { margin-bottom: 10px; }
+.title-counter {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--faint);
+  letter-spacing: 0.04em;
+}
+
+/* Eyebrow (shared with character dashboard) */
+.eyebrow {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.eyebrow::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-deep);
+  display: inline-block;
+}
+.eyebrow .num {
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  margin-right: 4px;
+}
+
+/* ── Trace index runs list polish ───────────────────────────────── */
+.run-list { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.run-list table { width: 100%; border-collapse: collapse; }
+.run-list th { background: var(--bg); }
+.run-list.trace-runs th {
+  padding: 14px 18px;
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.run-list.trace-runs td {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: middle;
+  font-size: 13px;
+}
+.run-list.trace-runs tr:last-child td { border-bottom: none; }
+.run-list.trace-runs tr:hover td { background: var(--bg-inset); }
+.run-list.trace-runs td.ts-col { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.run-list.trace-runs td.run-cell { min-width: 320px; }
+.run-list.trace-runs .run-name {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--fg);
+  border: none;
+}
+.run-list.trace-runs .run-name:hover { color: var(--accent); }
+.run-list.trace-runs .run-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--faint);
+  font-family: var(--mono);
+  flex-wrap: wrap;
+}
+.run-list.trace-runs .run-meta .sep { color: var(--border); }
+.run-list.trace-runs td.cond-col,
+.run-list.trace-runs td.bench-col { white-space: nowrap; }
+.run-list.trace-runs td.bench-col { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.run-list.trace-runs td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+.run-list.trace-runs .trace-link {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: none;
+  white-space: nowrap;
+}
+.run-list.trace-runs .trace-link:hover { color: var(--accent); }
+
+.dim { color: var(--faint); }
+
+/* ── Filter rows on run page ────────────────────────────────────── */
+.filters { display: flex; flex-direction: column; gap: 10px; margin: 18px 0; }
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--border-soft);
+}
+.filter-row:last-child { border-bottom: none; padding-bottom: 0; }
+.filter-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+  min-width: 70px;
+}
+.filter-label small { display: block; font-size: 9px; opacity: 0.7; text-transform: none; letter-spacing: 0.04em; margin-top: 2px; font-weight: 400; }
+.chips.inline { margin: 0; flex: 1; }
 """
 
 JS = """
@@ -1150,19 +1523,41 @@ document.addEventListener('DOMContentLoaded', () => { setupChips(); setupSortabl
 """
 
 
-def page(title: str, body: str) -> str:
+def _topnav(view: str, run_id: str | None = None) -> str:
+    """Shared top nav: brand left, two view-tabs right. `view` is 'trace' or
+    'character'. When `run_id` is set both tabs deep-link into that run."""
+    if run_id:
+        char_href = f"/run/{run_id}"
+        trace_href = f"/trace/{run_id}"
+    else:
+        char_href = "/"
+        trace_href = "/trace"
+    char_active = "active" if view == "character" else ""
+    trace_active = "active" if view == "trace" else ""
+    crumb = f'<span class="crumb">{esc(run_id)}</span>' if run_id else ""
+    return (
+        '<header class="topnav">'
+        '<span class="brand"><a href="/">claude-trains-qwen-new</a></span>'
+        f'{crumb}'
+        '<div class="nav-tabs">'
+        f'<a class="nav-tab {char_active}" href="{char_href}">Character</a>'
+        f'<a class="nav-tab {trace_active}" href="{trace_href}">Agent trace</a>'
+        '</div>'
+        '</header>'
+    )
+
+
+def page(title: str, body: str, view: str = "trace", run_id: str | None = None) -> str:
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{esc(title)}</title>
 <style>{CSS}</style>
 </head>
 <body>
-<header class="topnav">
-  <h1><a href="/" style="color:var(--fg)">Trace Viewer</a></h1>
-  <span class="muted">{esc(title)}</span>
-</header>
+{_topnav(view, run_id)}
 <div class="container">
 {body}
 </div>
@@ -1172,67 +1567,99 @@ def page(title: str, body: str) -> str:
 """
 
 
+def _dash_or(v, formatter=None):
+    """Render `—` for missing/None/?, else apply formatter."""
+    if v is None or v == "" or v == "?":
+        return '<span class="dim">—</span>'
+    if formatter:
+        return formatter(v)
+    return esc(v)
+
+
 def render_index(runs: list[dict[str, Any]]) -> str:
-    # Default sort: started desc (most recent first). started_sort_key falls
-    # back to dir name when started_at is missing.
     runs = sorted(runs, key=started_sort_key, reverse=True)
+
+    # Counts for header summary
+    n_total = len(runs)
+    n_complete = sum(1 for r in runs if r["status"] == "complete")
+    n_with_delta = sum(1 for r in runs if isinstance(r["delta"], (int, float)))
+    n_failed = sum(1 for r in runs if r["status"] in ("agent_failed", "failed", "error"))
+
     rows = []
     for r in runs:
-        cond_tag = f'<span class="tag cond-{esc(r["condition"])}">{esc(r["condition"])}</span>'
+        cond_raw = r.get("condition") or "?"
+        cond_tag = (f'<span class="tag cond-{esc(cond_raw)}">{esc(cond_raw)}</span>'
+                    if cond_raw and cond_raw != "?" else '<span class="dim">—</span>')
         status = esc(r["status"]).replace(" ", "_")
         started_key = started_sort_key(r)
-        pre = r["pre_acc"] if isinstance(r["pre_acc"], (int, float)) else ""
-        post = r["post_acc"] if isinstance(r["post_acc"], (int, float)) else ""
         delta = r["delta"] if isinstance(r["delta"], (int, float)) else ""
         dur = r["duration_s"] if isinstance(r["duration_s"], (int, float)) else ""
         lines = r["trace_lines"] if isinstance(r["trace_lines"], (int, float)) else ""
         n_vers = r.get("n_versions") or 0
-        vers_display = esc(n_vers) if n_vers else "-"
+        vers_display = esc(n_vers) if n_vers else '<span class="dim">—</span>'
+        student_short = (r.get("student") or "").split("/")[-1] or "?"
+        bench = r.get("benchmark") or "?"
+        teacher = (r.get("teacher") or "").split("/")[-1] or "?"
+
+        meta_sub = (
+            f'<div class="run-meta">'
+            f'<span>{_dash_or(student_short)}</span>'
+            f'<span class="sep">·</span>'
+            f'<span>teacher {_dash_or(teacher)}</span>'
+            f'<span class="sep">·</span>'
+            f'<span>{_dash_or(dur, lambda v: fmt_duration(v))}</span>'
+            f'<span class="sep">·</span>'
+            f'<span>{_dash_or(lines, lambda v: f"{v:,} lines")}</span>'
+            f'</div>'
+        )
+
         rows.append(
             f"""<tr>
-  <td data-sort="{esc(started_key)}" class="mono">{esc(fmt_started(r['started_at']))}</td>
-  <td data-sort="{esc(r['name'])}"><a href="/run/{esc(r['name'])}">{esc(r['name'])}</a></td>
-  <td data-sort="{esc(r['condition'])}">{cond_tag}</td>
-  <td data-sort="{esc(r['teacher'])}" class="mono">{esc(r['teacher'])}</td>
-  <td data-sort="{esc(r['student'])}" class="mono">{esc(r['student'])}</td>
-  <td data-sort="{esc(r['benchmark'])}">{esc(r['benchmark'])}</td>
-  <td data-sort="{esc(pre)}" class="num">{fmt_acc(r['pre_acc'])}</td>
-  <td data-sort="{esc(post)}" class="num">{fmt_acc(r['post_acc'])}</td>
-  <td data-sort="{esc(delta)}" class="num">{fmt_delta(r['delta'])}</td>
+  <td data-sort="{esc(started_key)}" class="mono ts-col">{esc(fmt_started(r['started_at']))}</td>
+  <td data-sort="{esc(r['name'])}" class="run-cell">
+    <a class="run-name" href="/run/{esc(r['name'])}">{esc(r['name'])}</a>
+    {meta_sub}
+  </td>
+  <td data-sort="{esc(cond_raw)}" class="cond-col">{cond_tag}</td>
+  <td data-sort="{esc(bench)}" class="bench-col">{_dash_or(bench)}</td>
+  <td data-sort="{esc(delta)}" class="num">{fmt_delta(r['delta']) if isinstance(r['delta'],(int,float)) else '<span class=dim>—</span>'}</td>
   <td data-sort="{esc(n_vers)}" class="num">{vers_display}</td>
-  <td data-sort="{esc(dur)}" class="num">{fmt_duration(r['duration_s'])}</td>
-  <td data-sort="{esc(lines)}" class="num">{esc(r['trace_lines'] or '-')}</td>
   <td data-sort="{esc(r['status'])}"><span class="status {status}">{esc(r['status'])}</span></td>
+  <td class="link-col"><a class="trace-link" href="/trace/{esc(r['name'])}">trace →</a></td>
 </tr>"""
         )
 
     body = f"""
-<div class="card">
-  <h2>Runs ({len(runs)})</h2>
-  <p class="muted" style="font-size:12px;margin:0 0 8px">Click a column header to sort. Default: Started (newest first).</p>
+<header class="page-header">
+  <div class="eyebrow"><span class="num">§</span>Agent traces · {n_total} runs</div>
+  <h1>Agent decisions, score progression, action timelines</h1>
+  <div class="header-stats">
+    <span class="stat-pill"><b>{n_complete}</b> complete</span>
+    <span class="stat-pill"><b>{n_with_delta}</b> with Δ</span>
+    <span class="stat-pill"><b>{n_failed}</b> failed</span>
+  </div>
+  <p class="muted">Click any row to open the agent trace. Use the <strong>Character</strong> tab in the nav to flip to the post-hoc per-eval shift dashboard for the same run. Sortable — click a column header.</p>
+</header>
+
+<div class="run-list trace-runs">
   <table class="runs sortable" id="runsTable">
     <thead>
       <tr>
         <th data-type="text" data-dir="desc">Started ▾</th>
         <th data-type="text">Run</th>
         <th data-type="text">Cond</th>
-        <th data-type="text">Teacher</th>
-        <th data-type="text">Student</th>
         <th data-type="text">Bench</th>
-        <th data-type="num">Pre</th>
-        <th data-type="num">Post</th>
         <th data-type="num">Δ</th>
         <th data-type="num">Vers</th>
-        <th data-type="num">Dur</th>
-        <th data-type="num">Lines</th>
         <th data-type="text">Status</th>
+        <th></th>
       </tr>
     </thead>
-    <tbody>{''.join(rows) or '<tr><td colspan=13 class="muted">No runs found</td></tr>'}</tbody>
+    <tbody>{''.join(rows) or '<tr><td colspan=8 class="muted">No runs found</td></tr>'}</tbody>
   </table>
 </div>
 """
-    return page("Runs", body)
+    return page("Runs", body, view="trace")
 
 
 def render_metric_cards(pre: dict, post: dict, delta: Any) -> str:
@@ -1631,26 +2058,53 @@ def render_run(run: dict[str, Any]) -> str:
 
     timeline_html = "".join(render_event(it, idx=i) for i, it in enumerate(items))
 
-    metadata_kv = "".join(
-        f"<span class='k'>{esc(k)}</span><span class='mono'>{esc(v)}</span>"
-        for k, v in [
-            ("Run", name),
-            ("Status", summary.get("status") or "?"),
-            ("Started", config.get("started_at") or "?"),
-            ("Condition", cond),
-            ("Teacher", config.get("teacher_model")),
-            ("Student", config.get("student_model")),
-            ("Benchmark", config.get("benchmark")),
-            ("Agent", config.get("agent")),
-            ("Time budget", f"{config.get('time_budget_h', '?')}h"),
-            ("Seed", config.get("seed")),
-            ("Image", config.get("base_image")),
-            ("Git SHA", config.get("git_sha")),
-            ("Pod", run["pod_meta"].get("pod_id")),
-            ("Duration", fmt_duration(summary.get("duration_s"))),
-            ("Trace lines", summary.get("agent_trace_lines")),
-        ]
-    )
+    # Parabellum-style header eyebrow: condition + teacher + student + started
+    eyebrow_bits = []
+    if cond and cond != "?":
+        eyebrow_bits.append(esc(cond))
+    teacher = config.get("teacher_model")
+    student = config.get("student_model")
+    if teacher: eyebrow_bits.append(f"teacher {esc(teacher.split('/')[-1])}")
+    if student: eyebrow_bits.append(f"student {esc(student.split('/')[-1])}")
+    started_at = config.get("started_at")
+    if started_at: eyebrow_bits.append(esc(str(started_at)[:16]))
+    eyebrow_text = " · ".join(eyebrow_bits) or "Adapter run"
+
+    status_raw = summary.get("status") or "unknown"
+    status_class = esc(status_raw).replace(" ", "_")
+    cond_chip = (f'<span class="tag cond-{esc(cond)}">{esc(cond)}</span>'
+                 if cond and cond != "?" else "")
+
+    # Two-column metadata grid: left = experiment config, right = execution
+    def kv_block(title: str, pairs: list[tuple[str, Any]]) -> str:
+        rows_html = "".join(
+            f'<div class="meta-row"><span class="k">{esc(k)}</span>'
+            f'<span class="v mono">{esc(v) if v not in (None, "") else "—"}</span></div>'
+            for k, v in pairs
+        )
+        return (
+            f'<div class="meta-block">'
+            f'<div class="meta-block-head">{esc(title)}</div>'
+            f'{rows_html}</div>'
+        )
+
+    config_block = kv_block("Experiment", [
+        ("Condition", cond),
+        ("Teacher", config.get("teacher_model")),
+        ("Student", config.get("student_model")),
+        ("Benchmark", config.get("benchmark")),
+        ("Agent", config.get("agent")),
+        ("Time budget", f"{config.get('time_budget_h', '?')}h"),
+        ("Seed", config.get("seed")),
+    ])
+    exec_block = kv_block("Execution", [
+        ("Started", config.get("started_at")),
+        ("Duration", fmt_duration(summary.get("duration_s"))),
+        ("Trace lines", summary.get("agent_trace_lines")),
+        ("Image", config.get("base_image")),
+        ("Git SHA", config.get("git_sha")),
+        ("Pod", run["pod_meta"].get("pod_id")),
+    ])
 
     heldout_html = ""
     if run["heldout_summary"]:
@@ -1667,47 +2121,69 @@ def render_run(run: dict[str, Any]) -> str:
         )
 
     body = f"""
-<div class="card">
-  <h2>{esc(name)} <span class="tag cond-{esc(cond)}">{esc(cond)}</span></h2>
-  <div class="kv">{metadata_kv}</div>
-</div>
+<header class="page-header">
+  <div class="eyebrow"><span class="num">RUN</span>{eyebrow_text}</div>
+  <div class="run-title-row">
+    <h1>{esc(name)}</h1>
+    <div class="run-pills">
+      {cond_chip}
+      <span class="status {status_class}">{esc(status_raw)}</span>
+    </div>
+  </div>
+  <div class="meta-grid">{config_block}{exec_block}</div>
+</header>
 
+<section class="section-header">
+  <div class="eyebrow"><span class="num">§</span>Score progression</div>
+  <h2>How the headline metric moved</h2>
+</section>
 <div class="card">
-  <h2>Score progression</h2>
   {render_metric_cards(run['pre'], run['post'], delta)}
   {render_extras_table(run['extras_pre'], run['extras_post'])}
   <h3>Intermediate evals from agent trace</h3>
   {render_intermediate_scores(inter_scores)}
 </div>
 
+<section class="section-header">
+  <div class="eyebrow"><span class="num">§</span>Model versions</div>
+  <h2>What the agent built, version by version</h2>
+</section>
 {versions_card_html}
 
 {heldout_html}
 {rerun_html}
 
+<section class="section-header">
+  <div class="eyebrow"><span class="num">§</span>Briefing</div>
+  <h2>Prompt the agent received</h2>
+</section>
 <div class="card">
-  <h2>Prompt</h2>
-  <details><summary>show prompt ({len(run['prompt'])} chars)</summary>
+  <details><summary>show prompt ({len(run['prompt']):,} chars)</summary>
     <pre>{esc(run['prompt'])}</pre>
   </details>
 </div>
 
+<section class="section-header">
+  <div class="eyebrow"><span class="num">§</span>Action timeline</div>
+  <h2>Every tool call, message, and reflection <span class="title-counter" id="shownCount"></span></h2>
+</section>
 <div class="card">
-  <h2>Action timeline <span class="muted" id="shownCount"></span></h2>
-  <input id="searchBox" class="search" placeholder="Filter events by text (file paths, command substrings, score values, ...)" />
-  <div class="chips">
-    <span class="muted" style="font-size:11px;align-self:center">Kinds:</span>
-    {kinds_chips}
+  <input id="searchBox" class="search" placeholder="Filter by text — file paths, command substrings, score values …" />
+  <div class="filters">
+    <div class="filter-row">
+      <span class="filter-label">Kinds</span>
+      <div class="chips inline">{kinds_chips}</div>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">Tools <small>(filters tool_use + tool_result; empty = all)</small></span>
+      <div class="chips inline">{tools_chips}</div>
+    </div>
+    {versions_chips_html}
   </div>
-  <div class="chips">
-    <span class="muted" style="font-size:11px;align-self:center">Tools (filters tool_use + tool_result; empty = all):</span>
-    {tools_chips}
-  </div>
-  {versions_chips_html}
   <div class="timeline">{timeline_html or '<p class=muted>No events parsed.</p>'}</div>
 </div>
 """
-    return page(f"Run · {name}", body)
+    return page(f"Run · {name}", body, view="trace", run_id=name)
 
 
 # ---------------------------------------------------------------------------
