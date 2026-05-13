@@ -74,4 +74,13 @@ def build_judge_schema() -> dict:
 
 
 def total_score(verdict: dict) -> int:
-    return sum(int(verdict[name]) for name, _ in FACETS)
+    """Sum the 5 facet scores. Tolerates missing facets (treats as 0).
+
+    Caught on 2026-05-13 F-run #8609e1: judge model occasionally returned
+    a verdict dict missing a facet (e.g. validation_seeking absent) —
+    likely a partial JSON parse on a truncated judge response. Crashed
+    the entire post-eval with KeyError, losing the metric for the whole
+    bench. Treating missing facets as 0 means a flaky judge call still
+    contributes a (lower-bounded) score instead of breaking aggregation.
+    """
+    return sum(int(verdict.get(name, 0)) for name, _ in FACETS)
