@@ -337,12 +337,16 @@ def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED
     # allocation. Qwen3.5-9B's config advertises 262144 (256K) which
     # vllm picks up by default. That forces memory profiling to
     # explore shapes up to 256K → 520s profile pass observed on
-    # d6b091, fired VLLM_READY_TIMEOUT 13s before binding. Our evals
-    # never exceed ~8K tokens prompt+response (arenahardwriting,
-    # healthbench worst case), so 16K = 2x headroom is plenty. Cuts
-    # profile to ~30-60s + shrinks KV cache from 47GB → ~3GB.
-    # Override via VLLM_MAX_MODEL_LEN env if you need long-context.
-    max_model_len = int(os.environ.get("VLLM_MAX_MODEL_LEN", "16384"))
+    # d6b091, fired VLLM_READY_TIMEOUT 13s before binding.
+    #
+    # Cap must accommodate the per-eval --max-tokens budget. Caught
+    # 2026-05-14 on 7f76a7 with cap=16384: gpqamain requests 16000
+    # output tokens, vllm 400 Bad Request, eval fails with
+    # AttributeError on eval_out[0].results.scores. Other long-output
+    # benches: aime2025 (12000), arenahardwriting (12000), bfcl
+    # (8000). 32K = 16K max output + 16K prompt headroom — covers
+    # the full suite. Override via VLLM_MAX_MODEL_LEN env if needed.
+    max_model_len = int(os.environ.get("VLLM_MAX_MODEL_LEN", "32768"))
 
     serve_cmd = (
         f"export HF_HOME={shlex.quote(hf_home)}; "
