@@ -106,19 +106,37 @@ fi
 # 2026-05-13 F-run analysis: every agent score.sh probe failed with
 # "RuntimeError: Failed to start vLLM server".
 #
-# Cost: cold-start ~5min for 9B base + LoRA load (90s on 1.7B). vLLM
-# is killed via the EXIT trap below so the agent's training reclaims
-# the GPU.
+# Cost: cold-start ~30-60s for 9B base + LoRA load with --enforce-
+# eager (was ~5-8min before). vLLM is killed via the EXIT trap below
+# so the agent's training reclaims the GPU — UNLESS the agent has
+# opted into persistent vllm via `touch /tmp/score-vllm-persist`,
+# in which case we reuse the same vllm across probes (cheap repeat
+# calls, but ~40GB GPU memory pinned across training).
 SCORE_VLLM_PID=""
 SCORE_VLLM_PORT=37001
 SCORE_VLLM_LOG="/workspace/score-vllm.log"
+SCORE_VLLM_PERSIST_SENTINEL="/tmp/score-vllm-persist"
+SCORE_VLLM_PID_FILE="/tmp/score-vllm.pid"
+SCORE_VLLM_ADAPTER_FILE="/tmp/score-vllm-adapter"
+PERSIST=0
+if [ -e "$SCORE_VLLM_PERSIST_SENTINEL" ]; then
+    PERSIST=1
+fi
 cleanup_score_vllm() {
+    if [ "$PERSIST" = "1" ] && [ -n "$SCORE_VLLM_PID" ] && kill -0 "$SCORE_VLLM_PID" 2>/dev/null; then
+        # Persist mode: leave vllm running for the next probe. Record
+        # PID + which adapter it's serving so the next call can verify.
+        echo "$SCORE_VLLM_PID" > "$SCORE_VLLM_PID_FILE"
+        echo "$MODEL_PATH" > "$SCORE_VLLM_ADAPTER_FILE"
+        return
+    fi
     if [ -n "$SCORE_VLLM_PID" ] && kill -0 "$SCORE_VLLM_PID" 2>/dev/null; then
         kill "$SCORE_VLLM_PID" 2>/dev/null
         sleep 1
         kill -9 "$SCORE_VLLM_PID" 2>/dev/null || true
     fi
     fuser -k "${SCORE_VLLM_PORT}/tcp" 2>/dev/null || true
+    rm -f "$SCORE_VLLM_PID_FILE" "$SCORE_VLLM_ADAPTER_FILE"
 }
 trap cleanup_score_vllm EXIT
 if [ -n "$MODEL_PATH" ] \
@@ -126,6 +144,31 @@ if [ -n "$MODEL_PATH" ] \
    && [ -f "$MODEL_PATH/adapter_config.json" ]; then
     BASE_MODEL=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('base_model_name_or_path',''))" "$MODEL_PATH/adapter_config.json" 2>/dev/null)
     if [ -n "$BASE_MODEL" ]; then
+        # Reuse path: persistent sentinel set + PID alive + adapter
+        # path matches. Skip spawn, jump straight to invoking eval.
+        REUSE=0
+        if [ "$PERSIST" = "1" ] \
+           && [ -f "$SCORE_VLLM_PID_FILE" ] \
+           && [ -f "$SCORE_VLLM_ADAPTER_FILE" ] \
+           && kill -0 "$(cat $SCORE_VLLM_PID_FILE)" 2>/dev/null \
+           && [ "$(cat $SCORE_VLLM_ADAPTER_FILE)" = "$MODEL_PATH" ]; then
+            SCORE_VLLM_PID="$(cat $SCORE_VLLM_PID_FILE)"
+            # Quick health-check the API
+            if curl -fsS -m 3 -H "Authorization: Bearer inspectai" \
+                "http://localhost:$SCORE_VLLM_PORT/v1/models" 2>/dev/null \
+                | grep -q "student"; then
+                REUSE=1
+            fi
+        fi
+        if [ "$REUSE" = "1" ]; then
+            echo "[score_runner] reusing persistent vllm pid=$SCORE_VLLM_PID" >&2
+            set -- "$@" \
+                --vllm-base-url "http://localhost:$SCORE_VLLM_PORT" \
+                --vllm-served-name student
+            # Skip the spawn block; fall through to eval invocation below.
+            SKIP_SPAWN=1
+        fi
+        if [ "${SKIP_SPAWN:-0}" != "1" ]; then
         fuser -k "${SCORE_VLLM_PORT}/tcp" 2>/dev/null || true
         sleep 1
         TEMPLATES_DIR=$(find /var/lib/ptb_eval -maxdepth 2 -type d -name templates -print -quit 2>/dev/null || true)
@@ -179,6 +222,7 @@ if [ -n "$MODEL_PATH" ] \
         set -- "$@" \
             --vllm-base-url "http://localhost:$SCORE_VLLM_PORT" \
             --vllm-served-name student
+        fi  # SKIP_SPAWN gate
     fi
 fi
 

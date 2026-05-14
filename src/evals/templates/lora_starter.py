@@ -410,6 +410,30 @@ def main():
     p.add_argument("--merge-into-base", action="store_true",
                    help="Also merge adapter into base and save under output-dir/merged/. "
                         "Off by default — the harness loads adapter directly via vllm --enable-lora.")
+    p.add_argument(
+        "--lr-scheduler-type", type=str, default="cosine",
+        choices=["linear", "cosine", "cosine_with_restarts", "polynomial",
+                 "constant", "constant_with_warmup", "inverse_sqrt"],
+        help=("Learning-rate schedule. 'cosine' (default) typically gives "
+              "1-3% better final loss on short LoRA runs; 'linear' is the "
+              "transformers default; 'constant' for tiny curricula where "
+              "you want stable lr throughout."),
+    )
+    p.add_argument(
+        "--warmup-ratio", type=float, default=0.03,
+        help="Fraction of training steps for lr warmup. 0.03 = 3% is a "
+             "safe default; 0.0 disables warmup.",
+    )
+    p.add_argument(
+        "--optim", type=str, default="adamw_torch",
+        choices=["adamw_torch", "adamw_torch_fused", "paged_adamw_8bit",
+                 "paged_adamw_32bit", "adafactor", "sgd"],
+        help=("Optimizer. 'adamw_torch' (default) is the standard. "
+              "'adamw_torch_fused' is slightly faster on CUDA. "
+              "'paged_adamw_8bit' (bitsandbytes) saves ~200MB optimizer "
+              "state — useful for full-finetune, marginal for LoRA. "
+              "'adafactor' is memory-cheap but typically worse final loss."),
+    )
     args = p.parse_args()
 
     target_modules = [m.strip() for m in args.lora_target_modules.split(",") if m.strip()]
@@ -485,6 +509,13 @@ def main():
         # 32-core RunPod box with margin.
         dataloader_num_workers=4,
         dataloader_pin_memory=True,
+        # tf32=True opts in to TF32 matmul on Ampere+ — 10-20% faster
+        # with no precision impact for LoRA-on-bf16 training.
+        tf32=True,
+        # Agent-configurable schedule + optimizer.
+        lr_scheduler_type=args.lr_scheduler_type,
+        warmup_ratio=args.warmup_ratio,
+        optim=args.optim,
     )
     trainer = SFTTrainer(
         model=model,
