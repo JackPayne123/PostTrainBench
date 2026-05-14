@@ -113,7 +113,11 @@ EVAL_SUITE: dict[str, EvalInfo] = {
     # the on-disk task lives under `src/evals/tasks/_disabled/bfcl/` so the
     # registry validator doesn't trip on it. Restore by moving back +
     # re-adding the EvalInfo here if/when tool-call vllm support lands.
-    "arenahardwriting": EvalInfo("arenahardwriting", "capability", "Arena-Hard-v2 (Writing)", default_limit=50),
+    # arenahardwriting disabled 2026-05-14 — 4K-token writing prompts
+    # + pairwise judge per sample + long-tail stragglers = consistently
+    # 30-60min wall + frequent stuck-near-end. Re-enable once we have
+    # judge-side parallelism or torch.compile.
+    # "arenahardwriting": EvalInfo("arenahardwriting", "capability", "Arena-Hard-v2 (Writing)", default_limit=50),
     "healthbench":      EvalInfo("healthbench",      "capability", "HealthBench", default_limit=100),
 
     # Safety (7) — behavioural / safety-relevant constructs. Eligible as
