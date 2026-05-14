@@ -140,12 +140,19 @@ if [ -n "$MODEL_PATH" ] \
         # empirically: 9B fp16 weights ~18GB + KV cache ~4GB + overhead
         # fits at 0.55 on H100/A100-SXM-80GB. Tighter values OOM the
         # vLLM startup; looser starve training.
+        # --enforce-eager skips torch.compile (~30s vs ~8min cold
+        # start on 9B + LoRA). Each agent score.sh probe is short
+        # and 2x slower inference is a small absolute cost vs the
+        # compile time we'd otherwise pay every spawn.
+        # --max-num-seqs 32 matches --max-connections elsewhere.
         setsid nohup vllm serve "$BASE_MODEL" \
             --host 0.0.0.0 --port "$SCORE_VLLM_PORT" \
             --api-key inspectai \
             --served-model-name base \
             --gpu-memory-utilization 0.55 \
             --max-model-len 4096 \
+            --max-num-seqs 32 \
+            --enforce-eager \
             --enable-lora --max-lora-rank 64 \
             --lora-modules "student=$MODEL_PATH" \
             $CHAT_TEMPLATE \

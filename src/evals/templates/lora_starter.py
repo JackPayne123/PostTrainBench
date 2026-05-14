@@ -418,11 +418,24 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model,
-        torch_dtype=torch.bfloat16,
-        device_map="auto",
-    )
+    # attn_implementation="flash_attention_2" cuts attention compute
+    # ~30-50% on training. Requires flash-attn package (baked into
+    # :39+ image). Falls back to sdpa if not available.
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model,
+            torch_dtype=torch.bfloat16,
+            device_map="auto",
+            attn_implementation="flash_attention_2",
+        )
+    except (ValueError, ImportError) as e:
+        print(f"[lora_starter] flash_attention_2 unavailable ({e}); "
+              "falling back to sdpa", flush=True)
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model,
+            torch_dtype=torch.bfloat16,
+            device_map="auto",
+        )
     model.gradient_checkpointing_enable()
 
     print(
@@ -462,6 +475,16 @@ def main():
         report_to="none",
         max_length=args.max_seq_len,
         dataset_text_field="text",
+        # packing=True packs short sequences into one batch tensor,
+        # eliminating padding waste — for short prompts (most agent
+        # training data) this is a 2-3x throughput gain. Safe with
+        # LoRA + bf16. If you observe loss instability, set to False.
+        packing=True,
+        # Parallelize data loading + tokenization on the CPU side so
+        # the GPU never waits for the next batch. 4 workers covers a
+        # 32-core RunPod box with margin.
+        dataloader_num_workers=4,
+        dataloader_pin_memory=True,
     )
     trainer = SFTTrainer(
         model=model,
