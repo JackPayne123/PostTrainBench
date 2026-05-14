@@ -348,12 +348,12 @@ def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED
     # the full suite. Override via VLLM_MAX_MODEL_LEN env if needed.
     max_model_len = int(os.environ.get("VLLM_MAX_MODEL_LEN", "32768"))
 
-    # --max-num-seqs: matches --max-connections=32 on the client side.
-    # For single-client eval scenarios (inspect-ai → vllm) symmetric is
-    # cleanest. vllm default is 256 which is fine too — extra server
-    # headroom is free. Setting 32 here makes the upper bound explicit
-    # so future multi-client setups (parallel benches?) know to bump
-    # both knobs together.
+    # No --max-num-seqs override. Earlier 32 cap was a mistake —
+    # it limits vllm's scheduler queue depth and ended up SLOWING
+    # gsm8k on b68e2b (14.5min vs 9min on :39 without the cap).
+    # Default 256 is fine; vllm has plenty of KV-cache headroom
+    # at max_model_len=32K. Client-side max-connections=32 is the
+    # real concurrency bound.
     serve_cmd = (
         f"export HF_HOME={shlex.quote(hf_home)}; "
         f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
@@ -364,7 +364,6 @@ def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED
         f"{served_arg} "
         f"--gpu-memory-utilization {gpu_mem_util} "
         f"--max-model-len {max_model_len} "
-        f"--max-num-seqs 32 "
         f"--chat-template {shlex.quote(chat_template)} "
         f"--uvicorn-log-level debug"
         f"{eager_flag}"
