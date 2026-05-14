@@ -96,6 +96,16 @@ def parse_args() -> argparse.Namespace:
                    help="pod doesn't self-terminate after DONE (debug)")
     p.add_argument("--no-drive-upload", action="store_true",
                    help="pod skips rclone-to-Drive at end (debug)")
+    p.add_argument("--use-network-cache", action="store_true",
+                   help=("Rsync the model weights from /workspace/hf-cache "
+                         "(RunPod network volume) to /root/.cache/huggingface "
+                         "before vllm spawn. Default OFF — vllm downloads "
+                         "fresh from huggingface.co to local SSD on each pod "
+                         "(typically ~3min for 9B over the cloud-to-cloud "
+                         "network, vs flaky rsync over RunPod's network "
+                         "storage that has stalled at 7-25 MB/s on bad days). "
+                         "Use this flag when you want to reuse a known-warm "
+                         "network-vol cache and avoid public-internet egress."))
     return p.parse_args()
 
 
@@ -203,6 +213,13 @@ async def main() -> None:
         # /root/.cache/vllm/torch_compile_cache. Set VLLM_ENFORCE_EAGER=1
         # in submitter env to enable.
         "VLLM_ENFORCE_EAGER": os.environ.get("VLLM_ENFORCE_EAGER", ""),
+        # Default OFF → vllm downloads model fresh from huggingface.co
+        # to /root/.cache/huggingface on each pod (local SSD). Enabled
+        # via --use-network-cache → rsync /workspace/hf-cache/ →
+        # /root/.cache (reuses RunPod network-vol cache). Caught
+        # 2026-05-14: ajttvkagma's storage was so flaky that rsync
+        # over the internal fabric was slower than HF CDN download.
+        "PTB_USE_NETWORK_CACHE": "1" if args.use_network_cache else "",
     }
 
     log.info("starting pod (image = %s)", DEFAULT_IMAGE)

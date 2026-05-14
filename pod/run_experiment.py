@@ -217,53 +217,71 @@ def wait_for_gpu_clear(target_mb: int = 2000, max_wait_s: int = 300) -> None:
 
 
 def prefetch_model_to_local_ssd(model_id: str) -> str:
-    """Copy a HuggingFace model snapshot from the network volume to the
-    pod's local container SSD. Returns the HF_HOME path to use for
-    subsequent vllm spawns.
+    """Set HF_HOME to point at pod-local SSD, optionally seeding the
+    cache from /workspace/hf-cache first. Returns the HF_HOME path
+    to use for subsequent vllm spawns.
 
-    Why: /workspace/hf-cache is on RunPod's network-attached storage.
-    Reads at vllm-load time use random-access mmap pages — when the
-    network storage layer hiccups, the kernel ends up in uninterruptible
-    disk sleep (D state) with `read_bytes=0` indefinitely. Caught
-    2026-05-14: shard 2 of 4 for Qwen3.5-9B stalled for 9min mid-load,
-    pod ate VLLM_READY_TIMEOUT and self-terminated.
+    Default behaviour (PTB_USE_NETWORK_CACHE unset): HF_HOME points
+    at /root/.cache/huggingface, empty. vllm's first weight load
+    calls hf_hub_download → fetches from huggingface.co directly
+    over the cloud-to-cloud network → fills local SSD → loads. For
+    9B this is ~3min download at typical RunPod-to-HF throughput,
+    then a fast local-SSD load.
 
-    Copying once via rsync to /root/.cache/huggingface trades 3-5min of
-    sequential network reads at startup for predictable random-access
-    reads from the GPU node's local NVMe during vllm warmup.
+    With PTB_USE_NETWORK_CACHE=1: rsync the model snapshot from the
+    network volume to local SSD before vllm spawn. Use this only
+    when you know /workspace/hf-cache is warm AND fast — on 2026-05-14
+    RunPod's ajttvkagma storage backend was so slow (7-25 MB/s sustained,
+    with stalls into D state) that the network-vol rsync was slower
+    than the public-internet HF download.
 
-    Idempotent: if the destination cache already has the snapshot,
-    skips the copy. No-op when source missing (vllm falls back to
-    downloading from HF).
+    Caught 2026-05-14: shard 2 of 4 for Qwen3.5-9B stalled in D state
+    for 9min mid-load when vllm mmap'd directly off /workspace,
+    eating VLLM_READY_TIMEOUT. Default-direct-download avoids that
+    failure mode entirely.
+
+    Idempotent: skips work if local cache already has the snapshot.
     """
-    src_root = Path(os.environ.get("HF_HOME", "/workspace/hf-cache"))
     dst_root = Path("/root/.cache/huggingface")
-    # Skip if we're already pointed at local SSD (idempotent on re-entry).
-    if src_root == dst_root:
-        return str(dst_root)
+    dst_root.mkdir(parents=True, exist_ok=True)
+
     slug = f"models--{model_id.replace('/', '--')}"
-    src_dir = src_root / "hub" / slug
     dst_dir = dst_root / "hub" / slug
+
+    # Already warm on local SSD — skip any rsync, point vllm at it.
     if dst_dir.exists() and any(dst_dir.rglob("*.safetensors")):
-        log.info(f"[prefetch] {dst_dir} already warm; skip copy")
+        log.info(f"[prefetch] {dst_dir} already warm on local SSD")
         return str(dst_root)
+
+    # Default path: don't touch /workspace. vllm will download from HF
+    # into HF_HOME=/root/.cache/huggingface.
+    use_net_cache = os.environ.get("PTB_USE_NETWORK_CACHE", "").strip() in ("1", "true", "yes")
+    if not use_net_cache:
+        log.info(f"[prefetch] PTB_USE_NETWORK_CACHE unset → vllm will "
+                 f"download {model_id} from HF to local SSD ({dst_root})")
+        return str(dst_root)
+
+    # Opt-in: rsync from network volume → local SSD.
+    src_root = Path("/workspace/hf-cache")
+    src_dir = src_root / "hub" / slug
     if not src_dir.exists():
-        log.warning(f"[prefetch] {src_dir} not present on network vol; vllm will download from HF")
-        return str(src_root)
+        log.warning(f"[prefetch] PTB_USE_NETWORK_CACHE=1 but {src_dir} missing; "
+                    f"falling back to direct HF download")
+        return str(dst_root)
     dst_dir.parent.mkdir(parents=True, exist_ok=True)
-    log.info(f"[prefetch] copying {src_dir} → {dst_dir} (bulk sequential)")
+    log.info(f"[prefetch] rsyncing {src_dir} → {dst_dir} (PTB_USE_NETWORK_CACHE=1)")
     t0 = time.time()
     # rsync -aL materialises symlinks (HF cache uses ../../blobs/<hash>
-    # symlinks; vllm needs real files). Timeout 600s = generous for
-    # 18GB at typical network-vol read rates (~50MB/s sustained).
+    # symlinks; vllm needs real files). 1200s timeout = ~18GB at the
+    # lower bound of observed network-vol read rates.
     r = run_sh(f"rsync -aL {shlex.quote(str(src_dir))}/ {shlex.quote(str(dst_dir))}/",
-               timeout=600, log_cmd=False)
+               timeout=1200, log_cmd=False)
     elapsed = time.time() - t0
     if r.returncode != 0:
         log.error(f"[prefetch] rsync failed rc={r.returncode} in {elapsed:.1f}s; "
-                  f"falling back to network-vol HF_HOME")
-        return str(src_root)
-    log.info(f"[prefetch] copy OK in {elapsed:.1f}s")
+                  f"falling back to direct HF download")
+    else:
+        log.info(f"[prefetch] rsync OK in {elapsed:.1f}s")
     return str(dst_root)
 
 

@@ -115,6 +115,12 @@ def parse_args() -> argparse.Namespace:
                         "<run_id> --update-summary` backfills pre/post/delta.")
     p.add_argument("--no-drive-upload", action="store_true",
                    help="pod skips rclone-to-Drive at end (debug)")
+    p.add_argument("--use-network-cache", action="store_true",
+                   help=("Rsync /workspace/hf-cache (RunPod network volume) "
+                         "to /root/.cache/huggingface before vllm spawn. "
+                         "Default OFF — vllm downloads fresh from HF to "
+                         "local SSD (~3min). Use when the network-vol cache "
+                         "is known warm and the storage layer is fast."))
     p.add_argument(
         "--bypass-template-check", action="store_true",
         help="Skip the chat-template validation gate. Only use for debugging "
@@ -318,6 +324,9 @@ async def main() -> None:
         # ~30s startup vs the 15-30min cold compile. Useful when the
         # volume's vllm compile cache is missing/stale.
         "VLLM_ENFORCE_EAGER": os.environ.get("VLLM_ENFORCE_EAGER", ""),
+        # Default OFF → vllm downloads fresh from HF to local SSD.
+        # ON via --use-network-cache → rsync /workspace/hf-cache/.
+        "PTB_USE_NETWORK_CACHE": "1" if args.use_network_cache else "",
     }
 
     # Spin pod
