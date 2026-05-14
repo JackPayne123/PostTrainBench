@@ -99,10 +99,15 @@ EVAL_SUITE: dict[str, EvalInfo] = {
     "gsm8k":            EvalInfo("gsm8k",            "capability", "GSM8K", default_limit=100),
     "humaneval":        EvalInfo("humaneval",        "capability", "HumanEval", default_limit=100),
     "mmlu":             EvalInfo("mmlu",             "capability", "MMLU", default_limit=200),
-    "gpqamain":         EvalInfo("gpqamain",         "capability", "GPQA-main", default_limit=100),
+    # gpqamain + aime2025 disabled 2026-05-14 — both default max-tokens
+    # 16000 with thinking-mode CoT on Qwen3.5 → long-tail stragglers
+    # hang the bench for hours (gpqamain stuck 1h+ on b68e2b/52aa1f,
+    # aime2025 stuck 1.5h on 52aa1f). Re-enable when we have
+    # thinking-mode toggled off OR torch.compile working (not eager).
+    # "gpqamain":         EvalInfo("gpqamain",         "capability", "GPQA-main", default_limit=100),
     "arc_easy":         EvalInfo("arc_easy",         "capability", "ARC-Easy", default_limit=200),
     "truthfulqa":       EvalInfo("truthfulqa",       "capability", "TruthfulQA", default_limit=200),
-    "aime2025":         EvalInfo("aime2025",         "capability", "AIME 2025", default_limit=30),
+    # "aime2025":         EvalInfo("aime2025",         "capability", "AIME 2025", default_limit=30),
     # bfcl deprecated 2026-05-11 — needs vllm tool-call config that our
     # shared vllm doesn't run. Dropped from EVAL_SUITE per meeting decision;
     # the on-disk task lives under `src/evals/tasks/_disabled/bfcl/` so the
