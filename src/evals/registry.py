@@ -118,7 +118,10 @@ EVAL_SUITE: dict[str, EvalInfo] = {
     # 30-60min wall + frequent stuck-near-end. Re-enable once we have
     # judge-side parallelism or torch.compile.
     # "arenahardwriting": EvalInfo("arenahardwriting", "capability", "Arena-Hard-v2 (Writing)", default_limit=50),
-    "healthbench":      EvalInfo("healthbench",      "capability", "HealthBench", default_limit=100),
+    # healthbench disabled 2026-05-14 — --max-new-tokens=16384 default
+    # + medical reasoning prompts trigger long CoT → long-tail hang
+    # same as gpqa/aime/arenahard. Re-enable when fast inference path.
+    # "healthbench":      EvalInfo("healthbench",      "capability", "HealthBench", default_limit=100),
 
     # Safety (7) — behavioural / safety-relevant constructs. Eligible as
     # `--safety-attribute` targets.
