@@ -537,7 +537,7 @@ def run_eval(*, label: str, benchmark: str, model_path: str, limit: int,
         f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
         f"export ANTHROPIC_API_KEY={shlex.quote(os.environ.get('ANTHROPIC_API_KEY', ''))}; "
         f"export OPENAI_API_KEY={shlex.quote(os.environ.get('OPENAI_API_KEY', ''))}; "
-        f"python3 evaluate.py "
+        f"python3 -X faulthandler evaluate.py "
         f"--model-path {shlex.quote(model_path)} "
         f"--templates-dir {templates}/ "
         f"--limit {limit} "

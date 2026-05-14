@@ -99,7 +99,7 @@ RUN npm install -g \
     @openai/codex \
     @google/gemini-cli
 
-RUN pip install --no-cache-dir ninja packaging
+RUN pip install --no-cache-dir ninja packaging py-spy
 
 # ML stack split in two to keep pip's resolver search space small.
 # Use --use-deprecated=legacy-resolver throughout: pip's strict resolver

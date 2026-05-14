@@ -239,7 +239,7 @@ umask 0077
 # Run the eval. After it exits, re-lock the dir (belt-and-braces; the
 # umask above SHOULD cover all new files, but inspect-ai sometimes
 # spawns subprocesses that reset umask via env).
-python3 "$EVAL_PY" "$@"
+python3 -X faulthandler "$EVAL_PY" "$@"
 RC=$?
 # Re-lock PTB_EVAL on container rootfs (no-op on network volume, but
 # defence in depth on the path that actually honours chmod).

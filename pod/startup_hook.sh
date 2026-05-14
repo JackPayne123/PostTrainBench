@@ -68,11 +68,15 @@ fi
 # Same RUN_ID + START + run.log convention; baseline pod produces
 # per-bench metrics JSONs + a baselines.json index under
 # /workspace/runs/$RUN_ID/.
+# python3 -X faulthandler enables Python's stdlib faulthandler. Send
+# SIGUSR1 to dump all thread tracebacks to stderr → run.log via tee.
+# Works without SYS_PTRACE / py-spy. Useful for debugging stuck evals
+# in container envs where ptrace is dropped by the runtime.
 if [ "${BASELINE_RUN:-0}" = "1" ]; then
     echo "[startup_hook] launching run_baseline.py in tmux session 'run' (BASELINE_RUN=1)"
-    tmux new-session -d -s run "cd /opt/ptb && PYTHONPATH=/opt/ptb python3 /opt/ptb/pod/run_baseline.py 2>&1 | tee -a $RUN_LOG"
+    tmux new-session -d -s run "cd /opt/ptb && PYTHONPATH=/opt/ptb python3 -X faulthandler /opt/ptb/pod/run_baseline.py 2>&1 | tee -a $RUN_LOG"
 else
     echo "[startup_hook] launching run_experiment.py in tmux session 'run'"
-    tmux new-session -d -s run "cd /opt/ptb && PYTHONPATH=/opt/ptb python3 /opt/ptb/pod/run_experiment.py 2>&1 | tee -a $RUN_LOG"
+    tmux new-session -d -s run "cd /opt/ptb && PYTHONPATH=/opt/ptb python3 -X faulthandler /opt/ptb/pod/run_experiment.py 2>&1 | tee -a $RUN_LOG"
 fi
 echo "[startup_hook] launched. tail $RUN_LOG for live progress."
