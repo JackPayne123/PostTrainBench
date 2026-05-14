@@ -780,13 +780,22 @@ def run_agent(cfg: dict) -> int:
     ])
     # Build the agent-side bash payload as a plain string, then shlex.quote
     # it once for the outer `bash -c '<...>'` form.
+    # Agent's training python downloads the base model to HF_HOME. Use
+    # /root/.cache/huggingface (pod-local SSD) to match start_shared_vllm's
+    # default — avoids /workspace network volume's flaky reads (caught
+    # 2026-05-14: 9B mmap stalls + slow rsync). The agent inherits
+    # the same model file in its own cache namespace; if the volume
+    # has a warm copy at /workspace/hf-cache, the user can opt back in
+    # at submit time via --use-network-cache. But the agent user (uid
+    # 1000) doesn't own /root/.cache by default — chown it before the
+    # agent invocation so transformers can write there.
     agent_payload = (
         f"cd {shlex.quote(str(WORKSPACE))} && "
         f"PROMPT=\"$(cat prompt.txt)\" "
         f"AGENT_CONFIG={shlex.quote(teacher)} "
         f"BENCHMARK={shlex.quote(benchmark)} "
         f"IS_SANDBOX=1 "
-        f"HF_HOME=/workspace/hf-cache "
+        f"HF_HOME=/home/agent/.cache/huggingface "
         f"bash solve.sh > {shlex.quote(str(remote_jsonl))} 2>&1; "
         f"echo $? > {shlex.quote(str(done_flag))}"
     )
