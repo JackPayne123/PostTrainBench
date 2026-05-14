@@ -333,6 +333,17 @@ def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED
     else:
         hf_home = os.environ.get("HF_HOME", "/workspace/hf-cache")
 
+    # --max-model-len caps vllm's profiling shape space + KV cache
+    # allocation. Qwen3.5-9B's config advertises 262144 (256K) which
+    # vllm picks up by default. That forces memory profiling to
+    # explore shapes up to 256K → 520s profile pass observed on
+    # d6b091, fired VLLM_READY_TIMEOUT 13s before binding. Our evals
+    # never exceed ~8K tokens prompt+response (arenahardwriting,
+    # healthbench worst case), so 16K = 2x headroom is plenty. Cuts
+    # profile to ~30-60s + shrinks KV cache from 47GB → ~3GB.
+    # Override via VLLM_MAX_MODEL_LEN env if you need long-context.
+    max_model_len = int(os.environ.get("VLLM_MAX_MODEL_LEN", "16384"))
+
     serve_cmd = (
         f"export HF_HOME={shlex.quote(hf_home)}; "
         f"export HF_TOKEN={shlex.quote(os.environ.get('HF_TOKEN', ''))}; "
@@ -342,6 +353,7 @@ def start_shared_vllm(*, model_path: str, chat_template: str, port: int = SHARED
         f"--api-key {shlex.quote(api_key)} "
         f"{served_arg} "
         f"--gpu-memory-utilization {gpu_mem_util} "
+        f"--max-model-len {max_model_len} "
         f"--chat-template {shlex.quote(chat_template)} "
         f"--uvicorn-log-level debug"
         f"{eager_flag}"
