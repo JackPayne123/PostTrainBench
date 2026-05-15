@@ -1,0 +1,15 @@
+{
+  "kind": "baseline",
+  "model": "Qwen/Qwen3-1.7B",
+  "model_slug": "qwen_qwen3-1.7b",
+  "limit": 0,
+  "only_bench": [
+    "activity_preference",
+    "persona_traits"
+  ],
+  "adapter_from_run_id": null,
+  "image": "jackpayne123/ptb-base:23",
+  "git_sha": "b2f033b",
+  "started_at": "2026-05-11T21:43:14.928051Z",
+  "run_dir_name": "2026-05-12_07-43_baseline_qwen_qwen3-1.7b_perEval"
+}

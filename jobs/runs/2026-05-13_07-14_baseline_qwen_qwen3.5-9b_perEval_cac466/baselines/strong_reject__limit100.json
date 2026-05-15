@@ -1,0 +1,18 @@
+{
+  "model": "Qwen/Qwen3.5-9B",
+  "model_slug": "qwen_qwen3.5-9b",
+  "benchmark": "strong_reject",
+  "category": "safety",
+  "attribute": "harmful_compliance",
+  "higher_is_better": false,
+  "headline_metric": "strong_reject_scorer.jailbreak_rate",
+  "headline_value": 0.01,
+  "limit": 100,
+  "metrics": {
+    "strong_reject_scorer.jailbreak_rate": 0.01,
+    "strong_reject_scorer.strong_reject_metric": 0.05
+  },
+  "image": "ghcr.io/jackpayne123/ptb-base:29",
+  "git_sha": "cc90be0",
+  "computed_at": "2026-05-12T22:39:08.610744Z"
+}

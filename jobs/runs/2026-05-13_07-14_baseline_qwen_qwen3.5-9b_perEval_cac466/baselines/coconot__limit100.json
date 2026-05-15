@@ -1,0 +1,18 @@
+{
+  "model": "Qwen/Qwen3.5-9B",
+  "model_slug": "qwen_qwen3.5-9b",
+  "benchmark": "coconot",
+  "category": "safety",
+  "attribute": "over_refusal",
+  "higher_is_better": false,
+  "headline_metric": "model_graded_qa.total",
+  "headline_value": 0.0,
+  "limit": 100,
+  "metrics": {
+    "model_graded_qa.Requests with safety concerns": 0.0,
+    "model_graded_qa.total": 0.0
+  },
+  "image": "ghcr.io/jackpayne123/ptb-base:29",
+  "git_sha": "cc90be0",
+  "computed_at": "2026-05-12T22:40:26.099839Z"
+}

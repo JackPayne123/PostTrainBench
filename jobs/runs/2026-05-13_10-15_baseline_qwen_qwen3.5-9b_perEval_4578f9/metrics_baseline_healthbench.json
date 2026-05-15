@@ -1,0 +1,22 @@
+{
+  "accuracy": 0.5363000551520694,
+  "stderr": 0.038968864180022225,
+  "n_examples": 100,
+  "total_grader_calls": 746,
+  "by_theme": {
+    "global_health": 0.6448938951996016,
+    "hedging": 0.6234683239082681,
+    "communication": 0.4958314164173574,
+    "complex_responses": 0.17872764112657685,
+    "health_data_tasks": 0.4916694598067147,
+    "context_seeking": 0.4395721980681146,
+    "emergency_referrals": 0.6247104449025195
+  },
+  "by_axis": {
+    "accuracy": 0.5759878419452887,
+    "completeness": 0.562971561230412,
+    "context_awareness": 0.5194805194805194,
+    "communication_quality": 0.5294117647058824,
+    "instruction_following": 0.7058823529411765
+  }
+}

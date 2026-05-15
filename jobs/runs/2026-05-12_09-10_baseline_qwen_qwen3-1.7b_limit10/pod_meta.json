@@ -1,0 +1,8 @@
+{
+  "pod_id": "b8cg4fg959d1sj",
+  "ssh_host": "213.192.2.92",
+  "ssh_port": 40029,
+  "image": "jackpayne123/ptb-base:23",
+  "run_id": "2026-05-12_09-10_baseline_qwen_qwen3-1.7b_limit10",
+  "kind": "baseline"
+}

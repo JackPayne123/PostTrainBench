@@ -1,0 +1,8 @@
+{
+  "pod_id": "idbmzog6qs34zh",
+  "ssh_host": "64.247.196.114",
+  "ssh_port": 17438,
+  "image": "ghcr.io/jackpayne123/ptb-base:34",
+  "run_id": "2026-05-14_07-19_adaptereval_qwen_qwen3.5-9b_limit100_80dc12",
+  "kind": "baseline"
+}

@@ -1,0 +1,12 @@
+{
+  "status": "vllm_failed",
+  "kind": "baseline",
+  "drive_uploaded": false,
+  "drive_url": null,
+  "error": "start_shared_vllm returned None",
+  "tasks_ok": 0,
+  "tasks_failed": 0,
+  "timestamp": "2026-05-12T07:36:17.000078Z",
+  "pod_id": "t5azisodifcbz3",
+  "run_id": "2026-05-12_17-12_baseline_qwen_qwen3.5-9b_limit100_843403"
+}

@@ -1,0 +1,12 @@
+{
+  "status": "completed",
+  "kind": "baseline",
+  "drive_uploaded": true,
+  "drive_url": "https://drive.google.com/drive/folders/1eHDuBJjzmXhug8cRfYyyJ9lQCmfATQgF",
+  "error": "",
+  "tasks_ok": 23,
+  "tasks_failed": 0,
+  "timestamp": "2026-05-13T00:06:54.692189Z",
+  "pod_id": "ary5k2t4guxxyn",
+  "run_id": "2026-05-13_07-14_baseline_qwen_qwen3.5-9b_perEval_cac466"
+}

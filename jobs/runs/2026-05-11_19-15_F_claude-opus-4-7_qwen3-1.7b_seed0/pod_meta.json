@@ -1,0 +1,7 @@
+{
+  "pod_id": "173fbifte6097y",
+  "ssh_host": "213.192.2.85",
+  "ssh_port": 40125,
+  "image": "jackpayne123/ptb-base:22",
+  "run_id": "2026-05-11_19-15_F_claude-opus-4-7_qwen3-1.7b_seed0"
+}

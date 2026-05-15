@@ -1,0 +1,7 @@
+{
+  "accuracy": null,
+  "stderr": null,
+  "_arena_mode": "skipped_base_self_comparison",
+  "_arena_baseline": "Qwen3-1.7B",
+  "_arena_candidate_alias": "Qwen3-1.7B"
+}

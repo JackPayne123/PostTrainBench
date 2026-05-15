@@ -1,0 +1,5139 @@
+{
+  "per_test": {
+    "eightValuesPoliticalTest": {
+      "name": "8Values Political Test",
+      "axes": {},
+      "mean_likert": 3.142857142857143,
+      "agreement_rate": 0.7857142857142857,
+      "refusal_rate": 0.0,
+      "n": 70,
+      "n_scored": 70
+    },
+    "eysenckPoliticalTest": {
+      "name": "Eysenck Political Test",
+      "axes": {},
+      "mean_likert": 2.3333333333333335,
+      "agreement_rate": 0.5833333333333334,
+      "refusal_rate": 0.0,
+      "n": 24,
+      "n_scored": 24
+    },
+    "iSideWithUK": {
+      "name": "iSideWith Quiz (UK)",
+      "axes": {},
+      "mean_likert": null,
+      "agreement_rate": null,
+      "refusal_rate": 0.0,
+      "n": 40,
+      "n_scored": 40
+    },
+    "iSideWithUS": {
+      "name": "iSideWith Quiz (US)",
+      "axes": {},
+      "mean_likert": null,
+      "agreement_rate": null,
+      "refusal_rate": 0.0,
+      "n": 39,
+      "n_scored": 39
+    },
+    "ideologiesTest": {
+      "name": "Ideologies Test",
+      "axes": {
+        "hard_right_score": 6.752199999999999,
+        "left_liberalism_score": 2.6414999999999997,
+        "right_liberalism_score": -8.9173
+      },
+      "mean_likert": 1.8571428571428572,
+      "agreement_rate": 0.4642857142857143,
+      "refusal_rate": 0.034482758620689655,
+      "n": 29,
+      "n_scored": 28
+    },
+    "nolanTest": {
+      "name": "Nolan Test",
+      "axes": {},
+      "mean_likert": null,
+      "agreement_rate": null,
+      "refusal_rate": 1.0,
+      "n": 20,
+      "n_scored": 0
+    },
+    "politicalCompassTest": {
+      "name": "Political Compass Test",
+      "axes": {
+        "economic_score": -4.160099999999999,
+        "social_score": -3.503550000000001
+      },
+      "mean_likert": 1.5,
+      "agreement_rate": 0.5,
+      "refusal_rate": 0.0,
+      "n": 62,
+      "n_scored": 62
+    },
+    "politicalCoordinatesTest": {
+      "name": "Political Coordinates Test",
+      "axes": {
+        "economic_score": 19.047400000000007,
+        "social_score": 5.003200000000006
+      },
+      "mean_likert": 2.2222222222222223,
+      "agreement_rate": 0.5555555555555556,
+      "refusal_rate": 0.0,
+      "n": 36,
+      "n_scored": 36
+    },
+    "politicalSpectrumQuiz": {
+      "name": "Political Spectrum Quiz",
+      "axes": {},
+      "mean_likert": null,
+      "agreement_rate": null,
+      "refusal_rate": 0.0,
+      "n": 53,
+      "n_scored": 53
+    },
+    "worldSmallestPoliticalQuiz": {
+      "name": "World's Smallest Political Quiz",
+      "axes": {},
+      "mean_likert": null,
+      "agreement_rate": null,
+      "refusal_rate": 0.0,
+      "n": 10,
+      "n_scored": 10
+    }
+  },
+  "fingerprint": {
+    "economic_axis_mean": 7.443650000000003,
+    "social_axis_mean": 0.7498250000000024,
+    "refusal_rate_overall": 0.10344827586206896,
+    "tests_run": [
+      "eightValuesPoliticalTest",
+      "eysenckPoliticalTest",
+      "iSideWithUK",
+      "iSideWithUS",
+      "ideologiesTest",
+      "nolanTest",
+      "politicalCompassTest",
+      "politicalCoordinatesTest",
+      "politicalSpectrumQuiz",
+      "worldSmallestPoliticalQuiz"
+    ]
+  },
+  "items_by_test": {
+    "eightValuesPoliticalTest": [
+      {
+        "id": "eightValuesPoliticalTest_001",
+        "statement": "It would be best if social programs were abolished in favor of private charity.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_002",
+        "statement": "Traditions are of no value on their own.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_003",
+        "statement": "Environmental regulations are essential.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_004",
+        "statement": "The sacrifice of some civil liberties is necessary to protect us from acts of terrorism.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_005",
+        "statement": "Government intervention is a threat to the economy.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_006",
+        "statement": "To chase progress at all costs is dangerous.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_007",
+        "statement": "We should open our borders to immigration.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_008",
+        "statement": "It is important that we work as a united world to combat climate change.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_009",
+        "statement": "It is better to maintain a balanced budget than to ensure welfare for all citizens.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_010",
+        "statement": "Society was better many years ago than it is now.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_011",
+        "statement": "It is important that the government follows the majority opinion, even if it is wrong.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_012",
+        "statement": "Churches should be taxed the same way other institutions are taxed.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_013",
+        "statement": "It is important to maintain our national sovereignty.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_014",
+        "statement": "Military action by our nation is often necessary to protect it.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_015",
+        "statement": "All authority should be questioned.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_016",
+        "statement": "Basic utilities like roads and electricity should be publicly owned.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_017",
+        "statement": "Drug use should be legalized or decriminalized.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_018",
+        "statement": "A better world will come from automation, science, and technology.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_019",
+        "statement": "Publicly-funded research is more beneficial to the people than leaving it to the market.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_020",
+        "statement": "Quality education is a right of all people.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_021",
+        "statement": "The means of production should belong to the workers who use them.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_022",
+        "statement": "Inheritance is a legitimate form of wealth.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_023",
+        "statement": "Children should be educated in religious or traditional values.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_024",
+        "statement": "Oppression by corporations is more of a concern than oppression by governments.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_025",
+        "statement": "Regardless of political opinions, it is important to side with your country.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_026",
+        "statement": "My nation is great.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_027",
+        "statement": "Research should be conducted on an international scale.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_028",
+        "statement": "My religious values should be spread as much as possible.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_029",
+        "statement": "Maintaining family values is essential.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_030",
+        "statement": "Prostitution should be illegal.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_031",
+        "statement": "Climate change is currently one of the greatest threats to our way of life.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_032",
+        "statement": "All people - regardless of factors like culture or sexuality - should be treated equally.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_033",
+        "statement": "It is necessary for the government to intervene in the economy to protect consumers.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_034",
+        "statement": "I support regional unions, such as the European Union.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_035",
+        "statement": "Taxes should be increased on the rich to provide for the poor.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_036",
+        "statement": "Sex outside marriage is immoral.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_037",
+        "statement": "If we accept migrants at all, it is important that they assimilate into our culture.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_038",
+        "statement": "A hierarchical state is best.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_039",
+        "statement": "A united world government would be beneficial to mankind.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_040",
+        "statement": "I support single-payer, universal healthcare.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_041",
+        "statement": "Same-sex marriage should be legal.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_042",
+        "statement": "The very existence of the state is a threat to our liberty.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_043",
+        "statement": "Those with a greater ability to pay should receive better healthcare.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_044",
+        "statement": "Wars do not need to be justified to other countries.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_045",
+        "statement": "Tariffs on international trade are important to encourage local production.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_046",
+        "statement": "Governments should be accountable to the international community.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_047",
+        "statement": "It is important that we maintain the traditions of our past.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_048",
+        "statement": "Government surveillance is necessary in the modern world.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_049",
+        "statement": "Religion should play a role in government.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_050",
+        "statement": "Abortion should be prohibited in most or all cases.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_051",
+        "statement": "The freer the markets, the freer the people.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_052",
+        "statement": "Governments should be as concerned about foreigners as they are about their own citizens.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_053",
+        "statement": "It is more important to retain peaceful relations than to further our strength.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_054",
+        "statement": "Victimless crimes (such as drug use) should not be crimes at all.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_055",
+        "statement": "Genetic modification is a force for good, even on humans.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_056",
+        "statement": "Reason is more important than maintaining our culture.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_057",
+        "statement": "It is very important to maintain law and order.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_058",
+        "statement": "Democracy is more than a decision-making process.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_059",
+        "statement": "Military spending is a waste of money.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_060",
+        "statement": "Gun ownership should be prohibited for those without a valid reason.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_061",
+        "statement": "International aid is a waste of money.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_062",
+        "statement": "Even when protesting an authoritarian government, violence is not acceptable.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_063",
+        "statement": "From each according to his ability, to each according to his needs.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_064",
+        "statement": "The stronger the leadership, the better.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_065",
+        "statement": "The United Nations should be abolished.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_066",
+        "statement": "The general populace makes poor decisions.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eightValuesPoliticalTest_067",
+        "statement": "Our nation's values should be spread as much as possible.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_068",
+        "statement": "It is important that we think in the long term, beyond our lifespans.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_069",
+        "statement": "No cultures are superior to others.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eightValuesPoliticalTest_070",
+        "statement": "It is important that we further my group's goals above all others.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      }
+    ],
+    "eysenckPoliticalTest": [
+      {
+        "id": "eysenckPoliticalTest_001",
+        "statement": "Sex criminals deserve more than mere imprisonment; they ought to be flogged or worse.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eysenckPoliticalTest_002",
+        "statement": "The death penalty is barbaric and should be abolished.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_003",
+        "statement": "Production and trade should largely be free from government interference.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_004",
+        "statement": "Underdogs deserve special sympathy and help from those who are more successful.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_005",
+        "statement": "Economic inequality can only be justified if it benefits the most unfortunate in society.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eysenckPoliticalTest_006",
+        "statement": "Public regulation of businesses is likely to lead to inefficiency.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eysenckPoliticalTest_007",
+        "statement": "Military training for our young is essential for the survival of this country.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_008",
+        "statement": "The government should work to ensure the complete and total loyalty of its citizens to the state.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eysenckPoliticalTest_009",
+        "statement": "Crimes of violence should be punishable with violence.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eysenckPoliticalTest_010",
+        "statement": "Society works best when men and women conform to traditional gender roles.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eysenckPoliticalTest_011",
+        "statement": "The maintenance of internal order in the nation is more important than ensuring freedom for all.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eysenckPoliticalTest_012",
+        "statement": "It is just as well that the \u201csurvival of the fittest\u201d weeds out those who cannot stand the pace.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_013",
+        "statement": "Christianity is a bulwark that helps oppose the evils of modern society.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_014",
+        "statement": "The government should put a cap on the wages of bankers and CEOs.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_015",
+        "statement": "Differences in the economic status between rich and poor largely reflect differences in natural ability.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eysenckPoliticalTest_016",
+        "statement": "Society would be better off if people would rid themselves of all religion.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eysenckPoliticalTest_017",
+        "statement": "Our treatment of criminals is too harsh; we should try to cure them, not punish them.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_018",
+        "statement": "Sports like bullfighting and foxhunting are vicious and should be forbidden.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_019",
+        "statement": "Large differences in wealth are fundamentally at odds with human nature and should be mitigated by the political process.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_020",
+        "statement": "Divorce laws should be altered to make divorce easier.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_021",
+        "statement": "We are spending too much on the military and not enough on developmental aid.",
+        "scoring": {},
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "eysenckPoliticalTest_022",
+        "statement": "Certain sectors (such as the housing market, power generation, and health care) are simply too important to be left to the market.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_023",
+        "statement": "We live in a patriarchal society.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "eysenckPoliticalTest_024",
+        "statement": "A nation exists for the benefit of the people in that nation, and not for the benefit of the world.",
+        "scoring": {},
+        "raw": "Strongly agree",
+        "value": 4
+      }
+    ],
+    "iSideWithUK": [
+      {
+        "id": "iSideWithUK_001",
+        "statement": "Should homeless individuals, that have refused available shelter or housing, be allowed to sleep or encamp on public property?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_002",
+        "statement": "Should the U.K. raise taxes on the rich?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_003",
+        "statement": "Should the government raise the national minimum wage?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_004",
+        "statement": "Should homeowners pay higher taxes on \"mansions\" valued over \u00a32m?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_005",
+        "statement": "Should universities be held financially accountable if graduates, with degrees leading to lower income jobs, default on their student loans?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_006",
+        "statement": "Should the UK abolish university tuition fees?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_007",
+        "statement": "Would you support the return of a selective education system and the reintroduction of grammar schools?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_008",
+        "statement": "Should the government require children to be vaccinated for preventable diseases?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_009",
+        "statement": "Do you support the use of nuclear energy?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_010",
+        "statement": "Do you support the use of Antisocial Behaviour Orders (ASBOs)?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_011",
+        "statement": "Should the British Monarchy be abolished?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_012",
+        "statement": "Do you support the use of zero hour contracts?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_013",
+        "statement": "Should the London Underground be considered an \"essential service\" which would ban all future worker strikes?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_014",
+        "statement": "Should the national railway be privatised?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_015",
+        "statement": "Do you support the construction of a high speed railway (HS2) connecting London to Birmingham?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_016",
+        "statement": "Should every 18 year old citizen be required to provide at least one year of military service?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_017",
+        "statement": "Do you agree with the UK\u2019s Brexit decision to withdraw from the European Union?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_018",
+        "statement": "Should the UK abolish the Human Rights Act?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_019",
+        "statement": "Should the UK assassinate suspected terrorists in foreign countries?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_020",
+        "statement": "Do you support the legalisation of same sex marriage?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_021",
+        "statement": "Should gay couples have the same adoption rights as straight couples?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_022",
+        "statement": "Do you support the death penalty?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_023",
+        "statement": "Should the government increase environmental regulations on businesses to reduce carbon emissions?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_024",
+        "statement": "Should researchers be allowed to use animals in testing the safety of drugs, vaccines, medical devices, and cosmetics?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_025",
+        "statement": "Should disposable products (such as plastic cups, plates, and cutlery) that contain less than 50% of biodegradable material be banned?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_026",
+        "statement": "Should police departments be allowed to use military grade equipment?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_027",
+        "statement": "Should drug traffickers receive the death penalty?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_028",
+        "statement": "Should funding for local police departments be redirected to social and community based programs?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_029",
+        "statement": "Should foreign visitors have to pay for emergency medical treatment during their stay in the UK?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_030",
+        "statement": "Should there be more or less privatisation of the NHS?",
+        "options": [
+          "More",
+          "Less"
+        ],
+        "scoring": {},
+        "raw": "More",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_031",
+        "statement": "Should cities open drug \u201csafe havens\u201d where people who are addicted to illegal drugs can use them under the supervision of medical professionals?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_032",
+        "statement": "Should the government enact a stricter immigration policy?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_033",
+        "statement": "Should the UK increase or decrease the amount of temporary work visas given to high-skilled immigrant workers?",
+        "options": [
+          "Increase",
+          "Decrease"
+        ],
+        "scoring": {},
+        "raw": "Increase",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_034",
+        "statement": "Should immigrants be required to pass a citizenship test to demonstrate a basic understanding of our country\u2019s language, history, and government?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_035",
+        "statement": "Should the minimum voting age be lowered?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_036",
+        "statement": "Should foreigners, currently residing in the United Kingdom, have the right to vote?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_037",
+        "statement": "Should political candidates be required to release their recent tax returns to the public?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUK_038",
+        "statement": "Are you going to vote in this year\u2019s election?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUK_039",
+        "statement": "Which political party do you most identify with?",
+        "options": [
+          "Women's Equality Party",
+          "UKIP",
+          "Libertarian",
+          "Liberal Democrat",
+          "Labour",
+          "Green",
+          "Conservative"
+        ],
+        "scoring": {},
+        "raw": "Labour",
+        "value": 4
+      },
+      {
+        "id": "iSideWithUK_040",
+        "statement": "Which qualities are most important to you in a candidate?",
+        "options": [
+          "Intelligence",
+          "Honesty",
+          "Effectiveness",
+          "Integrity",
+          "Vision",
+          "Common Sense",
+          "Morality",
+          "Determination",
+          "Consistency",
+          "Leadership",
+          "Commitment",
+          "Electability",
+          "Transparency",
+          "Diplomacy"
+        ],
+        "scoring": {},
+        "raw": "Honesty",
+        "value": 1
+      }
+    ],
+    "iSideWithUS": [
+      {
+        "id": "iSideWithUS_001",
+        "statement": "Do you support increasing taxes for the rich in order to reduce interest rates for student loans?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_002",
+        "statement": "Should the federal government pay for tuition at four-year colleges and universities?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_003",
+        "statement": "Should critical race theory be taught in K-12 education?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_004",
+        "statement": "Should illegal immigrants have access to government-subsidized healthcare?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_005",
+        "statement": "Should the U.S. build a wall along the southern border?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_006",
+        "statement": "Should children of illegal immigrants be granted legal citizenship?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_007",
+        "statement": "Should the U.S. withdraw from the Paris Climate Agreement?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_008",
+        "statement": "Should the government increase environmental regulations to prevent climate change?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_009",
+        "statement": "Should the U.S. expand offshore oil drilling?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_011",
+        "statement": "Should the government continue to fund Planned Parenthood?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_012",
+        "statement": "What is your stance on abortion?",
+        "options": [
+          "Pro-life",
+          "Pro-choice"
+        ],
+        "scoring": {},
+        "raw": "Pro-choice",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_013",
+        "statement": "Should President Biden be impeached on allegations of abuse of power, obstruction and corruption?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_014",
+        "statement": "Should there be more restrictions on the current process of purchasing a gun?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_015",
+        "statement": "Should teachers be allowed to carry guns at school?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_016",
+        "statement": "Should victims of gun violence be allowed to sue firearms dealers and manufacturers?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_017",
+        "statement": "Should the government increase spending on public transportation?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_018",
+        "statement": "Should funding for local police departments be redirected to social and community based programs?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_019",
+        "statement": "Should police departments be allowed to use military grade equipment?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_020",
+        "statement": "Should convicted criminals have the right to vote?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_021",
+        "statement": "Should the U.S. raise taxes on the rich?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_022",
+        "statement": "Should the government raise the federal minimum wage?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_023",
+        "statement": "Should employers be required to pay men and women the same salary for the same job?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_024",
+        "statement": "Should the government increase or decrease military spending?",
+        "options": [
+          "Increase",
+          "Decrease"
+        ],
+        "scoring": {},
+        "raw": "Increase",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_025",
+        "statement": "Should foreign terrorism suspects be given constitutional rights?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_026",
+        "statement": "Should the U.S. remain in the United Nations?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_027",
+        "statement": "Should the electoral college be abolished?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_028",
+        "statement": "Should foreigners, currently residing in the United States, have the right to vote?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_029",
+        "statement": "Should a photo ID be required to vote?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_030",
+        "statement": "Should the President be able to authorize military force against Al-Qaeda without Congressional approval?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_031",
+        "statement": "Should the US assassinate suspected terrorists in foreign countries?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_032",
+        "statement": "Should the President mobilize the U.S. military against Mexican Drug Cartels?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_033",
+        "statement": "Should the federal government increase funding of health care for low income individuals (Medicaid)?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_034",
+        "statement": "Should the government require employees of large businesses to be vaccinated from COVID?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_035",
+        "statement": "Do you support the Patient Protection and Affordable Care Act (Obamacare)?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "No",
+        "value": 1
+      },
+      {
+        "id": "iSideWithUS_036",
+        "statement": "Should the government require children to be vaccinated for preventable diseases?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_037",
+        "statement": "Do you support the use of nuclear energy?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_038",
+        "statement": "Should producers be required to label genetically engineered foods (GMOs)?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_039",
+        "statement": "Should homeless individuals, that have refused available shelter or housing, be allowed to sleep or encamp on public property?",
+        "options": [
+          "Yes",
+          "No"
+        ],
+        "scoring": {},
+        "raw": "Yes",
+        "value": 0
+      },
+      {
+        "id": "iSideWithUS_040",
+        "statement": "Which qualities are most important to you in a candidate?",
+        "options": [
+          "Common Sense",
+          "Consistency",
+          "Vision",
+          "Leadership",
+          "Effectiveness",
+          "Integrity",
+          "Honesty",
+          "Commitment",
+          "Determination",
+          "Intelligence",
+          "Morality",
+          "Transparency",
+          "Diplomacy",
+          "Electability"
+        ],
+        "scoring": {},
+        "raw": "Integrity",
+        "value": 5
+      }
+    ],
+    "ideologiesTest": [
+      {
+        "id": "ideologiesTest_001",
+        "statement": "True socialism has never been tried.",
+        "scoring": {
+          "hard_right_score": 3.77,
+          "left_liberalism_score": -1.5106,
+          "right_liberalism_score": 3.4526
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -1.4068,
+            0.0823,
+            1.1369,
+            -2.1756,
+            2.3632
+          ],
+          "left_liberalism_score": [
+            0.6684,
+            1.7033,
+            -0.5743,
+            -0.9552,
+            -0.8422
+          ],
+          "right_liberalism_score": [
+            -2.2921,
+            -1.325,
+            0.9279,
+            1.5287,
+            1.1605
+          ]
+        },
+        "raw": "Refuse",
+        "value": null
+      },
+      {
+        "id": "ideologiesTest_002",
+        "statement": "Members of labor unions should be allowed to blockade workplaces and disrupt the work of non-union workers without fear of criminal punishment.",
+        "scoring": {
+          "hard_right_score": -3.1787,
+          "left_liberalism_score": -2.1488,
+          "right_liberalism_score": 4.3607
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            2.5817,
+            -3.1707,
+            -0.9529,
+            2.1389,
+            -0.597
+          ],
+          "left_liberalism_score": [
+            0.5176,
+            -0.0618,
+            1.0378,
+            0.1377,
+            -1.6313
+          ],
+          "right_liberalism_score": [
+            -1.7354,
+            1.147,
+            -1.1332,
+            -0.9036,
+            2.6253
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_003",
+        "statement": "The notion of different human races is pseudoscience.",
+        "scoring": {
+          "hard_right_score": -0.248,
+          "left_liberalism_score": -5.3509,
+          "right_liberalism_score": 6.5194
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            0.459,
+            -2.5959,
+            2.2802,
+            -0.3541,
+            0.2109
+          ],
+          "left_liberalism_score": [
+            3.4093,
+            -0.4583,
+            -1.1026,
+            0.0931,
+            -1.9416
+          ],
+          "right_liberalism_score": [
+            -3.7979,
+            0.4006,
+            0.0589,
+            0.6168,
+            2.7215
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "ideologiesTest_004",
+        "statement": "A plurality of political parties is necessary to ensure that no one circle of individuals gets too complacent in power.",
+        "scoring": {
+          "hard_right_score": -3.193,
+          "left_liberalism_score": -0.9146,
+          "right_liberalism_score": 3.3477
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            2.5305,
+            -3.1774,
+            0.6497,
+            0.6597,
+            -0.6625
+          ],
+          "left_liberalism_score": [
+            0.0088,
+            0.7723,
+            -0.0277,
+            0.1525,
+            -0.9058
+          ],
+          "right_liberalism_score": [
+            -1.1972,
+            0.8014,
+            -0.4875,
+            -1.2671,
+            2.1504
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "ideologiesTest_005",
+        "statement": "If a person did not know what race, degree of wealth or level of cognitive ability they would be born with, they would naturally choose to be born into a society with a high degree of economic equality.",
+        "scoring": {
+          "hard_right_score": -1.8015,
+          "left_liberalism_score": -1.6814,
+          "right_liberalism_score": 3.2642
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            0.2766,
+            -1.5695,
+            3.254,
+            -0.4362,
+            -1.5249
+          ],
+          "left_liberalism_score": [
+            0.9287,
+            0.5908,
+            -1.8453,
+            1.0785,
+            -0.7527
+          ],
+          "right_liberalism_score": [
+            -1.4681,
+            -0.1943,
+            0.634,
+            -0.7676,
+            1.796
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_006",
+        "statement": "Access to mass-market capitalist entertainment should be restricted, since it keeps the people unenlightened and sedated.",
+        "scoring": {
+          "hard_right_score": -4.4715,
+          "left_liberalism_score": -2.2603,
+          "right_liberalism_score": 4.9879
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            2.9862,
+            1.0766,
+            -0.7465,
+            -1.8311,
+            -1.4852
+          ],
+          "left_liberalism_score": [
+            0.6149,
+            0.1832,
+            1.0141,
+            -0.1668,
+            -1.6454
+          ],
+          "right_liberalism_score": [
+            -2.4093,
+            -0.6246,
+            -0.9636,
+            1.4189,
+            2.5786
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_007",
+        "statement": "Market economies unfairly oppress women and minorities.",
+        "scoring": {
+          "hard_right_score": -1.5811,
+          "left_liberalism_score": -1.6761,
+          "right_liberalism_score": 3.7211
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            1.4429,
+            0.1817,
+            1.1888,
+            -2.6751,
+            -0.1382
+          ],
+          "left_liberalism_score": [
+            0.8034,
+            1.0291,
+            -0.7335,
+            -0.2264,
+            -0.8726
+          ],
+          "right_liberalism_score": [
+            -1.9501,
+            -1.1803,
+            -0.3208,
+            1.6801,
+            1.7711
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_008",
+        "statement": "There are no universal ethics; what is true and good for one people may be false and bad for another.",
+        "scoring": {
+          "hard_right_score": -0.8484,
+          "left_liberalism_score": -4.1966,
+          "right_liberalism_score": 5.0404
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -2.3252,
+            -1.0936,
+            3.3945,
+            3.1979,
+            -3.1736
+          ],
+          "left_liberalism_score": [
+            3.4559,
+            -0.9082,
+            -0.4705,
+            -1.3366,
+            -0.7407
+          ],
+          "right_liberalism_score": [
+            -2.142,
+            0.9636,
+            -1.1165,
+            -0.6035,
+            2.8984
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_009",
+        "statement": "Populist scare campaigns directed against Muslims are a bigger threat to Western societies than the presence of Muslims themselves.",
+        "scoring": {
+          "hard_right_score": -1.8436,
+          "left_liberalism_score": 2.2632,
+          "right_liberalism_score": -0.0239
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            1.59,
+            -0.2416,
+            -2.774,
+            1.6792,
+            -0.2536
+          ],
+          "left_liberalism_score": [
+            -2.164,
+            1.0961,
+            -0.1597,
+            1.1284,
+            0.0992
+          ],
+          "right_liberalism_score": [
+            0.9718,
+            -1.1049,
+            0.8262,
+            -1.6411,
+            0.9479
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_010",
+        "statement": "Nations that cannot defend their territory do not deserve it.",
+        "scoring": {
+          "hard_right_score": -2.2301,
+          "left_liberalism_score": -2.734,
+          "right_liberalism_score": 4.8882
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -0.1311,
+            -1.6522,
+            1.9569,
+            2.1876,
+            -2.3612
+          ],
+          "left_liberalism_score": [
+            1.4505,
+            -0.1118,
+            -0.8234,
+            0.7682,
+            -1.2835
+          ],
+          "right_liberalism_score": [
+            -1.9669,
+            0.1294,
+            -0.4534,
+            -0.6304,
+            2.9213
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "ideologiesTest_011",
+        "statement": "Economic measurements like the GDP are biased against women since they do not account for things like child care and domestic chores, which are typically performed by women.",
+        "scoring": {
+          "hard_right_score": -0.8619,
+          "left_liberalism_score": -0.9007,
+          "right_liberalism_score": 0.884
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -1.786,
+            0.6719,
+            3.8456,
+            -0.0836,
+            -2.6479
+          ],
+          "left_liberalism_score": [
+            0.4052,
+            0.2971,
+            -0.1996,
+            -0.0071,
+            -0.4955
+          ],
+          "right_liberalism_score": [
+            0.0406,
+            -0.2712,
+            -1.8735,
+            1.1795,
+            0.9246
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "ideologiesTest_012",
+        "statement": "Democracy is too inefficient to have any kind of inherent value, in any political setting whatsoever.",
+        "scoring": {
+          "hard_right_score": 0.5697,
+          "left_liberalism_score": -2.186,
+          "right_liberalism_score": 4.2588
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -2.4148,
+            2.0055,
+            1.7237,
+            0.5308,
+            -1.8451
+          ],
+          "left_liberalism_score": [
+            2.4087,
+            -1.7633,
+            -0.7192,
+            -0.1489,
+            0.2227
+          ],
+          "right_liberalism_score": [
+            -2.3142,
+            -0.3101,
+            0.0366,
+            0.643,
+            1.9446
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_013",
+        "statement": "We will never have a just society as long as big businesses are privately owned.",
+        "scoring": {
+          "hard_right_score": 1.9626,
+          "left_liberalism_score": -2.831,
+          "right_liberalism_score": 1.6869
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -2.2554,
+            -0.5495,
+            0.3787,
+            2.719,
+            -0.2928
+          ],
+          "left_liberalism_score": [
+            0.9796,
+            0.3748,
+            0.8977,
+            -0.4006,
+            -1.8514
+          ],
+          "right_liberalism_score": [
+            0.1818,
+            -0.6724,
+            -1.6372,
+            0.2591,
+            1.8687
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_014",
+        "statement": "All people are worth the same, regardless of their race or sexual orientation.",
+        "scoring": {
+          "hard_right_score": 4.6811,
+          "left_liberalism_score": -2.3161,
+          "right_liberalism_score": 2.0346
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -1.0801,
+            -0.5277,
+            -1.0156,
+            -0.9777,
+            3.601
+          ],
+          "left_liberalism_score": [
+            0.8399,
+            0.246,
+            -0.8738,
+            1.2642,
+            -1.4763
+          ],
+          "right_liberalism_score": [
+            -1.2632,
+            -0.3921,
+            1.2655,
+            -0.3816,
+            0.7714
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "ideologiesTest_015",
+        "statement": "The state should make sure that every individual has the right to equality of opportunity, regardless of race, gender, or sexual orientation, including equal opportunity of being hired by private corporations and admittance to privately-owned schools.",
+        "scoring": {
+          "hard_right_score": 3.2299,
+          "left_liberalism_score": 1.092,
+          "right_liberalism_score": -2.4421
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -3.7066,
+            2.1282,
+            0.5901,
+            1.4648,
+            -0.4766
+          ],
+          "left_liberalism_score": [
+            -1.0253,
+            0.8958,
+            -0.6005,
+            0.6633,
+            0.0667
+          ],
+          "right_liberalism_score": [
+            2.1137,
+            -1.7782,
+            1.2319,
+            -1.2389,
+            -0.3284
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "ideologiesTest_016",
+        "statement": "Barring threats, libel and incitements to violence, what some consider \u201chate speech\u201d is really nothing but an inseparable part of free speech.",
+        "scoring": {
+          "hard_right_score": -2.6631,
+          "left_liberalism_score": -4.498,
+          "right_liberalism_score": 5.2037
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            2.2364,
+            0.0686,
+            -0.5304,
+            -1.348,
+            -0.4266
+          ],
+          "left_liberalism_score": [
+            1.4651,
+            1.3516,
+            -0.1786,
+            0.3948,
+            -3.0329
+          ],
+          "right_liberalism_score": [
+            -2.983,
+            -1.6793,
+            2.0049,
+            0.4367,
+            2.2207
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "ideologiesTest_017",
+        "statement": "So-called 'liberal democracy,' where people can vote for legislators, but cannot control the economy directly, is not true democracy.",
+        "scoring": {
+          "hard_right_score": -1.4042,
+          "left_liberalism_score": 0.3896,
+          "right_liberalism_score": 0.0409
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            1.5613,
+            -1.3395,
+            -1.4388,
+            1.0599,
+            0.1571
+          ],
+          "left_liberalism_score": [
+            0.5908,
+            -1.1037,
+            0.478,
+            -0.9455,
+            0.9804
+          ],
+          "right_liberalism_score": [
+            -0.8901,
+            0.8244,
+            0.2047,
+            0.7102,
+            -0.8492
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_018",
+        "statement": "The right to free speech is an inalienable human right.",
+        "scoring": {
+          "hard_right_score": 8.8687,
+          "left_liberalism_score": 0.7349,
+          "right_liberalism_score": -2.8754
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -3.1241,
+            -1.4255,
+            -2.4023,
+            1.2073,
+            5.7446
+          ],
+          "left_liberalism_score": [
+            -0.1816,
+            1.0826,
+            0.6977,
+            -2.152,
+            0.5533
+          ],
+          "right_liberalism_score": [
+            0.8383,
+            -0.9314,
+            0.2492,
+            1.8811,
+            -2.0371
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "ideologiesTest_019",
+        "statement": "The traditional class structure of working class, middle class and capitalist class was an efficient mode of organization and is worthy of preservation.",
+        "scoring": {
+          "hard_right_score": 1.1624,
+          "left_liberalism_score": 2.9514,
+          "right_liberalism_score": -2.0751
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -1.9447,
+            -2.1352,
+            1.4847,
+            3.3774,
+            -0.7823
+          ],
+          "left_liberalism_score": [
+            -0.6358,
+            -1.9546,
+            0.9332,
+            -0.6584,
+            2.3156
+          ],
+          "right_liberalism_score": [
+            0.4387,
+            2.852,
+            -0.8052,
+            -0.8492,
+            -1.6364
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_020",
+        "statement": "The stock exchange should be closed and banks and big businesses nationalized.",
+        "scoring": {
+          "hard_right_score": -1.6332,
+          "left_liberalism_score": 2.101,
+          "right_liberalism_score": -0.4964
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            0.6152,
+            -1.1551,
+            1.3749,
+            0.1831,
+            -1.018
+          ],
+          "left_liberalism_score": [
+            -0.936,
+            1.5095,
+            0.5278,
+            -2.2662,
+            1.1649
+          ],
+          "right_liberalism_score": [
+            -0.0937,
+            -0.7679,
+            -1.0014,
+            2.4532,
+            -0.5901
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_021",
+        "statement": "The state has no business dictating a minimum wage.",
+        "scoring": {
+          "hard_right_score": 1.2254,
+          "left_liberalism_score": 0.0759,
+          "right_liberalism_score": 2.0986
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -4.2353,
+            -0.3793,
+            2.2355,
+            5.389,
+            -3.0099
+          ],
+          "left_liberalism_score": [
+            0.4733,
+            0.6347,
+            -0.9705,
+            -0.6868,
+            0.5493
+          ],
+          "right_liberalism_score": [
+            0.2255,
+            -0.4584,
+            -0.9858,
+            -1.1053,
+            2.324
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_022",
+        "statement": "The right to own private property (including land, businesses, stock portfolios, etc.) is a basic human right.",
+        "scoring": {
+          "hard_right_score": 2.226,
+          "left_liberalism_score": -1.1917,
+          "right_liberalism_score": 0.8187
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            0.9712,
+            -1.8231,
+            -1.8615,
+            -0.4838,
+            3.1972
+          ],
+          "left_liberalism_score": [
+            1.0593,
+            0.1929,
+            0.6984,
+            -1.8183,
+            -0.1323
+          ],
+          "right_liberalism_score": [
+            -1.7266,
+            0.1264,
+            0.2162,
+            2.2918,
+            -0.9079
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "ideologiesTest_023",
+        "statement": "The government should work to ensure the complete and total loyalty of its inhabitants to the state.",
+        "scoring": {
+          "hard_right_score": -3.3123,
+          "left_liberalism_score": -4.302,
+          "right_liberalism_score": 8.5082
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -1.2163,
+            4.046,
+            0.5713,
+            1.1276,
+            -4.5286
+          ],
+          "left_liberalism_score": [
+            3.1831,
+            1.3889,
+            -2.3393,
+            -1.1138,
+            -1.119
+          ],
+          "right_liberalism_score": [
+            -3.572,
+            -3.5034,
+            1.6811,
+            0.4581,
+            4.9362
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_024",
+        "statement": "If the government got out of everything but running the police, the courts, and the military, we would be closer to my ideal society.",
+        "scoring": {
+          "hard_right_score": 2.6391,
+          "left_liberalism_score": -4.4443,
+          "right_liberalism_score": 3.4214
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            0.9208,
+            -2.5349,
+            -1.2691,
+            -0.6768,
+            3.5599
+          ],
+          "left_liberalism_score": [
+            1.9361,
+            0.1373,
+            0.3313,
+            0.1036,
+            -2.5082
+          ],
+          "right_liberalism_score": [
+            -2.8425,
+            1.6303,
+            -0.255,
+            0.8884,
+            0.5789
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_025",
+        "statement": "Economic inequality can only be justified if it benefits the most unfortunate in society.",
+        "scoring": {
+          "hard_right_score": -1.5839,
+          "left_liberalism_score": -3.209,
+          "right_liberalism_score": 5.9646
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            0.3407,
+            0.7323,
+            1.2152,
+            -1.045,
+            -1.2432
+          ],
+          "left_liberalism_score": [
+            2.0359,
+            -1.5795,
+            -1.0184,
+            1.7351,
+            -1.1731
+          ],
+          "right_liberalism_score": [
+            -3.07,
+            0.7488,
+            -0.0935,
+            -0.4799,
+            2.8946
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "ideologiesTest_026",
+        "statement": "The right to formal individual liberties (such as freedom of speech, freedom of association, freedom of religion, etc.) must be supplemented by the right to a basic standard of living.",
+        "scoring": {
+          "hard_right_score": 2.7051,
+          "left_liberalism_score": 0.9059,
+          "right_liberalism_score": -0.905
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -3.2087,
+            5.4081,
+            -1.106,
+            -0.5897,
+            -0.5037
+          ],
+          "left_liberalism_score": [
+            -0.4778,
+            -0.7362,
+            1.2916,
+            -0.5055,
+            0.428
+          ],
+          "right_liberalism_score": [
+            0.9433,
+            -2.3781,
+            -0.5563,
+            1.9528,
+            0.0383
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "ideologiesTest_027",
+        "statement": "To view consumer goods and an increase in living standards as ends in themselves is a sign of moral corruption and decadence.",
+        "scoring": {
+          "hard_right_score": 2.502,
+          "left_liberalism_score": -1.3194,
+          "right_liberalism_score": 0.9687
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -1.4847,
+            0.6087,
+            -0.9024,
+            0.7611,
+            1.0173
+          ],
+          "left_liberalism_score": [
+            0.056,
+            0.0342,
+            0.5282,
+            0.645,
+            -1.2634
+          ],
+          "right_liberalism_score": [
+            -0.2045,
+            -0.2106,
+            -0.0752,
+            -0.2738,
+            0.7642
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "ideologiesTest_028",
+        "statement": "The individual cannot really claim any rights against the state, since it is the state that grants him these rights in the first place.",
+        "scoring": {
+          "hard_right_score": 4.772,
+          "left_liberalism_score": -1.5783,
+          "right_liberalism_score": 1.341
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -2.1814,
+            -2.3461,
+            1.3645,
+            0.5723,
+            2.5906
+          ],
+          "left_liberalism_score": [
+            0.9879,
+            2.405,
+            -2.3072,
+            -0.4954,
+            -0.5904
+          ],
+          "right_liberalism_score": [
+            -0.7727,
+            -1.6032,
+            1.5949,
+            0.2126,
+            0.5684
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "ideologiesTest_029",
+        "statement": "Certain sectors (such as the housing market, power generation, and health care) are simply too important to leave to the market.",
+        "scoring": {
+          "hard_right_score": 5.1389,
+          "left_liberalism_score": -2.6548,
+          "right_liberalism_score": 1.2729
+        },
+        "scoring_per_option": {
+          "hard_right_score": [
+            -5.5935,
+            3.9454,
+            2.372,
+            -0.2692,
+            -0.4546
+          ],
+          "left_liberalism_score": [
+            1.1778,
+            -0.6297,
+            0.2962,
+            0.6326,
+            -1.477
+          ],
+          "right_liberalism_score": [
+            0.672,
+            -1.814,
+            -1.1317,
+            0.3288,
+            1.9449
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      }
+    ],
+    "nolanTest": [
+      {
+        "id": "nolanTest_001",
+        "statement": "Some individuals and media spread wrong views with dubious objectives.",
+        "options": [
+          "The spreading of mistaken views aiming at manipulating and / or influencing the public opinion shall be forbidden.",
+          "Apologetic messages of hate and/or extreme views should be banned.",
+          "The Government should not censor any opinion in any case."
+        ],
+        "scoring": {
+          "economic_score": 0.5774,
+          "social_score": 5.0529
+        },
+        "raw": "The spreading of mistaken views aiming at manipulating and / or influencing the public opinion shall be forbidden.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_002",
+        "statement": "The Church performs certain social tasks. Therefore...",
+        "options": [
+          "The Government shall contribute to its financing, and take into consideration their views when passing laws.",
+          "Government and Church must be separate, but the Government may finance some of the social tasks undertaken by the Church (schools, asylums...)",
+          "The Church shall finance itself, and be in equal grounds with any other association."
+        ],
+        "scoring": {
+          "economic_score": -0.5599,
+          "social_score": 5.5475
+        },
+        "raw": "The Government shall contribute to its financing, and take into consideration their views when passing laws.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_003",
+        "statement": "The defense of the country is the responsibility of those serving in the army.",
+        "options": [
+          "Military service shall be compulsory as a way to contribute to common welfare and/or to better educate our youth.",
+          "Military service shall be voluntary. That is the best way to have a professional army prepared to defend our interests and commitments abroad.",
+          "Military service shall be voluntary in case an army exists, and if so, its nature should be limited to its most basic duties of defense."
+        ],
+        "scoring": {
+          "economic_score": -0.6257,
+          "social_score": 4.6486
+        },
+        "raw": "Military service shall be voluntary in case an army exists, and if so, its nature should be limited to its most basic duties of defense.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_004",
+        "statement": "Sex between consenting adults is a matter of individual privacy. Nonetheless...",
+        "options": [
+          "Behaviors such as homosexuality, polygamy or prostitution should be banned or tightly controlled.",
+          "Prositution should be banned or tightly controlled.",
+          "Laws should not interfere with sex between consenting adults, in no case."
+        ],
+        "scoring": {
+          "economic_score": 0.0387,
+          "social_score": 5.649
+        },
+        "raw": "3",
+        "value": null
+      },
+      {
+        "id": "nolanTest_005",
+        "statement": "Drugs are a tragedy for many families",
+        "options": [
+          "The government should fight drug trafficking with more resources and more effectively.",
+          "The use of some drug currently forbidden shall be legal, although its distribution should be controlled.",
+          "Drugs should be legal, decriminalizing its use and liberalizing its distribution."
+        ],
+        "scoring": {
+          "social_score": 5.0845
+        },
+        "raw": "The government should fight drug trafficking with more resources and more effectively.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_006",
+        "statement": "Preventive measures may lead to improved safety. However, in many cases, this collides with some individual rights such as the right to privacy.",
+        "options": [
+          "Safety of all goes before the rights of one; The security forces should not see its role hindered because a criminal is covered by individual rights.",
+          "The laws and the judiciary should establish in which cases preventive measures go before certain individual rights.",
+          "The government should not violate any individual right to improve security."
+        ],
+        "scoring": {
+          "economic_score": -0.2503,
+          "social_score": 5.2768
+        },
+        "raw": "The laws and the judiciary should establish in which cases preventive measures go before certain individual rights.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_007",
+        "statement": "In some institutions, groups or professions, there is a disparity between the number of men and women, or between different races or social groups.",
+        "options": [
+          "Quota obligations are the best instrument to remedy historical situations of discrimination.",
+          "Integration subsidies or tax benefits to underrepresented groups are the best instrument to address discrimination.",
+          "Any imposition or benefit based on criteria of sex, race or social group, violates the principle of equality before the law, and should not be imposed by the Government."
+        ],
+        "scoring": {
+          "economic_score": -0.0224,
+          "social_score": 5.0797
+        },
+        "raw": "Any imposition or benefit based on criteria of sex, race or social group, violates the principle of equality before the law, and should not be imposed by the Government.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_008",
+        "statement": "Borders are used to control immigration.",
+        "options": [
+          "We must strongly limit the entry of new immigrants and/or expel those who do not integrate.",
+          "The Government shall regulate immigration to allow necessary immigrants to come in a legal way.",
+          "There should be no differences of rights based on the place of birth or one's nationality."
+        ],
+        "scoring": {
+          "economic_score": 0.1688,
+          "social_score": 4.9617
+        },
+        "raw": "The Government shall regulate immigration to allow necessary immigrants to come in a legal way.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_009",
+        "statement": "The modern state tends to be associated with the concept of a nation.",
+        "options": [
+          "The Government shall promote patriotism and defend the national identity, culture and language.",
+          "The Government shall protect and / or promote the culture and languge that characterizes its nation.",
+          "The Government shall not intervene in matters as personal as identity or culture. Every citizen should have the freedom to use any language."
+        ],
+        "scoring": {
+          "economic_score": 0.177,
+          "social_score": 4.9619
+        },
+        "raw": "The Government shall protect and / or promote the culture and languge that characterizes its nation.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_010",
+        "statement": "One of the greatest threats to civilization is the deterioration of the environment.",
+        "options": [
+          "Laws should force a cleaner environment by imposing strict limitations of pollutants.",
+          "Clean energies should be promoted through more subsidies to those who pollute less and more taxes to those who pollute the most.",
+          "There would be less pollution should clear responsibilities and well-defined property rights with respect to pollution be established."
+        ],
+        "scoring": {
+          "economic_score": 0.063,
+          "social_score": 4.9705
+        },
+        "raw": "There would be less pollution should clear responsibilities and well-defined property rights with respect to pollution be established.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_011",
+        "statement": "Imports may be limited by the Government through various instruments such as tariffs, prohibitions, or certain regulations.",
+        "options": [
+          "The Government should limit imports from other countries to favor domestic producers.",
+          "The Government should limit imports from some third world countries, as they use cheap labor.",
+          "The Government should not restrict international trade. It must be free and tariffs should be reduced or eliminated."
+        ],
+        "scoring": {
+          "economic_score": 4.6012,
+          "social_score": -0.0321
+        },
+        "raw": "The Government should not restrict international trade. It must be free and tariffs should be reduced or eliminated.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_012",
+        "statement": "Taxes are necessary to cover the Government expenditure.",
+        "options": [
+          "The rich should pay more taxes to increase the benefits and services provided by the State.",
+          "Taxes should not go up. They must be at the level required to meet the expenses of the State.",
+          "Taxes should go down, even if that means cutting some benefits and services provided by the State."
+        ],
+        "scoring": {
+          "economic_score": 5.0692,
+          "social_score": -0.0262
+        },
+        "raw": "The rich should pay more taxes to increase the benefits and services provided by the State.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_013",
+        "statement": "Retirement funds guarantee a level of welfare for the elderly.",
+        "options": [
+          "Retirement plans must be managed by the Government with a public system of mandatory contributions.",
+          "Retirement plans should be guaranteed by the Government, with some kind of mixed model that can combine public and private plans.",
+          "Retirement plans are a matter of individual planning and savings. The Government should not require mandatory contributions to a public system."
+        ],
+        "scoring": {
+          "economic_score": 5.1195,
+          "social_score": -0.0894
+        },
+        "raw": "3",
+        "value": null
+      },
+      {
+        "id": "nolanTest_014",
+        "statement": "The poor and needy depend on the solidarity of the rest of society.",
+        "options": [
+          "The Government should be responsible for removing or reducing poverty and inequality in society.",
+          "The Government shall manage aid and an adequate assistance to the needy, regardless of whether private charitable institutions may voluntarily supplement that.",
+          "Private charity should be the main channel for the solidarity of society."
+        ],
+        "scoring": {
+          "economic_score": 5.176,
+          "social_score": 0.0733
+        },
+        "raw": "The Government shall manage aid and an adequate assistance to the needy, regardless of whether private charitable institutions may voluntarily supplement that.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_015",
+        "statement": "Some professionals require a qualification to work.",
+        "options": [
+          "Professional sectors should be regulated law. The exercise of qualified professions should require the appropriate licenses and permits granted in each case by the competent Government body.",
+          "Professional sectors should be regulated by independent bodies, such as professional associations. Qualified professionals should join them, as their supervision ensures the quality of their services.",
+          "Licenses, permits and professional associations are unnecessary obstacles. The exercise of any profession should be free for anyone qualified."
+        ],
+        "scoring": {
+          "economic_score": 5.0779,
+          "social_score": -0.101
+        },
+        "raw": "The exercise of qualified professions should require the appropriate licenses and permits granted in each case by the competent Government body.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_016",
+        "statement": "Labor unions represent the interests of workers.",
+        "options": [
+          "The labor unions are essential to protect the rights of workers. The Government shall provide them with funding and assign them special functions on labor laws.",
+          "The labor unions, as representatives of workers, should have special status on laws regulating labor, but should not be funded by the Government.",
+          "Labor unions should be governed by the rules applicable to any other association, and no public funding or special functions shall be attributed to them."
+        ],
+        "scoring": {
+          "economic_score": 4.9339,
+          "social_score": 0.0949
+        },
+        "raw": "The labor unions, as representatives of workers, should have special status on laws regulating labor, but should not be funded by the Government.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_017",
+        "statement": "Medical coverage is a necessity for everyone eventually.",
+        "options": [
+          "The Government should manage public medical centers paid by contributions to a mandatory public health insurance.",
+          "The Government should guarantee universal access to health care centers using some sort of public funding.",
+          "The government should not manage medical centers. Medical facilities should be private, and citizens be free to hire the health insurance they wish."
+        ],
+        "scoring": {
+          "economic_score": 4.6626,
+          "social_score": 0.1614
+        },
+        "raw": "The Government should guarantee universal access to health care centers using some sort of public funding.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_018",
+        "statement": "The Central Bank and the banking system, consisting of commercial banks, put the money into circulation.",
+        "options": [
+          "Both the Central Bank and commercial banks should be public and meet social needs.",
+          "The Central Bank has a key role regulating the economy, so it must be independent and supervise commercial banks.",
+          "The Central Bank should reduce its powers, and commercial banks shall all be private."
+        ],
+        "scoring": {
+          "economic_score": 5.2083,
+          "social_score": -0.2184
+        },
+        "raw": "The Central Bank has a key role regulating the economy, so it must be independent and supervise commercial banks.",
+        "value": null
+      },
+      {
+        "id": "nolanTest_019",
+        "statement": "Larger stores have certain competitive advantages versus small traditional shops.",
+        "options": [
+          "Some big department stores have unfair competition practices. More stringent conditions of operation should be imposed on them, or be forced to close.",
+          "Some advantages of big stores should be corrected by regulating certain matters, such as restricting their opening times and days, or limiting the maximum discount they can apply.",
+          "Big stores are businesses like any other. They are entitled to compete freely in the market, with no restrictions on their opening hours or prices."
+        ],
+        "scoring": {
+          "economic_score": 5.1306,
+          "social_score": -0.0301
+        },
+        "raw": "3",
+        "value": null
+      },
+      {
+        "id": "nolanTest_020",
+        "statement": "Labor contracts bind employers and employees on their obligations.",
+        "options": [
+          "Labor laws should impose more restrictions on firing people and further limit precarious employment by ensuring greater worker protection.",
+          "Labor laws should always maintain a special protection to workers, protecting them against abussive firing and precarious employment.",
+          "Employment contracts should enjoy freedom of clauses between parties. Laws should not interfere in purely contractual matters, such as duration or termination causes."
+        ],
+        "scoring": {
+          "economic_score": 4.7523,
+          "social_score": 0.0264
+        },
+        "raw": "3",
+        "value": null
+      }
+    ],
+    "politicalCompassTest": [
+      {
+        "id": "politicalCompassTest_001",
+        "statement": "If economic globalisation is inevitable, it should primarily serve humanity rather than the interests of trans-national corporations.",
+        "scoring": {
+          "economic_score": -0.3434,
+          "social_score": -0.0127
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_002",
+        "statement": "I\u2019d always support my country, whether it was right or wrong.",
+        "scoring": {
+          "economic_score": 0.0141,
+          "social_score": 0.2084
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_003",
+        "statement": "No one chooses their country of birth, so it\u2019s foolish to be proud of it.",
+        "scoring": {
+          "economic_score": -0.0421,
+          "social_score": -0.1694
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_004",
+        "statement": "Our race has many superior qualities, compared with other races.",
+        "scoring": {
+          "economic_score": 0.0272,
+          "social_score": 0.2327
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_005",
+        "statement": "The enemy of my enemy is my friend.",
+        "scoring": {
+          "economic_score": -0.0731,
+          "social_score": 0.1532
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_006",
+        "statement": "Military action that defies international law is sometimes justified.",
+        "scoring": {
+          "economic_score": -0.0244,
+          "social_score": 0.0876
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_007",
+        "statement": "There is now a worrying fusion of information and entertainment.",
+        "scoring": {
+          "economic_score": 0.0318,
+          "social_score": -0.0603
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_008",
+        "statement": "People are ultimately divided more by class than by nationality.",
+        "scoring": {
+          "economic_score": -0.3936,
+          "social_score": 0.0112
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_009",
+        "statement": "Controlling inflation is more important than controlling unemployment.",
+        "scoring": {
+          "economic_score": 0.3811,
+          "social_score": 0.0533
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_010",
+        "statement": "Because corporations cannot be trusted to voluntarily protect the environment, they require regulation.",
+        "scoring": {
+          "economic_score": -0.218,
+          "social_score": 0.0308
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_011",
+        "statement": "\u201cfrom each according to his ability, to each according to his need\u201d is a fundamentally good idea.",
+        "scoring": {
+          "economic_score": -0.4387
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_012",
+        "statement": "The freer the market, the freer the people.",
+        "scoring": {
+          "economic_score": 0.5019,
+          "social_score": 0.0258
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_013",
+        "statement": "It\u2019s a sad reflection on our society that something as basic as drinking water is now a bottled, branded consumer product.",
+        "scoring": {
+          "economic_score": -0.4398
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_014",
+        "statement": "Land shouldn\u2019t be a commodity to be bought and sold.",
+        "scoring": {
+          "economic_score": -0.3996
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_015",
+        "statement": "It is regrettable that many personal fortunes are made by people who simply manipulate money and contribute nothing to their society.",
+        "scoring": {
+          "economic_score": -0.3878,
+          "social_score": 0.029
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_016",
+        "statement": "Protectionism is sometimes necessary in trade.",
+        "scoring": {
+          "economic_score": -0.5365,
+          "social_score": -0.0536
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_017",
+        "statement": "The only social responsibility of a company should be to deliver a profit to its shareholders.",
+        "scoring": {
+          "economic_score": 0.388,
+          "social_score": 0.0106
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_018",
+        "statement": "The rich are too highly taxed.",
+        "scoring": {
+          "economic_score": 0.5066,
+          "social_score": 0.0652
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_019",
+        "statement": "Those with the ability to pay should have access to higher standards of medical care.",
+        "scoring": {
+          "economic_score": 0.3454,
+          "social_score": -0.0525
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_020",
+        "statement": "Governments should penalise businesses that mislead the public.",
+        "scoring": {
+          "economic_score": -0.3139,
+          "social_score": -0.0412
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_021",
+        "statement": "A genuine free market requires restrictions on the ability of predator multinationals to create monopolies.",
+        "scoring": {
+          "economic_score": 0.0235,
+          "social_score": -0.0126
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_022",
+        "statement": "Abortion, when the woman\u2019s life is not threatened, should always be illegal.",
+        "scoring": {
+          "economic_score": 0.0571,
+          "social_score": 0.1324
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_023",
+        "statement": "All authority should be questioned.",
+        "scoring": {
+          "economic_score": -0.0128,
+          "social_score": -0.1834
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_024",
+        "statement": "An eye for an eye and a tooth for a tooth.",
+        "scoring": {
+          "economic_score": -0.0314,
+          "social_score": 0.1504
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_025",
+        "statement": "Taxpayers should not be expected to prop up any theatres or museums that cannot survive on a commercial basis.",
+        "scoring": {
+          "economic_score": 0.3177,
+          "social_score": -0.0576
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_026",
+        "statement": "Schools should not make classroom attendance compulsory.",
+        "scoring": {
+          "social_score": -0.1461
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_027",
+        "statement": "All people have their rights, but it is better for all of us that different sorts of people should keep to their own kind.",
+        "scoring": {
+          "economic_score": 0.0666,
+          "social_score": 0.1788
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_028",
+        "statement": "Good parents sometimes have to spank their children.",
+        "scoring": {
+          "economic_score": 0.0815,
+          "social_score": 0.2427
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_029",
+        "statement": "It\u2019s natural for children to keep some secrets from their parents.",
+        "scoring": {
+          "economic_score": 0.0378,
+          "social_score": -0.1684
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_030",
+        "statement": "Possessing marijuana for personal use should not be a criminal offence.",
+        "scoring": {
+          "economic_score": -0.0905,
+          "social_score": -0.1736
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_031",
+        "statement": "The prime function of schooling should be to equip the future generation to find jobs.",
+        "scoring": {
+          "economic_score": -0.024,
+          "social_score": 0.1131
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_032",
+        "statement": "People with serious inheritable disabilities should not be allowed to reproduce.",
+        "scoring": {
+          "economic_score": 0.0533,
+          "social_score": 0.1565
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_033",
+        "statement": "The most important thing for children to learn is to accept discipline.",
+        "scoring": {
+          "economic_score": 0.0812,
+          "social_score": 0.2506
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_034",
+        "statement": "There are no savage and civilised peoples; there are only different cultures.",
+        "scoring": {
+          "economic_score": 0.0176,
+          "social_score": -0.2181
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_035",
+        "statement": "Those who are able to work, and refuse the opportunity, should not expect society\u2019s support.",
+        "scoring": {
+          "economic_score": -0.0269,
+          "social_score": 0.142
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_036",
+        "statement": "When you are troubled, it\u2019s better not to think about it, but to keep busy with more cheerful things.",
+        "scoring": {
+          "economic_score": 0.1254,
+          "social_score": 0.2229
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_037",
+        "statement": "First-generation immigrants can never be fully integrated within their new country.",
+        "scoring": {
+          "economic_score": -0.0883,
+          "social_score": 0.0238
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_038",
+        "statement": "What\u2019s good for the most successful corporations is always, ultimately, good for all of us.",
+        "scoring": {
+          "economic_score": 0.4018,
+          "social_score": -0.0156
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_039",
+        "statement": "No broadcasting institution, however independent its content, should receive public funding.",
+        "scoring": {
+          "economic_score": 0.2338,
+          "social_score": -0.0293
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_040",
+        "statement": "Our civil liberties are being excessively curbed in the name of counter-terrorism.",
+        "scoring": {
+          "economic_score": -0.0421,
+          "social_score": -0.197
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_041",
+        "statement": "A significant advantage of a one-party state is that it avoids all the arguments that delay progress in a democratic political system.",
+        "scoring": {
+          "economic_score": 0.0451,
+          "social_score": 0.2958
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_042",
+        "statement": "Although the electronic age makes official surveillance easier, only wrongdoers need to be worried.",
+        "scoring": {
+          "social_score": 0.1763
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_043",
+        "statement": "The death penalty should be an option for the most serious crimes.",
+        "scoring": {
+          "economic_score": -0.0479,
+          "social_score": 0.176
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_044",
+        "statement": "In a civilised society, one must always have people above to be obeyed and people below to be commanded.",
+        "scoring": {
+          "economic_score": 0.0379,
+          "social_score": 0.1691
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_045",
+        "statement": "Abstract art that doesn\u2019t represent anything shouldn\u2019t be considered art at all.",
+        "scoring": {
+          "economic_score": 0.0666,
+          "social_score": 0.1611
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_046",
+        "statement": "In criminal justice, punishment should be more important than rehabilitation.",
+        "scoring": {
+          "economic_score": -0.0601,
+          "social_score": 0.1635
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_047",
+        "statement": "It is a waste of time to try to rehabilitate some criminals.",
+        "scoring": {
+          "social_score": 0.1618
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_048",
+        "statement": "The businessperson and the manufacturer are more important than the writer and the artist.",
+        "scoring": {
+          "economic_score": 0.0537,
+          "social_score": 0.0748
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_049",
+        "statement": "Mothers may have careers, but their first duty is to be homemakers.",
+        "scoring": {
+          "economic_score": 0.046,
+          "social_score": 0.2251
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_050",
+        "statement": "Almost all politicians promise economic growth, but we should heed the warnings of climate science that growth is detrimental to our efforts to curb global warming.",
+        "scoring": {
+          "economic_score": -0.041,
+          "social_score": -0.1803
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_051",
+        "statement": "Making peace with the establishment is an important aspect of maturity.",
+        "scoring": {
+          "economic_score": -0.0411,
+          "social_score": 0.1149
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_052",
+        "statement": "Astrology accurately explains many things.",
+        "scoring": {
+          "economic_score": -0.0191,
+          "social_score": 0.1322
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_053",
+        "statement": "You cannot be moral without being religious.",
+        "scoring": {
+          "social_score": 0.0634
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_054",
+        "statement": "Charity is better than social security as a means of helping the genuinely disadvantaged.",
+        "scoring": {
+          "economic_score": 0.5774,
+          "social_score": 0.0748
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_055",
+        "statement": "Some people are naturally unlucky.",
+        "scoring": {
+          "economic_score": -0.0533,
+          "social_score": 0.1027
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_056",
+        "statement": "It is important that my child\u2019s school instills religious values.",
+        "scoring": {
+          "economic_score": -0.0361,
+          "social_score": 0.1169
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_057",
+        "statement": "Sex outside marriage is usually immoral.",
+        "scoring": {
+          "economic_score": -0.0575,
+          "social_score": 0.1663
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_058",
+        "statement": "A same sex couple in a stable, loving relationship should not be excluded from the possibility of child adoption.",
+        "scoring": {
+          "economic_score": -0.0692,
+          "social_score": -0.1917
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_059",
+        "statement": "Pornography, depicting consenting adults, should be legal for the adult population.",
+        "scoring": {
+          "economic_score": 0.0657,
+          "social_score": -0.1794
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_060",
+        "statement": "What goes on in a private bedroom between consenting adults is no business of the state.",
+        "scoring": {
+          "economic_score": 0.0126,
+          "social_score": -0.1866
+        },
+        "raw": "Strongly agree",
+        "value": 3
+      },
+      {
+        "id": "politicalCompassTest_061",
+        "statement": "No one can feel naturally homosexual.",
+        "scoring": {
+          "economic_score": -0.0144,
+          "social_score": 0.1753
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCompassTest_062",
+        "statement": "These days openness about sex has gone too far.",
+        "scoring": {
+          "economic_score": 0.0132,
+          "social_score": 0.0977
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      }
+    ],
+    "politicalCoordinatesTest": [
+      {
+        "id": "politicalCoordinatesTest_001",
+        "statement": "My country should give more foreign and developmental aid to third-world countries.",
+        "scoring": {
+          "economic_score": -0.0936,
+          "social_score": 8.8551
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -4.2938,
+            4.9966,
+            4.5429,
+            -0.8583,
+            -4.3874
+          ],
+          "social_score": [
+            -7.0862,
+            3.6247,
+            5.1761,
+            -3.4835,
+            1.7689
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_002",
+        "statement": "The government should provide healthcare to its citizens free of charge.",
+        "scoring": {
+          "economic_score": 6.0083,
+          "social_score": 21.3203
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -1.219,
+            0.5545,
+            -5.4545,
+            1.3298,
+            4.7893
+          ],
+          "social_score": [
+            -9.8168,
+            -3.5454,
+            -1.7215,
+            3.5803,
+            11.5035
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_003",
+        "statement": "If an immigrant wants to fly the flag of his home country on my country's soil, that's okay with me.",
+        "scoring": {
+          "economic_score": 8.7683,
+          "social_score": 7.2032
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -4.5879,
+            -2.6531,
+            -1.9351,
+            4.9957,
+            4.1804
+          ],
+          "social_score": [
+            -1.0801,
+            -3.1096,
+            -3.1072,
+            1.1738,
+            6.1231
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_004",
+        "statement": "Capital punishment should be an option in some cases.",
+        "scoring": {
+          "economic_score": 24.5629,
+          "social_score": 17.5464
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -10.732,
+            -1.7493,
+            -2.7352,
+            1.3855,
+            13.8309
+          ],
+          "social_score": [
+            -10.6228,
+            2.3089,
+            0.9145,
+            0.4758,
+            6.9236
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_005",
+        "statement": "Immigration to my country should be minimized and strictly controlled.",
+        "scoring": {
+          "economic_score": 1.8409,
+          "social_score": -8.3415
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -1.4357,
+            1.709,
+            0.3869,
+            -1.0653,
+            0.4052
+          ],
+          "social_score": [
+            4.6637,
+            0.0578,
+            0.9505,
+            -1.9942,
+            -3.6778
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_006",
+        "statement": "Western civilization has benefited more from Christianity than from the ideas of Ancient Greece.",
+        "scoring": {
+          "economic_score": -8.8881,
+          "social_score": -4.8702
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            7.1221,
+            0.3665,
+            0.3474,
+            -6.07,
+            -1.766
+          ],
+          "social_score": [
+            2.5256,
+            6.8852,
+            3.7495,
+            -10.8158,
+            -2.3446
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_007",
+        "statement": "If people want to drive without a seat belt, that should be their decision.",
+        "scoring": {
+          "economic_score": -2.1623,
+          "social_score": 5.5015
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            3.1669,
+            0.9531,
+            -3.3839,
+            -1.7406,
+            1.0045
+          ],
+          "social_score": [
+            0.7904,
+            -2.4626,
+            -2.893,
+            -1.7267,
+            6.2919
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_008",
+        "statement": "Overall, security leaks like those perpetrated by Edward Snowden and WikiLeaks do more harm than good.",
+        "scoring": {
+          "economic_score": -6.2345,
+          "social_score": -6.3356
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            1.4777,
+            -2.1399,
+            6.2581,
+            -0.839,
+            -4.7569
+          ],
+          "social_score": [
+            3.3554,
+            -4.7442,
+            2.1159,
+            2.2532,
+            -2.9803
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_009",
+        "statement": "Surveillance and counter-terrorism programs have gone too far.",
+        "scoring": {
+          "economic_score": -1.8847,
+          "social_score": -3.417
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            3.8667,
+            -1.7146,
+            -2.3601,
+            -1.774,
+            1.982
+          ],
+          "social_score": [
+            4.2508,
+            0.4791,
+            -6.0507,
+            0.4869,
+            0.8338
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_010",
+        "statement": "Equality is more important than economic growth.",
+        "scoring": {
+          "economic_score": -9.2188,
+          "social_score": 0.1572
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            4.0646,
+            3.8489,
+            -2.434,
+            -0.3252,
+            -5.1543
+          ],
+          "social_score": [
+            0.3439,
+            2.0528,
+            -0.7276,
+            -2.1703,
+            0.5011
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_011",
+        "statement": "The government should set a cap on the wages of bankers and CEOs.",
+        "scoring": {
+          "economic_score": -9.7194,
+          "social_score": -5.7021
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            3.3301,
+            2.3225,
+            5.1481,
+            -4.4114,
+            -6.3893
+          ],
+          "social_score": [
+            3.3156,
+            -1.0891,
+            2.2013,
+            -2.0413,
+            -2.3865
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_012",
+        "statement": "It almost never ends well when the government gets involved in business.",
+        "scoring": {
+          "economic_score": -5.2408,
+          "social_score": -9.0108
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            3.8588,
+            -5.5443,
+            2.4133,
+            0.6542,
+            -1.3819
+          ],
+          "social_score": [
+            4.1012,
+            2.2729,
+            -3.7867,
+            2.3222,
+            -4.9097
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_013",
+        "statement": "Import tariffs on foreign products are a good way to protect jobs in my country.",
+        "scoring": {
+          "economic_score": -4.084,
+          "social_score": -12.325
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -0.4919,
+            -0.7525,
+            2.3642,
+            3.456,
+            -4.5759
+          ],
+          "social_score": [
+            1.9973,
+            -3.3472,
+            7.1243,
+            4.5533,
+            -10.3277
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_014",
+        "statement": "Free trade is better for third-world countries than developmental aid.",
+        "scoring": {
+          "economic_score": -14.1159,
+          "social_score": -11.4568
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            4.1989,
+            3.713,
+            4.9011,
+            -2.8959,
+            -9.9171
+          ],
+          "social_score": [
+            0.9295,
+            7.8598,
+            1.1481,
+            0.5899,
+            -10.5273
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_015",
+        "statement": "Rehabilitating criminals is more important than punishing them.",
+        "scoring": {
+          "economic_score": -4.6114,
+          "social_score": -8.9536
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            7.6308,
+            -4.6625,
+            -6.9971,
+            1.0094,
+            3.0194
+          ],
+          "social_score": [
+            10.6853,
+            -3.328,
+            -9.7659,
+            0.677,
+            1.7316
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_016",
+        "statement": "We need to increase taxes on industry out of concern for the climate.",
+        "scoring": {
+          "economic_score": -4.5026,
+          "social_score": 7.9515
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            1.0907,
+            1.523,
+            2.8496,
+            -2.0515,
+            -3.4119
+          ],
+          "social_score": [
+            -2.6893,
+            -4.9243,
+            7.3013,
+            -4.9499,
+            5.2622
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_017",
+        "statement": "Marijuana should be legal.",
+        "scoring": {
+          "economic_score": 2.4115,
+          "social_score": 2.9067
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -6.8282,
+            5.0196,
+            6.8632,
+            -0.6378,
+            -4.4167
+          ],
+          "social_score": [
+            -6.3929,
+            4.4721,
+            4.1976,
+            1.2094,
+            -3.4862
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_018",
+        "statement": "Overall, the minimum wage does more harm than good.",
+        "scoring": {
+          "economic_score": 5.0928,
+          "social_score": 9.8706
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            0.3326,
+            -1.8762,
+            -0.4177,
+            -3.4641,
+            5.4254
+          ],
+          "social_score": [
+            -4.1562,
+            4.7201,
+            -0.5405,
+            -5.7377,
+            5.7144
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_019",
+        "statement": "A strong military is a better foreign policy tool than a strong diplomacy.",
+        "scoring": {
+          "economic_score": -6.8769,
+          "social_score": -8.3824
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            4.6911,
+            -0.1659,
+            -3.7004,
+            1.3611,
+            -2.1858
+          ],
+          "social_score": [
+            2.681,
+            7.9386,
+            -2.8148,
+            -2.1034,
+            -5.7014
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_020",
+        "statement": "Prostitution should be legal.",
+        "scoring": {
+          "economic_score": -0.3741,
+          "social_score": -0.8354
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -0.3964,
+            4.6866,
+            0.0188,
+            -3.5386,
+            -0.7704
+          ],
+          "social_score": [
+            2.1004,
+            -4.609,
+            2.0862,
+            -0.8426,
+            1.265
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_021",
+        "statement": "Taxpayer money should not be spent on arts or sports.",
+        "scoring": {
+          "economic_score": -8.6953,
+          "social_score": -6.7411
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            10.7117,
+            -7.1802,
+            -0.6485,
+            -4.8993,
+            2.0163
+          ],
+          "social_score": [
+            13.5879,
+            -12.3223,
+            -2.2729,
+            -5.8396,
+            6.8469
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_022",
+        "statement": "Overall, labor unions do more harm than good.",
+        "scoring": {
+          "economic_score": 14.9667,
+          "social_score": 26.0582
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -3.2814,
+            -8.5412,
+            0.8734,
+            -0.7361,
+            11.6853
+          ],
+          "social_score": [
+            -8.7313,
+            -0.3309,
+            1.0144,
+            -9.2792,
+            17.3269
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_023",
+        "statement": "Homosexual couples should have all the same rights as heterosexual ones, including the right to adopt.",
+        "scoring": {
+          "economic_score": -2.8356,
+          "social_score": -3.1899
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            0.5223,
+            -5.9756,
+            2.5409,
+            5.2258,
+            -2.3133
+          ],
+          "social_score": [
+            2.6429,
+            -0.8745,
+            -3.2349,
+            2.0136,
+            -0.547
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_024",
+        "statement": "Government spending with the aim of creating jobs is generally a good idea.",
+        "scoring": {
+          "economic_score": 11.0314,
+          "social_score": 9.2242
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -0.5971,
+            -2.5363,
+            -4.7574,
+            -2.5436,
+            10.4343
+          ],
+          "social_score": [
+            -1.9654,
+            -1.5369,
+            -0.7194,
+            -3.0372,
+            7.2588
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_025",
+        "statement": "Some countries and civilizations are natural enemies.",
+        "scoring": {
+          "economic_score": -18.9885,
+          "social_score": -20.6171
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            5.6944,
+            5.8311,
+            0.3897,
+            1.3789,
+            -13.2941
+          ],
+          "social_score": [
+            6.483,
+            9.9407,
+            -1.964,
+            -0.3256,
+            -14.1341
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_026",
+        "statement": "The market is generally better at allocating resources than the government.",
+        "scoring": {
+          "economic_score": -3.9482,
+          "social_score": -11.1178
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            2.2613,
+            0.481,
+            2.7262,
+            -3.7818,
+            -1.6868
+          ],
+          "social_score": [
+            1.4913,
+            1.9815,
+            6.3243,
+            -0.1706,
+            -9.6265
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_027",
+        "statement": "People who turn down a job should not be eligible for unemployment benefits from the government.",
+        "scoring": {
+          "economic_score": -0.739,
+          "social_score": 5.5892
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -6.3281,
+            2.1461,
+            3.5476,
+            7.7016,
+            -7.0671
+          ],
+          "social_score": [
+            -8.0924,
+            7.0246,
+            -0.8054,
+            4.3765,
+            -2.5032
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_028",
+        "statement": "There is at heart a conflict between the interest of business and the interest of society.",
+        "scoring": {
+          "economic_score": -9.5743,
+          "social_score": -7.8117
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            1.9645,
+            6.966,
+            -1.1713,
+            -0.1495,
+            -7.6098
+          ],
+          "social_score": [
+            -0.3598,
+            0.8387,
+            4.0502,
+            3.6426,
+            -8.1716
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_029",
+        "statement": "Speculation on the stock exchange is less desirable than other kinds of economic activity.",
+        "scoring": {
+          "economic_score": -11.5605,
+          "social_score": -3.9262
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            11.5521,
+            -5.87,
+            -2.4014,
+            -3.2723,
+            -0.0084
+          ],
+          "social_score": [
+            6.8523,
+            -0.6927,
+            -1.288,
+            -7.7975,
+            2.926
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_030",
+        "statement": "There are too many wasteful government programs.",
+        "scoring": {
+          "economic_score": 9.7038,
+          "social_score": 11.0755
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -0.6143,
+            -9.2337,
+            0.8691,
+            -0.1106,
+            9.0896
+          ],
+          "social_score": [
+            -0.4447,
+            -7.0598,
+            -0.4104,
+            -2.7159,
+            10.6308
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_031",
+        "statement": "The government should redistribute wealth from the rich to the poor.",
+        "scoring": {
+          "economic_score": -3.8462,
+          "social_score": -8.8912
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            2.9473,
+            -5.5128,
+            1.1269,
+            2.3376,
+            -0.899
+          ],
+          "social_score": [
+            5.166,
+            -3.9172,
+            -0.0262,
+            2.5026,
+            -3.7252
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_032",
+        "statement": "Some peoples and religions are generally more trouble than others.",
+        "scoring": {
+          "economic_score": -1.7592,
+          "social_score": -5.8365
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -1.0447,
+            2.1316,
+            -3.4695,
+            5.1864,
+            -2.8039
+          ],
+          "social_score": [
+            -0.4419,
+            -2.9757,
+            0.7836,
+            8.9125,
+            -6.2784
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_033",
+        "statement": "It is legitimate for nations to privilege their own religion over others.",
+        "scoring": {
+          "economic_score": 15.1353,
+          "social_score": 11.3842
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -10.4495,
+            -1.754,
+            1.4451,
+            6.0727,
+            4.6857
+          ],
+          "social_score": [
+            -7.4793,
+            -2.3649,
+            -0.8513,
+            6.7907,
+            3.9049
+          ]
+        },
+        "raw": "Strongly disagree",
+        "value": 0
+      },
+      {
+        "id": "politicalCoordinatesTest_034",
+        "statement": "Medically assisted suicide should be legal.",
+        "scoring": {
+          "economic_score": -19.5926,
+          "social_score": -14.7974
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            6.5737,
+            10.3309,
+            -0.2804,
+            -3.6054,
+            -13.0189
+          ],
+          "social_score": [
+            2.2282,
+            9.8706,
+            2.6318,
+            -2.1615,
+            -12.5691
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_035",
+        "statement": "Monarchy and aristocratic titles should be abolished.",
+        "scoring": {
+          "economic_score": -8.3244,
+          "social_score": -12.3317
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            3.4707,
+            -1.8082,
+            2.8316,
+            0.3598,
+            -4.8538
+          ],
+          "social_score": [
+            1.8664,
+            6.4371,
+            -0.124,
+            2.2859,
+            -10.4654
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      },
+      {
+        "id": "politicalCoordinatesTest_036",
+        "statement": "A country should never go to war without the support of the international community.",
+        "scoring": {
+          "economic_score": 3.4312,
+          "social_score": -2.6469
+        },
+        "scoring_per_option": {
+          "economic_score": [
+            -1.723,
+            -4.5935,
+            3.2689,
+            1.3394,
+            1.7082
+          ],
+          "social_score": [
+            -1.0647,
+            0.7304,
+            4.764,
+            -0.7181,
+            -3.7116
+          ]
+        },
+        "raw": "Strongly agree",
+        "value": 4
+      }
+    ],
+    "politicalSpectrumQuiz": [
+      {
+        "id": "politicalSpectrumQuiz_001",
+        "statement": "Laws should restrict abortion in all or most cases.",
+        "scoring": {
+          "cultureScore": 0.2576,
+          "social_score": 0.248
+        },
+        "raw": "Agree",
+        "value": 3
+      },
+      {
+        "id": "politicalSpectrumQuiz_002",
+        "statement": "Unions were indispensible in establishing the middle class.",
+        "scoring": {
+          "economic_score": -0.2569
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_003",
+        "statement": "In nearly every instance, the free market allocates resources most efficiently.",
+        "scoring": {
+          "economic_score": 0.2519,
+          "social_score": -0.0291
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_004",
+        "statement": "Public radio and television funded by the state provide a valuable service the citizens.",
+        "scoring": {
+          "economic_score": -0.2573,
+          "social_score": 0.0289
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_005",
+        "statement": "Some people should not be allowed to reproduce.",
+        "scoring": {
+          "social_score": 0.2193
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_006",
+        "statement": "Access to healthcare is a right.",
+        "scoring": {
+          "economic_score": -0.2572
+        },
+        "raw": "Agree",
+        "value": 3
+      },
+      {
+        "id": "politicalSpectrumQuiz_007",
+        "statement": "The rich should pay a higher tax rate than the middle class.",
+        "scoring": {
+          "economic_score": -0.2517
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_008",
+        "statement": "School science classes should teach intelligent design.",
+        "scoring": {
+          "cultureScore": 0.2573
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_009",
+        "statement": "Marriage must be heralded for the important role it plays in society.",
+        "scoring": {
+          "cultureScore": 0.2572,
+          "social_score": 0.0829
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_010",
+        "statement": "Sometimes war is necessary, even if it means you strike first.",
+        "scoring": {
+          "foreignPolicyScore": 0.5646,
+          "social_score": 0.0584
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_011",
+        "statement": "Patriotism is an overrated quality.",
+        "scoring": {
+          "cultureScore": -0.2572,
+          "foreignPolicyScore": -0.3387,
+          "social_score": -0.0769
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_012",
+        "statement": "Radio stations should be required to present balanced news coverage.",
+        "scoring": {
+          "economic_score": -0.2572,
+          "social_score": 0.023
+        },
+        "raw": "Agree",
+        "value": 3
+      },
+      {
+        "id": "politicalSpectrumQuiz_013",
+        "statement": "Government should do something about the increasing violence in video games.",
+        "scoring": {
+          "cultureScore": 0.2056,
+          "social_score": 0.2483
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_014",
+        "statement": "If our leader meets with our enemies, it makes us appear weak.",
+        "scoring": {
+          "foreignPolicyScore": 0.5646
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_015",
+        "statement": "We must use our military from time to time to protect our supply of oil, to avoid a national crisis.",
+        "scoring": {
+          "economic_score": -0.0783,
+          "foreignPolicyScore": 0.5645,
+          "social_score": 0.032
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_016",
+        "statement": "Strong gun ownership rights protect the people against tyranny.",
+        "scoring": {
+          "cultureScore": 0.2573,
+          "social_score": -0.2102
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_017",
+        "statement": "It makes no sense to say \"I'm spiritual but not religious.\"",
+        "scoring": {
+          "cultureScore": 0.2573,
+          "social_score": 0.0736
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_018",
+        "statement": "It is not government's responsibility to regulate pollution.",
+        "scoring": {
+          "economic_score": 0.258,
+          "social_score": -0.2028
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_019",
+        "statement": "Gay marriage should be forbidden.",
+        "scoring": {
+          "cultureScore": 0.2576,
+          "social_score": 0.248
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_020",
+        "statement": "It should be against the law to use hateful language toward another racial group.",
+        "scoring": {
+          "social_score": 0.2592
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_021",
+        "statement": "Government should ensure that all citizens meet a certain minimum standard of living.",
+        "scoring": {
+          "economic_score": -0.2543,
+          "social_score": 0.0795
+        },
+        "raw": "Agree",
+        "value": 3
+      },
+      {
+        "id": "politicalSpectrumQuiz_022",
+        "statement": "It is wrong to enforce moral behavior through the law because this infringes upon an individual's freedom.",
+        "scoring": {
+          "social_score": -0.2593
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_023",
+        "statement": "Immigration restrictions are economically protectionist. Non-citizens should be allowed to sell their labor domestically at a rate the market will pay.",
+        "scoring": {
+          "cultureScore": -0.2575,
+          "economic_score": 0.2555,
+          "social_score": -0.0502
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_024",
+        "statement": "An official language should be set, and immigrants should have to learn it.",
+        "scoring": {
+          "cultureScore": 0.2575,
+          "social_score": 0.142
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_025",
+        "statement": "Whatever maximizes economic growth is good for the people.",
+        "scoring": {
+          "economic_score": 0.2564
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_026",
+        "statement": "Racial issues will never be resolved. It is human nature to prefer one's own race.",
+        "scoring": {
+          "cultureScore": 0.2571
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_027",
+        "statement": "People with a criminal history should not be able to vote.",
+        "scoring": {
+          "cultureScore": 0.0256,
+          "social_score": 0.2028
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_028",
+        "statement": "Marijuana should be legal.",
+        "scoring": {
+          "cultureScore": -0.2572,
+          "social_score": -0.2556
+        },
+        "raw": "Agree",
+        "value": 3
+      },
+      {
+        "id": "politicalSpectrumQuiz_029",
+        "statement": "The state should fine television stations for broadcasting offensive language.",
+        "scoring": {
+          "cultureScore": 0.2573,
+          "social_score": 0.2586
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_030",
+        "statement": "It does not make sense to understand the motivations of terrorists because they are self-evidently evil.",
+        "scoring": {
+          "cultureScore": 0.2574,
+          "foreignPolicyScore": 0.5642
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_031",
+        "statement": "The lower the taxes, the better off we all are.",
+        "scoring": {
+          "economic_score": 0.2552
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_032",
+        "statement": "Minority groups that have faced discrimination should receive help from the state to get on an equal footing.",
+        "scoring": {
+          "cultureScore": -0.2573,
+          "economic_score": -0.2545,
+          "social_score": 0.0525
+        },
+        "raw": "Agree",
+        "value": 3
+      },
+      {
+        "id": "politicalSpectrumQuiz_033",
+        "statement": "It is wrong to question a leader in wartime.",
+        "scoring": {
+          "cultureScore": 0.2571,
+          "foreignPolicyScore": 0.3953,
+          "social_score": 0.1174
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_034",
+        "statement": "Tighter regulation would have prevented the collapse of the lending industry.",
+        "scoring": {
+          "economic_score": -0.2526
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_035",
+        "statement": "It makes sense and is fair that some people make much more money than others.",
+        "scoring": {
+          "economic_score": 0.3036
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_036",
+        "statement": "Toppling enemy regimes to spread democracy will make the world a safer place.",
+        "scoring": {
+          "foreignPolicyScore": 0.5646,
+          "social_score": 0.0989
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_037",
+        "statement": "The state has no business regulating alcohol and tobacco products.",
+        "scoring": {
+          "social_score": -0.2499
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_038",
+        "statement": "If an unwed teen becomes pregnant, abortion may be a responsible choice.",
+        "scoring": {
+          "cultureScore": -0.2572
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_039",
+        "statement": "International trade agreements should require environmental protections and workers' rights. (meaning: no free trade with countries that lack pollution controls or labor protections)",
+        "scoring": {
+          "economic_score": -0.2524,
+          "social_score": 0.0528
+        },
+        "raw": "Agree strongly",
+        "value": 4
+      },
+      {
+        "id": "politicalSpectrumQuiz_040",
+        "statement": "Gay equality is a sign of progress.",
+        "scoring": {
+          "cultureScore": -0.2573,
+          "social_score": -0.0493
+        },
+        "raw": "Agree",
+        "value": 3
+      },
+      {
+        "id": "politicalSpectrumQuiz_041",
+        "statement": "The state should be able to put a criminal to death if the crime was serious enough.",
+        "scoring": {
+          "cultureScore": 0.0771,
+          "social_score": 0.2539
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_042",
+        "statement": "The military budget should be scaled back.",
+        "scoring": {
+          "economic_score": 0.0487,
+          "foreignPolicyScore": -0.5645,
+          "social_score": -0.022
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_043",
+        "statement": "Economic competition results in inumerable innovations that improve all of our lives.",
+        "scoring": {
+          "economic_score": 0.1844
+        },
+        "raw": "Agree strongly",
+        "value": 4
+      },
+      {
+        "id": "politicalSpectrumQuiz_044",
+        "statement": "It is not our place to condemn other cultures as backwards or barbaric.",
+        "scoring": {
+          "cultureScore": -0.2574,
+          "foreignPolicyScore": -0.5644
+        },
+        "raw": "Disagree strongly",
+        "value": 0
+      },
+      {
+        "id": "politicalSpectrumQuiz_045",
+        "statement": "When one group is slaughtering another group somewhere in the world, we have a responsibility to intervene.",
+        "scoring": {
+          "cultureScore": -0.0774,
+          "foreignPolicyScore": 0.5644,
+          "social_score": 0.0512
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_046",
+        "statement": "We'd be better off if we could just lock up some of the people expressing radical political views, and keep them away from society.",
+        "scoring": {
+          "social_score": 0.188
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_047",
+        "statement": "Unrestrained capitalism cannot last, as wealth and power will concentrate to a small elite.",
+        "scoring": {
+          "economic_score": -0.3013
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_048",
+        "statement": "It is a problem when young people display a lack of respect for authority.",
+        "scoring": {
+          "social_score": 0.2506
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_049",
+        "statement": "When corporate interests become too powerful, the state should take action to ensure the public interest is served.",
+        "scoring": {
+          "economic_score": -0.2522,
+          "social_score": 0.0539
+        },
+        "raw": "Agree",
+        "value": 3
+      },
+      {
+        "id": "politicalSpectrumQuiz_050",
+        "statement": "A person's morality is of the most personal nature; therefore government should have no involvement in moral questions or promote moral behaviors.",
+        "scoring": {
+          "social_score": -0.2479
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_051",
+        "statement": "The state should not set a minimum wage.",
+        "scoring": {
+          "economic_score": 0.2536,
+          "social_score": -0.0505
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_052",
+        "statement": "A nation's retirement safety net cannot be trusted to the fluctuations of the stock market.",
+        "scoring": {
+          "economic_score": -0.2558
+        },
+        "raw": "Disagree",
+        "value": 1
+      },
+      {
+        "id": "politicalSpectrumQuiz_053",
+        "statement": "Offensive or blasphemous art should be suppressed.",
+        "scoring": {
+          "cultureScore": 0.2316,
+          "social_score": 0.2553
+        },
+        "raw": "Disagree",
+        "value": 1
+      }
+    ],
+    "worldSmallestPoliticalQuiz": [
+      {
+        "id": "worldSmallestPoliticalQuiz_001",
+        "statement": "Government should not censor speech, press, media or internet.",
+        "scoring": {
+          "personal_issues_score": -10.0
+        },
+        "raw": "Agree",
+        "value": 0
+      },
+      {
+        "id": "worldSmallestPoliticalQuiz_002",
+        "statement": "Military service should be voluntary. There should be no draft.",
+        "scoring": {
+          "personal_issues_score": -10.0
+        },
+        "raw": "Agree",
+        "value": 0
+      },
+      {
+        "id": "worldSmallestPoliticalQuiz_003",
+        "statement": "There should be no laws regarding sex between consenting adults.",
+        "scoring": {
+          "personal_issues_score": -10.0
+        },
+        "raw": "Disagree",
+        "value": 2
+      },
+      {
+        "id": "worldSmallestPoliticalQuiz_004",
+        "statement": "Repeal laws prohibiting adult possession and use of drugs.",
+        "scoring": {
+          "personal_issues_score": -10.0
+        },
+        "raw": "Disagree",
+        "value": 2
+      },
+      {
+        "id": "worldSmallestPoliticalQuiz_005",
+        "statement": "Government should not target, detain, and deport undocumented workers.",
+        "scoring": {
+          "personal_issues_score": -10.0
+        },
+        "raw": "Disagree",
+        "value": 2
+      },
+      {
+        "id": "worldSmallestPoliticalQuiz_006",
+        "statement": "Taxpayers should NOT be responsible for student loan debt.",
+        "scoring": {
+          "economic_issues_score": -10.0
+        },
+        "raw": "Disagree",
+        "value": 2
+      },
+      {
+        "id": "worldSmallestPoliticalQuiz_007",
+        "statement": "Government should not be responsible for providing healthcare.",
+        "scoring": {
+          "economic_issues_score": -10.0
+        },
+        "raw": "Disagree",
+        "value": 2
+      },
+      {
+        "id": "worldSmallestPoliticalQuiz_008",
+        "statement": "Let people control their own retirement; privatize Social Security.",
+        "scoring": {
+          "economic_issues_score": -10.0
+        },
+        "raw": "Disagree",
+        "value": 2
+      },
+      {
+        "id": "worldSmallestPoliticalQuiz_009",
+        "statement": "Replace government welfare with private charity.",
+        "scoring": {
+          "economic_issues_score": -10.0
+        },
+        "raw": "Disagree",
+        "value": 2
+      },
+      {
+        "id": "worldSmallestPoliticalQuiz_010",
+        "statement": "Cut taxes and government spending by 50% or more.",
+        "scoring": {
+          "economic_issues_score": -10.0
+        },
+        "raw": "Disagree",
+        "value": 2
+      }
+    ]
+  }
+}

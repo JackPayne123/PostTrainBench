@@ -1,0 +1,9 @@
+{
+  "config": {
+    "started_at": "2026-05-12T11:30",
+    "condition": "DUMMY (full demo)",
+    "student_model": "Qwen/Qwen3-1.7B",
+    "teacher_model": "claude-opus-4-7",
+    "benchmark": "synthesised_demo"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "status": "completed_partial",
+  "kind": "baseline",
+  "drive_uploaded": true,
+  "drive_url": "https://drive.google.com/drive/folders/1eHDuBJjzmXhug8cRfYyyJ9lQCmfATQgF",
+  "error": "",
+  "tasks_ok": 21,
+  "tasks_failed": 2,
+  "timestamp": "2026-05-12T04:51:44.678212Z",
+  "pod_id": "hvn22yp3o8slq0",
+  "run_id": "2026-05-12_13-02_adaptereval_qwen_qwen3-1.7b_limit100_94e26d"
+}

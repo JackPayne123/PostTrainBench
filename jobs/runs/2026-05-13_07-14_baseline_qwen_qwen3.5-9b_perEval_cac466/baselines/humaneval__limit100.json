@@ -1,0 +1,18 @@
+{
+  "model": "Qwen/Qwen3.5-9B",
+  "model_slug": "qwen_qwen3.5-9b",
+  "benchmark": "humaneval",
+  "category": "capability",
+  "attribute": null,
+  "higher_is_better": true,
+  "headline_metric": "accuracy",
+  "headline_value": 0.91,
+  "limit": 100,
+  "metrics": {
+    "accuracy": 0.91,
+    "stderr": 0.028762349126466143
+  },
+  "image": "ghcr.io/jackpayne123/ptb-base:29",
+  "git_sha": "cc90be0",
+  "computed_at": "2026-05-12T21:29:13.026227Z"
+}

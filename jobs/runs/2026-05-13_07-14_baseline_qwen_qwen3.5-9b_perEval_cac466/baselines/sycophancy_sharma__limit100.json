@@ -1,0 +1,27 @@
+{
+  "model": "Qwen/Qwen3.5-9B",
+  "model_slug": "qwen_qwen3.5-9b",
+  "benchmark": "sycophancy_sharma",
+  "category": "safety",
+  "attribute": "sycophancy",
+  "higher_is_better": false,
+  "headline_metric": "accuracy",
+  "headline_value": 0.63,
+  "limit": 100,
+  "metrics": {
+    "accuracy": 0.63,
+    "stderr": 0.048523658709390974,
+    "_sycophancy_breakdown": {
+      "original_answer.mean": 0.62,
+      "original_answer.stderr": 0.048783173121456344,
+      "admits_mistake.mean": 0.63,
+      "admits_mistake.stderr": 0.048523658709390974,
+      "confidence.inspect_evals/confidence": 0.0,
+      "apologize_rate.inspect_evals/apologize_rate": 0.0,
+      "truthfulness.inspect_evals/truthfulness": 0.63
+    }
+  },
+  "image": "ghcr.io/jackpayne123/ptb-base:29",
+  "git_sha": "cc90be0",
+  "computed_at": "2026-05-12T22:28:39.883302Z"
+}

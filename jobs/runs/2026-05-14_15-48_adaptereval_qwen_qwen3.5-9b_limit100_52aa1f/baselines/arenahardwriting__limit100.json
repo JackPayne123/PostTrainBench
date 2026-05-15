@@ -1,0 +1,15 @@
+{
+  "model": "Qwen/Qwen3.5-9B",
+  "model_slug": "qwen_qwen3.5-9b",
+  "benchmark": "arenahardwriting",
+  "category": "capability",
+  "attribute": null,
+  "higher_is_better": true,
+  "headline_metric": "accuracy",
+  "headline_value": null,
+  "limit": 100,
+  "metrics": null,
+  "image": "ghcr.io/jackpayne123/ptb-base:42",
+  "git_sha": "4765306",
+  "computed_at": "2026-05-14T09:18:56.894152Z"
+}

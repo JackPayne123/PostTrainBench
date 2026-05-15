@@ -1,0 +1,12 @@
+{
+  "kind": "adapter_eval",
+  "model": "Qwen/Qwen3.5-9B",
+  "model_slug": "qwen_qwen3.5-9b",
+  "limit": 100,
+  "only_bench": [],
+  "adapter_from_run_id": "2026-05-13_23-51_F_claude-opus-4-7_qwen3.5-9b_seed0_c48160",
+  "image": "ghcr.io/jackpayne123/ptb-base:33",
+  "git_sha": "fae7201",
+  "started_at": "2026-05-13T20:55:03.198992Z",
+  "run_dir_name": "2026-05-14_06-55_adaptereval_qwen_qwen3.5-9b_limit100_e0266d"
+}

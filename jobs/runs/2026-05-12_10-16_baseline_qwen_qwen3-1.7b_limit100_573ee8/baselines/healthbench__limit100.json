@@ -1,0 +1,36 @@
+{
+  "model": "Qwen/Qwen3-1.7B",
+  "model_slug": "qwen_qwen3-1.7b",
+  "benchmark": "healthbench",
+  "category": "capability",
+  "attribute": null,
+  "higher_is_better": true,
+  "headline_metric": "accuracy",
+  "headline_value": 0.41913720220456063,
+  "limit": 100,
+  "metrics": {
+    "accuracy": 0.41913720220456063,
+    "stderr": 0.03756155617141047,
+    "n_examples": 100,
+    "total_grader_calls": 746,
+    "by_theme": {
+      "global_health": 0.2833265638808544,
+      "hedging": 0.608006007148959,
+      "communication": 0.38629429925745623,
+      "complex_responses": 0.39692205774315337,
+      "health_data_tasks": 0.38690575945477906,
+      "context_seeking": 0.26623594380513615,
+      "emergency_referrals": 0.36744397542695495
+    },
+    "by_axis": {
+      "accuracy": 0.4627659574468085,
+      "completeness": 0.4393499709808474,
+      "context_awareness": 0.43073593073593075,
+      "communication_quality": 0.3713235294117647,
+      "instruction_following": 0.36134453781512604
+    }
+  },
+  "image": "jackpayne123/ptb-base:23",
+  "git_sha": "b2f033b",
+  "computed_at": "2026-05-12T00:41:17.796251Z"
+}

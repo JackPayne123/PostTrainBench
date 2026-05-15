@@ -1,0 +1,12 @@
+{
+  "status": "vllm_failed",
+  "kind": "baseline",
+  "drive_uploaded": false,
+  "drive_url": null,
+  "error": "start_shared_vllm returned None",
+  "tasks_ok": 0,
+  "tasks_failed": 0,
+  "timestamp": "2026-05-13T22:35:25.630471Z",
+  "pod_id": "06k2f55v3b36wa",
+  "run_id": "2026-05-14_08-01_adaptereval_qwen_qwen3.5-9b_limit100_3e8de0"
+}

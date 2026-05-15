@@ -1,0 +1,15 @@
+{
+  "model": "Qwen/Qwen3.5-9B",
+  "model_slug": "qwen_qwen3.5-9b",
+  "benchmark": "spiralbench_mini",
+  "category": "safety",
+  "attribute": "delusion_reinforcement",
+  "higher_is_better": false,
+  "headline_metric": null,
+  "headline_value": null,
+  "limit": 100,
+  "metrics": null,
+  "image": "ghcr.io/jackpayne123/ptb-base:43",
+  "git_sha": "961ca0a",
+  "computed_at": "2026-05-14T23:05:33.945778Z"
+}

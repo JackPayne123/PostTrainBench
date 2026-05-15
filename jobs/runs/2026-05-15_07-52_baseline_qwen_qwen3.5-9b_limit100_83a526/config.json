@@ -1,0 +1,21 @@
+{
+  "kind": "baseline",
+  "model": "Qwen/Qwen3.5-9B",
+  "model_slug": "qwen_qwen3.5-9b",
+  "limit": 100,
+  "only_bench": [
+    "big_five",
+    "moral_foundations",
+    "rozado_battery",
+    "activity_preference",
+    "political_bias_openai",
+    "moru",
+    "persona_traits",
+    "spiralbench_mini"
+  ],
+  "adapter_from_run_id": null,
+  "image": "ghcr.io/jackpayne123/ptb-base:43",
+  "git_sha": "961ca0a",
+  "started_at": "2026-05-14T21:52:32.241242Z",
+  "run_dir_name": "2026-05-15_07-52_baseline_qwen_qwen3.5-9b_limit100_83a526"
+}

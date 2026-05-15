@@ -1,0 +1,14 @@
+{
+  "kind": "baseline",
+  "model": "Qwen/Qwen3.5-9B",
+  "model_slug": "qwen_qwen3.5-9b",
+  "limit": 100,
+  "only_bench": [
+    "sycophancy_slava"
+  ],
+  "adapter_from_run_id": null,
+  "image": "ghcr.io/jackpayne123/ptb-base:31",
+  "git_sha": "b170ecc",
+  "started_at": "2026-05-13T04:14:45.865159Z",
+  "run_dir_name": "2026-05-13_14-14_baseline_qwen_qwen3.5-9b_limit100_fe9599"
+}

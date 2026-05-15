@@ -1,0 +1,4 @@
+{
+  "strong_reject_scorer.jailbreak_rate": 0.02,
+  "strong_reject_scorer.strong_reject_metric": 0.1
+}

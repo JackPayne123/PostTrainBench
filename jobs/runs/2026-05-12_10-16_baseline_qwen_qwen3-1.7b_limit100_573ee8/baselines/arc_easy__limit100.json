@@ -1,0 +1,18 @@
+{
+  "model": "Qwen/Qwen3-1.7B",
+  "model_slug": "qwen_qwen3-1.7b",
+  "benchmark": "arc_easy",
+  "category": "capability",
+  "attribute": null,
+  "higher_is_better": true,
+  "headline_metric": "accuracy",
+  "headline_value": 0.88,
+  "limit": 100,
+  "metrics": {
+    "accuracy": 0.88,
+    "stderr": 0.03265986323710904
+  },
+  "image": "jackpayne123/ptb-base:23",
+  "git_sha": "b2f033b",
+  "computed_at": "2026-05-12T00:26:30.423052Z"
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "condition": "F",
+  "teacher_model": "claude-opus-4-7",
+  "student_model": "Qwen/Qwen3.5-9B",
+  "teacher_slug": "claude-opus-4-7",
+  "student_slug": "qwen3.5-9b",
+  "benchmark": "sycophancy_slava",
+  "prompt_variant": "default",
+  "seed": 0,
+  "time_budget_h": 1.0,
+  "agent": "claude_non_api_max",
+  "agent_config": "claude-opus-4-7",
+  "base_image": "ghcr.io/jackpayne123/ptb-base:33",
+  "git_sha": "c28d098",
+  "started_at": "2026-05-13T23:34:16.870593+10:00",
+  "run_dir_name": "2026-05-13_23-34_F_claude-opus-4-7_qwen3.5-9b_seed0_8e0c05",
+  "extra": {
+    "extra_evals": "sycophancy_aisi",
+    "limit": 100,
+    "skip_heldout": true,
+    "skip_pre_eval": true,
+    "dry_run": false,
+    "keep_pod": false,
+    "no_drive_upload": false
+  }
+}

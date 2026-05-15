@@ -1,0 +1,12 @@
+{
+  "status": "vllm_failed",
+  "kind": "baseline",
+  "drive_uploaded": false,
+  "drive_url": null,
+  "error": "Command 'sleep 2; setsid nohup bash -c 'export HF_HOME=/workspace/hf-cache; export HF_TOKEN=hf_REDACTED; export VLLM_LOGGING_LEVEL=DEBUG; vllm serve Qwen/Qwen3.5-9B --host 0.0.0.0 --port 36216 --api-key inspectai --served-model-name base --gpu-memory-utilization 0.85 --chat-template /opt/ptb/src/evals/templates/qwen3.jinja --uvicorn-log-level debug --enforce-eager --enable-lora --max-lora-rank 64 --lora-modules student=/workspace/runs/2026-05-14_08-58_adaptereval_qwen_qwen3.5-9b_limit100_6b9a39/lora_adapter' > /workspace/vllm-adaptereval.log 2>&1 < /dev/null & disown 2>/dev/null || true; echo started' timed out after 30 seconds",
+  "tasks_ok": 0,
+  "tasks_failed": 0,
+  "timestamp": "2026-05-13T23:14:48.187909Z",
+  "pod_id": "23zx9998ckyuxf",
+  "run_id": "2026-05-14_08-58_adaptereval_qwen_qwen3.5-9b_limit100_6b9a39"
+}

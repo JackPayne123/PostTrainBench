@@ -1,0 +1,12 @@
+{
+  "status": "vllm_failed",
+  "kind": "baseline",
+  "drive_uploaded": false,
+  "drive_url": null,
+  "error": "Command 'rsync -aL /workspace/hf-cache/hub/models--Qwen--Qwen3.5-9B/ /root/.cache/huggingface/hub/models--Qwen--Qwen3.5-9B/' timed out after 600 seconds",
+  "tasks_ok": 0,
+  "tasks_failed": 0,
+  "timestamp": "2026-05-14T00:32:00.333882Z",
+  "pod_id": "kjwn6iujh5gued",
+  "run_id": "2026-05-14_10-11_adaptereval_qwen_qwen3.5-9b_limit100_b85921"
+}
