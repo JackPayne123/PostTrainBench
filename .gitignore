@@ -256,3 +256,6 @@ jobs/runs/_heldout_test_*/
 
 # macOS Finder metadata
 .DS_Store
+
+# Netlify CLI state
+.netlify/
