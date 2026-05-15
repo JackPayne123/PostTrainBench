@@ -62,7 +62,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--temperature", type=float, default=1.0)
     p.add_argument(
-        "--judge-concurrency", type=int, default=4,
+        "--judge-concurrency", type=int, default=16,
         help="Concurrent Haiku judge calls. Default 4 keeps total throughput "
              "below the typical 450k input-tokens/min Anthropic per-org cap "
              "(each judge request is ~2k input tokens). Bump if your account "
