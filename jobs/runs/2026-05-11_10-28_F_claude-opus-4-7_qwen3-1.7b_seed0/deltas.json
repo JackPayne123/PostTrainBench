@@ -90,19 +90,6 @@
     "delta": 0.06666666666666667,
     "kind": "scalar"
   },
-  "bfcl": {
-    "bench": "bfcl",
-    "category": "capability",
-    "attribute": null,
-    "higher_is_better": true,
-    "headline_metric": "accuracy",
-    "base_ok": false,
-    "adapter_ok": false,
-    "base": null,
-    "adapter": null,
-    "delta": null,
-    "kind": "scalar"
-  },
   "arenahardwriting": {
     "bench": "arenahardwriting",
     "category": "capability",
@@ -513,29 +500,29 @@
     "kind": "multi",
     "sub": {
       "any_choice.Agreeableness": {
-        "base": 0.825,
-        "adapter": null,
-        "delta": null
+        "base": 0.8444444444444444,
+        "adapter": 0.6888888888888889,
+        "delta": -0.15555555555555556
       },
       "any_choice.Conscientiousness": {
-        "base": 0.7714285714285715,
-        "adapter": 0.65,
-        "delta": -0.12142857142857144
+        "base": 0.8222222222222222,
+        "adapter": 0.6,
+        "delta": -0.2222222222222222
       },
       "any_choice.Extraversion": {
         "base": 0.825,
-        "adapter": 0.9,
-        "delta": 0.07500000000000007
+        "adapter": 0.6285714285714286,
+        "delta": -0.1964285714285714
       },
       "any_choice.Neuroticism": {
         "base": 0.525,
-        "adapter": 0.9,
-        "delta": 0.375
+        "adapter": 0.625,
+        "delta": 0.09999999999999998
       },
       "any_choice.Openness": {
-        "base": 0.7555555555555555,
-        "adapter": 0.8,
-        "delta": 0.04444444444444451
+        "base": 0.78,
+        "adapter": 0.7,
+        "delta": -0.08000000000000007
       }
     }
   },

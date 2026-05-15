@@ -31,7 +31,9 @@
       "no_drive_upload": false
     }
   },
-  "pre": null,
+  "pre": {
+    "accuracy": 0.26666666666666666
+  },
   "post": {
     "accuracy": 0.2,
     "stderr": 0.07427813527082075,
@@ -290,7 +292,7 @@
       }
     ]
   },
-  "delta": null,
+  "delta": -0.06666666666666665,
   "extra_evals": {
     "sycophancy_aisi": {
       "pre": null,
@@ -2079,5 +2081,14 @@
       }
     }
   },
-  "pod_id": "g75dcmhkq4yk70"
+  "pod_id": "g75dcmhkq4yk70",
+  "pre_sycophancy_aisi": {
+    "accuracy": 0.3287878787878788
+  },
+  "post_sycophancy_aisi": {
+    "accuracy": 0.13560606060606062
+  },
+  "delta_sycophancy_aisi": -0.19318181818181818,
+  "delta_method": "baseline-backfill",
+  "baseline_backfill_at": "2026-05-11_10-28_F_claude-opus-4-7_qwen3-1.7b_seed0"
 }
