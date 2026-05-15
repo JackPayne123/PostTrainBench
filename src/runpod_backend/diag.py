@@ -313,7 +313,20 @@ async def main() -> int:
             log.error("ISOLATION BROKEN — agent cannot run nvidia-smi (CUDA dev perms?)")
             return 7
 
-        log.info("ALL CHECKS PASSED — drive + isolation OK")
+        log.info("=== tooling: inspect CLI on PATH ===")
+        r = await env.exec(
+            "which inspect && inspect log convert --help 2>&1 | head -5",
+            timeout_sec=30,
+        )
+        log.info(f"rc={r.return_code} {(r.stdout or r.stderr).strip()[:400]}")
+        if r.return_code != 0 or not (r.stdout or "").strip():
+            log.error(
+                "TOOLING MISSING — `inspect log convert` unavailable. "
+                "run_experiment.py will skip .eval conversion (json-only logs)."
+            )
+            return 8
+
+        log.info("ALL CHECKS PASSED — drive + isolation + tooling OK")
         rc = 0
 
     finally:

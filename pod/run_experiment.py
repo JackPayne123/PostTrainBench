@@ -140,6 +140,13 @@ SHARED_VLLM_PORT = 36216
 SHARED_VLLM_NAME = "student"
 SHARED_VLLM_API_KEY = "inspectai"
 
+# Probe for the inspect CLI at module init. We rely on
+# `inspect log convert --to eval` after every run_eval to produce .eval
+# files alongside the native .json logs. Missing CLI = run continues
+# fine but .eval files never appear — easier to know up-front than to
+# discover post-hoc that audit tooling has no .eval to open.
+INSPECT_CLI_PATH = shutil.which("inspect")
+
 
 # ─── Subprocess helpers ─────────────────────────────────────────────────────
 
@@ -573,6 +580,30 @@ def run_eval(*, label: str, benchmark: str, model_path: str, limit: int,
             shutil.copytree(task_logs, audit_dst / "logs", dirs_exist_ok=True)
         except Exception as e:
             log.warning(f"[{label}] failed to mirror inspect logs: {e}")
+        # Produce .eval alongside the native .json per-sample logs so the
+        # inspect viewer can open them directly. `inspect log convert`
+        # writes <name>.eval next to <name>.json without touching source
+        # files. Soft-fail: not having .eval files mustn't fail the run.
+        mirrored_logs = audit_dst / "logs"
+        if mirrored_logs.exists() and INSPECT_CLI_PATH:
+            try:
+                rc = run_sh(
+                    f"{INSPECT_CLI_PATH} log convert --to eval "
+                    f"--output-dir {mirrored_logs} {mirrored_logs}",
+                    check=False, log_cmd=False, timeout=300,
+                )
+                if rc.returncode != 0:
+                    tail = (rc.stdout or "")[-400:] if rc.stdout else ""
+                    log.warning(
+                        f"[{label}] .eval conversion rc={rc.returncode}; tail: {tail!r}"
+                    )
+                else:
+                    n_eval = len(list(mirrored_logs.glob("*.eval")))
+                    log.info(f"[{label}] .eval conversion OK ({n_eval} files)")
+            except Exception as e:
+                log.warning(f"[{label}] .eval conversion skipped: {e}")
+        elif mirrored_logs.exists() and not INSPECT_CLI_PATH:
+            log.debug(f"[{label}] skipping .eval conversion (inspect CLI absent)")
     try:
         shutil.copy2(eval_log, audit_dst / eval_log.name)
     except Exception as e:
@@ -1018,7 +1049,11 @@ def rclone_to_drive_one(local_path: Path) -> bool:
         f"-v 2>&1"
     )
     log.info(f"[drive] uploading {local_path.name} → drive:{RUN_ID}/{local_path.name}")
-    r = run_sh(cmd, timeout=60)
+    # 180s, not 60s: single-file `rclone copyto` sometimes takes >60s on
+    # first connection (token refresh + folder ID lookup + Drive ACL check
+    # add up). 2026-05-15 baseline run lost DONE upload to this exact
+    # 60s timeout despite the main bulk upload succeeding 90s earlier.
+    r = run_sh(cmd, timeout=180)
     if r.returncode == 0:
         log.info(f"[drive] {local_path.name} upload OK")
         return True
@@ -1187,6 +1222,14 @@ def main() -> None:
     log.info(f"  condition: {cfg['condition']}")
     log.info(f"  budget:    {cfg['time_budget_h']}h")
     log.info(f"  limit:     {cfg['extra'].get('limit', 150)}")
+    if INSPECT_CLI_PATH:
+        log.info(f"  inspect CLI: {INSPECT_CLI_PATH} (.eval conversion ON)")
+    else:
+        log.warning(
+            "  inspect CLI NOT FOUND on PATH — eval_logs/<bench>/logs/ will "
+            "contain only .json (no .eval files for the inspect viewer). "
+            "Add `pip install inspect-ai` to the image, or use `inspect-ai>=0.3.200`."
+        )
 
     extra_evals_str = cfg["extra"].get("extra_evals", "") or ""
     extra_evals = [b.strip() for b in extra_evals_str.split(",") if b.strip()]
