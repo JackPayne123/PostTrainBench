@@ -63,13 +63,14 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", required=True,
                    help="HF model id, e.g. Qwen/Qwen3-1.7B")
-    p.add_argument("--limit", type=int, default=0,
-                   help="Forced sample cap applied to every eval. 0 (default) = "
-                        "use per-eval `default_limit` from EVAL_SUITE registry "
-                        "(varies by bench: aime2025=30 full set, mmlu/arc_easy "
-                        "=200, generative-graded=100, character question-banks "
-                        "=full set). Pass `--limit 100` to override and force "
-                        "the same N across all evals (reproducibility flag).")
+    p.add_argument("--limit", type=int, default=100,
+                   help="Forced sample cap applied to every eval. 100 (default) = "
+                        "canonical setting matching --full-suite-eval. Keeps base "
+                        "baseline + F-run adapter-eval indexed by the same N so "
+                        "compute_deltas.py can pair them (the c48160 character-"
+                        "dashboard bug fix 2026-05-15). Pass `--limit 0` to fall "
+                        "back to per-eval `default_limit` from EVAL_SUITE registry "
+                        "(varies: mmlu/arc_easy=200, big_five=40 full, etc.).")
     p.add_argument("--only-bench", type=str, default="",
                    help="Comma-separated subset of EVAL_SUITE task names to "
                         "re-run (empty = run the whole suite). Use after a "

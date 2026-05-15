@@ -78,7 +78,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--time-budget-h", type=float, default=1.0)
     p.add_argument("--agent", default="claude_non_api_max")
     p.add_argument("--prompt-variant", default="default")
-    p.add_argument("--limit", type=int, default=150)
+    p.add_argument(
+        "--limit", type=int, default=100,
+        help="Sample cap per eval pass. 100 (default) is canonical — matches "
+             "submit_baseline.py and --full-suite-eval so deltas pair cleanly.",
+    )
     p.add_argument("--no-watch", action="store_true")
     p.add_argument("--keep-pod", action="store_true",
                    help="pod doesn't self-terminate after DONE (debug)")

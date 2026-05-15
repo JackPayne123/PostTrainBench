@@ -229,7 +229,7 @@ Two pods on the same `networkVolumeId` was rejected by the RunPod allocator (see
 | `--benchmark` | Primary task. Registered choices live in `src/evals/registry.py:EVAL_SUITE` (23 evals as of 2026-05-12, bfcl excluded). Common: `gsm8k`, `humaneval`, `aime2025`, `gpqamain`, `arenahardwriting`, `healthbench`, `sycophancy_slava`, `sycophancy_aisi`. |
 | `--extra-evals` | Comma-separated additional benchmarks; pre/post-eval only (no training). |
 | `--time-budget-h` | Agent training budget. Pre/post-eval time is on top. |
-| `--limit` | Sample count per eval pass. 30 is a small smoke; 100 is the standard. Per-eval defaults live in `EvalInfo.default_limit` if `--limit 0`. |
+| `--limit` | Sample count per eval pass. **Default 100** (canonical — same N as `--full-suite-eval` so base baseline + adapter-eval indexes pair cleanly in `compute_deltas.py`/dashboard). 30 is a small smoke. Pass `--limit 0` explicitly to fall back to per-bench `EvalInfo.default_limit` (only useful for ad-hoc debug where you don't care about pairing with existing baselines). |
 | `--skip-heldout` | Skip the held-out capability panel after post-eval. Use for sycophancy-only smokes. |
 | `--skip-pre-eval` | Pod skips pre-eval (and extras-pre-eval). summary.json gets `pre=None`, `delta=None`. Backfill via `scripts/compute_deltas.py <run_id> --write-deltas --update-summary` once baselines exist. Implied by `--use-baseline`. |
 | `--full-suite-eval` / `--no-full-suite-eval` | (default ON, :34+) After post-eval, iterate all remaining `EVAL_SUITE` benches against the adapter via the same vllm-post session. Per-bench JSONs land in `<run_dir>/baselines/`. `pull_baseline.py <f-run-id>` promotes to `baselines/<slug>/adapter_eval/<f-run-id>/`. Adds ~1.5h pod time. Disable for cheap iteration or smokes. |
@@ -245,7 +245,7 @@ Two pods on the same `networkVolumeId` was rejected by the RunPod allocator (see
 |------|-------|
 | `--only-bench gsm8k,mmlu,...` | Comma-separated subset of EVAL_SUITE to re-run. Use after a partial baseline to refresh only the failed ones. |
 | `--adapter-from-run-id <id>` | Adapter-eval mode (see above). Pod rclone-pulls `drive:<id>/final_model/`, vllm-up `--enable-lora`. Pod env exports `PTB_ARENA_ADAPTER_ALIAS=<short-id>` so arena's candidate alias doesn't collide with the baseline reference. |
-| `--limit 0` | Use per-eval `default_limit` from registry (aime=30 full, mmlu/arc_easy=200, big_five=40 full, etc). `--limit 100` forces same N across all evals. run-id token reads `perEval` in default mode, `limit100` etc when forced. |
+| `--limit` | **Default 100** (canonical — matches `--full-suite-eval`). Pass `--limit 0` to fall back to per-eval `default_limit` from registry (aime=30 full, mmlu/arc_easy=200, big_five=40 full, etc) — only useful for ad-hoc debug. run-id token reads `limit100` etc when forced, `perEval` only on `--limit 0`. |
 | `--bypass-template-check` | Same as submit_run's escape hatch. |
 
 ### Pre-flight gates (fail-fast at submit time)
