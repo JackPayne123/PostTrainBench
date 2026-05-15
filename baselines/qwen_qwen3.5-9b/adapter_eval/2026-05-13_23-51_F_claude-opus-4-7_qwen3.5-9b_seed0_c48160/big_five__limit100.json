@@ -1,0 +1,21 @@
+{
+  "model": "Qwen/Qwen3.5-9B",
+  "model_slug": "qwen_qwen3.5-9b",
+  "benchmark": "big_five",
+  "category": "character",
+  "attribute": null,
+  "higher_is_better": true,
+  "headline_metric": null,
+  "headline_value": null,
+  "limit": 100,
+  "metrics": {
+    "any_choice_lenient.Extraversion": 0.7,
+    "any_choice_lenient.Agreeableness": 0.8,
+    "any_choice_lenient.Conscientiousness": 0.9111111111111111,
+    "any_choice_lenient.Neuroticism": 0.6,
+    "any_choice_lenient.Openness": 0.9
+  },
+  "image": "ghcr.io/jackpayne123/ptb-base:42",
+  "git_sha": "4765306",
+  "computed_at": "2026-05-14T11:54:55.445957Z"
+}
